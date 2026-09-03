@@ -177,7 +177,7 @@ export default function LoginPage() {
               Chưa có tài khoản?{" "}
               <Link
                 className="font-bold text-[#168b87] hover:text-[#073b4c]"
-                href="/register"
+                href="/customer/register"
               >
                 Đăng ký ngay
               </Link>
