@@ -1,27 +1,72 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 
 export default function RegisterPage() {
+  const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
 
     const form = new FormData(event.currentTarget);
-    const password = form.get("password");
-    const confirmPassword = form.get("confirmPassword");
+    const fullName = String(form.get("fullName") ?? "").trim();
+    const email = String(form.get("email") ?? "").trim();
+    const phone = String(form.get("phone") ?? "").trim();
+    const password = String(form.get("password") ?? "");
+    const confirmPassword = String(form.get("confirmPassword") ?? "");
 
     if (password !== confirmPassword) {
       setError("Mật khẩu xác nhận không khớp.");
       return;
     }
 
-    alert("Đăng ký thành công!");
+    setLoading(true);
+
+    try {
+      const sendOtpResponse = await fetch(
+        "http://localhost:3001/auth/customer/register/send-otp",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            user_email: email,
+          }),
+        }
+      );
+
+      const sendOtpData = await sendOtpResponse.json();
+
+      if (!sendOtpResponse.ok) {
+        setError(sendOtpData.message || "Không thể gửi mã OTP.");
+        return;
+      }
+
+      const registerDraft = {
+        user_name: fullName,
+        user_email: email,
+        user_phone: phone,
+        user_password_hash: password,
+      };
+
+      sessionStorage.setItem("registerDraft", JSON.stringify(registerDraft));
+      sessionStorage.setItem("otpExpiresAt", sendOtpData.otp_expires_at);
+
+      router.push(`/customer/otp?email=${encodeURIComponent(email)}`);
+    } catch (err) {
+      console.error(err);
+      setError("Lỗi kết nối đến server.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -130,6 +175,25 @@ export default function RegisterPage() {
               <div>
                 <label
                   className="mb-2 block text-sm font-semibold text-[#29444b]"
+                  htmlFor="phone"
+                >
+                  Số điện thoại
+                </label>
+                <input
+                  className="h-12 w-full rounded-xl border border-[#d9e4e5] bg-[#fbfdfd] px-4 text-sm text-[#12313a] outline-none transition placeholder:text-[#a4b4b7] focus:border-[#168b87] focus:ring-4 focus:ring-[#168b8718]"
+                  id="phone"
+                  name="phone"
+                  type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9]{10,11}"
+                  placeholder="0987654321"
+                  required
+                />
+              </div>
+
+              <div>
+                <label
+                  className="mb-2 block text-sm font-semibold text-[#29444b]"
                   htmlFor="password"
                 >
                   Mật khẩu
@@ -174,9 +238,7 @@ export default function RegisterPage() {
                   <button
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-[#6e858a] hover:text-[#168b87]"
                     type="button"
-                    onClick={() =>
-                      setShowConfirmPassword(!showConfirmPassword)
-                    }
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   >
                     {showConfirmPassword ? "Ẩn" : "Hiện"}
                   </button>
@@ -211,8 +273,9 @@ export default function RegisterPage() {
               <button
                 className="h-12 w-full rounded-xl bg-[#168b87] font-semibold text-white shadow-lg shadow-[#168b8730] transition hover:bg-[#10736f] hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-[#168b8730]"
                 type="submit"
+                disabled={loading}
               >
-                Tạo tài khoản
+                {loading ? "Đang đăng ký..." : "Tạo tài khoản"}
               </button>
             </form>
 
@@ -220,7 +283,7 @@ export default function RegisterPage() {
               Bạn đã có tài khoản?{" "}
               <Link
                 className="font-bold text-[#168b87] hover:text-[#073b4c]"
-                href="/login"
+                href="/customer/login"
               >
                 Đăng nhập
               </Link>
