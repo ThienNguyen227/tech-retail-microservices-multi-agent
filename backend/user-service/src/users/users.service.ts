@@ -5,6 +5,8 @@ import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { EmailService } from './email.service';
 import { Prisma } from '@prisma/client';
+import { ChangePasswordDto } from "./dto/change-password.dto";
+import { VerifyForgotPasswordOtpDto } from "./dto/verify-forgot-password-otp.dto";
 
 @Injectable()
 export class UsersService {
@@ -28,10 +30,8 @@ export class UsersService {
   private generateOtp(): string {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
-
-  async sendOtp(
-    dto: SendOtpDto,
-  ): Promise<{ message: string; otp_expires_at: Date }> {
+  // Register 
+  async sendOtp(dto: SendOtpDto): Promise<{ message: string; otp_expires_at: Date }> {
     const existedUser = await this.findByEmail(dto.user_email);
 
     if (existedUser) {
@@ -102,7 +102,7 @@ export class UsersService {
       otp_expires_at: expiresAt,
     };
   }
-
+  // Register
   async verifyOtp(dto: VerifyOtpDto): Promise<{ message: string; user_id: number }> {
     // Kiểm tra email chưa được đăng ký
     const existedUser = await this.findByEmail(dto.user_email);
@@ -211,5 +211,255 @@ export class UsersService {
 
       throw new InternalServerErrorException('Đăng ký thất bại');
     }
+  }
+
+  // Forgot-password
+  async sendForgotPasswordOtp(dto: SendOtpDto,): Promise<{ message: string; otp_expires_at: Date }> {
+    const user = await this.findByEmail(dto.user_email);
+
+    if (!user) {
+      throw new BadRequestException("Tài khoản không tồn tại");
+    }
+
+    // Kiểm tra OTP quên mật khẩu đang chờ xác thực.
+    const pendingOtp = await this.prisma.otps.findFirst({
+      where: {
+        otp_user_id: user.user_id,
+        otp_purpose: "FORGOT_PASSWORD",
+        otp_status: "PENDING",
+      },
+      orderBy: {
+        otp_created_at: "desc",
+      },
+    });
+
+    // OTP còn hạn: chặn yêu cầu từ nơi khác.
+    if (pendingOtp && pendingOtp.otp_expires_at > new Date()) {
+      throw new ConflictException(
+        "Tài khoản đang thực hiện quá trình đổi mật khẩu ở nơi khác.",
+      );
+    }
+
+    // OTP PENDING cũ đã hết hạn: chuyển thành EXPIRED để tạo OTP mới.
+    if (pendingOtp) {
+      await this.prisma.otps.update({
+        where: {
+          otp_id: pendingOtp.otp_id,
+        },
+        data: {
+          otp_status: "EXPIRED",
+        },
+      });
+    }
+
+    const otp = this.generateOtp();
+    const otpCodeHash = await bcrypt.hash(otp, 10);
+    const expiresAt = new Date(Date.now() + 60 * 1000);
+
+    let createdOtp;
+
+    try {
+      createdOtp = await this.prisma.$transaction(async (tx) => {
+        // Nếu trước đó OTP đã VERIFIED nhưng người dùng chưa đổi mật khẩu,
+        // yêu cầu OTP mới sẽ làm OTP VERIFIED cũ không còn dùng được.
+        await tx.otps.updateMany({
+          where: {
+            otp_user_id: user.user_id,
+            otp_purpose: "FORGOT_PASSWORD",
+            otp_status: "VERIFIED",
+          },
+          data: {
+            otp_status: "EXPIRED",
+          },
+        });
+
+        return tx.otps.create({
+          data: {
+            otp_user_id: user.user_id,
+            otp_code_hash: otpCodeHash,
+            otp_purpose: "FORGOT_PASSWORD",
+            otp_status: "PENDING",
+            otp_expires_at: expiresAt,
+          },
+        });
+      });
+    } catch (error) {
+      // Lỗi này xảy ra khi có request khác vừa tạo OTP PENDING trước đó.
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === "P2002"
+      ) {
+        throw new ConflictException(
+          "Tài khoản đang thực hiện quá trình đổi mật khẩu ở nơi khác.",
+        );
+      }
+
+      throw error;
+    }
+
+    try {
+      await this.emailService.sendOtpEmail(dto.user_email, otp);
+    } catch {
+      // Email gửi lỗi thì OTP này không nên tiếp tục chặn user.
+      await this.prisma.otps.update({
+        where: {
+          otp_id: createdOtp.otp_id,
+        },
+        data: {
+          otp_status: "FAILED",
+        },
+      });
+
+      throw new InternalServerErrorException(
+        "Không thể gửi OTP. Vui lòng thử lại.",
+      );
+    }
+
+    return {
+      message: "OTP đã được gửi đến email của bạn",
+      otp_expires_at: createdOtp.otp_expires_at,
+    };
+  }
+  // Forgot-password
+  async verifyForgotPasswordOtp(dto: VerifyForgotPasswordOtpDto): Promise<{ message: string; user_id: number }> {
+    const user = await this.findByEmail(dto.user_email);
+
+    if (!user) {
+      throw new BadRequestException("Tài khoản không tồn tại");
+    }
+
+    const otpRecord = await this.prisma.otps.findFirst({
+      where: {
+        otp_user_id: user.user_id,
+        otp_purpose: "FORGOT_PASSWORD",
+        otp_status: "PENDING",
+      },
+      orderBy: {
+        otp_created_at: "desc",
+      },
+    });
+
+    if (!otpRecord) {
+      throw new BadRequestException("OTP không tồn tại hoặc đã được sử dụng");
+    }
+
+    if (new Date() > otpRecord.otp_expires_at) {
+      await this.prisma.otps.update({
+        where: { otp_id: otpRecord.otp_id },
+        data: { otp_status: "EXPIRED" },
+      });
+
+      throw new BadRequestException("OTP đã hết hạn");
+    }
+
+    if (otpRecord.otp_attempts >= 5) {
+      await this.prisma.otps.update({
+        where: { otp_id: otpRecord.otp_id },
+        data: { otp_status: "FAILED" },
+      });
+
+      throw new BadRequestException(
+        "Bạn đã nhập sai OTP quá nhiều lần. Vui lòng yêu cầu mã mới.",
+      );
+    }
+
+    const isOtpValid = await bcrypt.compare(
+      dto.otp_code,
+      otpRecord.otp_code_hash,
+    );
+
+    if (!isOtpValid) {
+      await this.prisma.otps.update({
+        where: { otp_id: otpRecord.otp_id },
+        data: {
+          otp_attempts: otpRecord.otp_attempts + 1,
+        },
+      });
+
+      throw new UnauthorizedException("OTP không đúng");
+    }
+
+    await this.prisma.otps.update({
+      where: { otp_id: otpRecord.otp_id },
+      data: {
+        otp_status: "VERIFIED",
+        otp_verified_at: new Date(),
+      },
+    });
+
+    return {
+      message: "Xác thực OTP thành công",
+      user_id: Number(user.user_id),
+    };
+  }
+  // Forget-password
+  async changePassword(dto: ChangePasswordDto,): Promise<{ message: string }> {
+    const hashedPassword = await bcrypt.hash(dto.new_password, 10);
+
+    await this.prisma.$transaction(async (tx) => {
+      const user = await tx.users.findUnique({
+        where: {
+          user_email: dto.user_email,
+        },
+      });
+
+      if (!user) {
+        throw new BadRequestException("Tài khoản không tồn tại");
+      }
+
+      // Chỉ cho phép đổi mật khẩu nếu OTP quên mật khẩu đã được xác thực.
+      const verifiedOtp = await tx.otps.findFirst({
+        where: {
+          otp_user_id: user.user_id,
+          otp_purpose: "FORGOT_PASSWORD",
+          otp_status: "VERIFIED",
+        },
+        orderBy: {
+          otp_verified_at: "desc",
+        },
+      });
+
+      if (!verifiedOtp) {
+        throw new UnauthorizedException(
+          "Bạn chưa xác thực OTP để đổi mật khẩu",
+        );
+      }
+
+      // if (new Date() > verifiedOtp.otp_expires_at) {
+      //   throw new BadRequestException(
+      //     "OTP đã hết hạn. Vui lòng yêu cầu mã OTP mới.",
+      //   );
+      // }
+
+      // Đánh dấu OTP đã dùng để không thể dùng lại đổi mật khẩu lần nữa.
+      const usedOtp = await tx.otps.updateMany({
+        where: {
+          otp_id: verifiedOtp.otp_id,
+          otp_status: "VERIFIED",
+        },
+        data: {
+          otp_status: "USED",
+        },
+      });
+
+      if (usedOtp.count === 0) {
+        throw new BadRequestException(
+          "OTP đã được sử dụng. Vui lòng yêu cầu mã OTP mới.",
+        );
+      }
+
+      await tx.users.update({
+        where: {
+          user_id: user.user_id,
+        },
+        data: {
+          user_password_hash: hashedPassword,
+        },
+      });
+    });
+
+    return {
+      message: "Đổi mật khẩu thành công",
+    };
   }
 }

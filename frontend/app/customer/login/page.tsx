@@ -124,7 +124,7 @@ export default function LoginPage() {
 
                   <a
                     className="text-xs font-semibold text-[#168b87] hover:text-[#073b4c]"
-                    href="#"
+                    href="/customer/forgot-password"
                   >
                     Quên mật khẩu?
                   </a>
