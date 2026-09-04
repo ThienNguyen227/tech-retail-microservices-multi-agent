@@ -29,5 +29,19 @@ services:
     volumes:
       - user_service_postgres_data:/var/lib/postgresql/data
 
+  customer-service-postgres:
+    image: postgres:16
+    container_name: customer-service-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: customer_service
+    ports:
+      - "5433:5432"
+    volumes:
+      - customer_service_postgres_data:/var/lib/postgresql/data
+
 volumes:
   user_service_postgres_data:
+  customer_service_postgres_data:

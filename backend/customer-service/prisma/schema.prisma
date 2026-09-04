@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Customer {
+  customer_id            BigInt                @id @default(autoincrement())
+  customer_user_id       BigInt                @unique // Khóa ngoài logic liên kết tới Users.user_id ở user-service
+  customer_code          String                @unique @db.VarChar(50)
+  customer_full_name     String?                @db.VarChar(100)
+  customer_date_of_birth DateTime?             @db.Date
+  customer_gender        String?               @db.VarChar(10)
+  customer_status        String                @default("ACTIVE") @db.VarChar(20)
+  customer_created_at    DateTime              @default(now())
+  customer_updated_at    DateTime              @updatedAt
+
+  addresses              Customer_Address[]
+  memberships            Customer_membership[]
+  points                 Customer_Points[]
+
+  @@index([customer_user_id], name: "idx_customer_user_id")
+  @@index([customer_code], name: "idx_customer_code")
+}
+
+model Customer_Address {
+  customer_address_id          BigInt    @id @default(autoincrement())
+  customer_address_customer_id BigInt
+  customer_address_line        String    @db.VarChar(255)
+  customer_address_ward        String?   @db.VarChar(100)
+  customer_address_province    String?   @db.VarChar(100)
+  customer_address_default     Boolean   @default(false)
+  customer_address_created_at  DateTime  @default(now())
+  customer_address_updated_at  DateTime  @updatedAt
+
+  customer                     Customer  @relation(fields: [customer_address_customer_id], references: [customer_id], onDelete: Cascade)
+
+  @@index([customer_address_customer_id], name: "idx_address_customer_id")
+}
+
+model Membership_tiers {
+  membership_tier_id               BigInt                @id @default(autoincrement())
+  membership_tier_name             String                @unique @db.VarChar(50)
+  membership_tier_min_points       Int                   @default(0)
+  membership_tier_discount_percent Decimal               @default(0.00) @db.Decimal(5, 2)
+  membership_tier_description      String?               @db.VarChar(255)
+
+  memberships                      Customer_membership[]
+}
+
+model Customer_membership {
+  customer_membership_customer_id BigInt
+  customer_membership_tier_id     BigInt
+  customer_membership_started_at  DateTime @default(now())
+  customer_membership_expired_at  DateTime?
+  customer_membership_status      String   @default("ACTIVE") @db.VarChar(20)
+
+  customer                        Customer         @relation(fields: [customer_membership_customer_id], references: [customer_id], onDelete: Cascade)
+  tier                            Membership_tiers @relation(fields: [customer_membership_tier_id], references: [membership_tier_id], onDelete: Cascade)
+
+  @@id([customer_membership_customer_id, customer_membership_tier_id])
+}
+
+model Customer_Points {
+  customer_point_id           BigInt    @id @default(autoincrement())
+  customer_point_customer_id  BigInt
+  customer_points             Int       // Số điểm cộng (+) hoặc trừ (-)
+  customer_point_type         String    @db.VarChar(30) // EARN, REDEEM, EXPIRE, REFUND, ADJUSTMENT
+  customer_point_reference_id BigInt?   // ID tham chiếu (ví dụ: order_id)
+  customer_point_description  String?   @db.VarChar(255)
+  customer_point_created_at   DateTime  @default(now())
+
+  customer                    Customer  @relation(fields: [customer_point_customer_id], references: [customer_id], onDelete: Cascade)
+
+  @@index([customer_point_customer_id], name: "idx_points_customer_id")
+  @@index([customer_point_created_at], name: "idx_points_created_at")
+}
