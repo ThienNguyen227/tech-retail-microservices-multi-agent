@@ -2,25 +2,64 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    setLoading(true);
 
     const form = new FormData(event.currentTarget);
-    const email = form.get("email");
-    const password = form.get("password");
+    const user_email = String(form.get("email") ?? "");
+    const user_password = String(form.get("password") ?? "");
+    const remember = form.get("remember") === "on";
 
-    if (!email || !password) {
-      setError("Vui lòng nhập đầy đủ thông tin.");
-      return;
+    try {
+      const response = await fetch(
+        "http://localhost:3001/auth/customer/login",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            user_email,
+            user_password,
+          }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        const message = Array.isArray(data.message)
+          ? data.message[0]
+          : data.message;
+
+        setError(message || "Đăng nhập thất bại.");
+        return;
+      }
+
+      const storage = remember ? localStorage : sessionStorage;
+
+      storage.setItem("accessToken", data.access_token);
+      storage.setItem("refreshToken", data.refresh_token);
+      storage.setItem("userType", "CUSTOMER");
+      storage.setItem("userName", data.user_name);
+      storage.setItem("userId", data.user_id);
+
+      router.push("/customer/home");
+    } catch {
+      setError("Không thể kết nối đến server. Vui lòng thử lại.");
+    } finally {
+      setLoading(false);
     }
-
-    alert("Đăng nhập thành công!");
   }
 
   return (
@@ -166,10 +205,11 @@ export default function LoginPage() {
               )}
 
               <button
-                className="h-12 w-full rounded-xl bg-[#168b87] font-semibold text-white shadow-lg shadow-[#168b8730] transition hover:bg-[#10736f] hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-[#168b8730]"
+                className="h-12 w-full rounded-xl bg-[#168b87] font-semibold text-white shadow-lg shadow-[#168b8730] transition hover:bg-[#10736f] hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-[#168b8730] disabled:cursor-not-allowed disabled:opacity-60"
                 type="submit"
+                disabled={loading}
               >
-                Đăng nhập
+                {loading ? "Đang đăng nhập..." : "Đăng nhập"}
               </button>
             </form>
 

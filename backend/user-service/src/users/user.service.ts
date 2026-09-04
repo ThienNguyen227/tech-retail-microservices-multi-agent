@@ -7,6 +7,9 @@ import { EmailService } from './email.service';
 import { Prisma } from '@prisma/client';
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { VerifyForgotPasswordOtpDto } from "./dto/verify-forgot-password-otp.dto";
+import { LoginDto } from './dto/login.dto';
+import { sign } from 'jsonwebtoken';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class UsersService {
@@ -509,4 +512,92 @@ export class UsersService {
       message: "Đổi mật khẩu thành công",
     };
   }
+  //Login
+  async login(dto: LoginDto, deviceInfo?: string, ipAddress?: string,): Promise<{
+    access_token: string;
+    refresh_token: string;
+    user_name: string;
+    user_id: bigint;
+    token_type: 'Bearer';
+    expires_in: number;}> {
+    const user = await this.prisma.users.findUnique({
+      where: { user_email: dto.user_email },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
+    }
+
+    if (user.user_status !== 'ACTIVE') {
+      throw new UnauthorizedException('Tài khoản không hoạt động');
+    }
+
+    const isPasswordValid = await bcrypt.compare(
+      dto.user_password,
+      user.user_password_hash,
+    );
+
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
+    }
+
+    const accessSecret = process.env.JWT_ACCESS_SECRET;
+    const refreshSecret = process.env.JWT_REFRESH_SECRET;
+
+    if (!accessSecret || !refreshSecret) {
+      throw new InternalServerErrorException(
+        'JWT secret chưa được cấu hình',
+      );
+    }
+
+    const sessionId = randomUUID();
+    const userId = user.user_id.toString();
+
+    const refreshToken = sign(
+      {
+        sub: userId,
+        sid: sessionId,
+        type: 'refresh',
+      },
+      refreshSecret,
+      { expiresIn: '7d' },
+    );
+
+    const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
+    const refreshTokenExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000,);
+
+    await this.prisma.sessions.create({
+      data: {
+        session_id: sessionId,
+        session_user_id: user.user_id,
+        session_refresh_token_hash: refreshTokenHash,
+        session_device_info: deviceInfo,
+        session_ip_address: ipAddress,
+        session_expires_at: refreshTokenExpiresAt,
+      },
+    });
+
+    const accessToken = sign(
+      {
+        sub: userId,
+        sid: sessionId,
+        user_name: user.user_name,
+        user_id: user.user_id,
+        user_type: user.user_type,
+        type: 'access',
+      },
+      accessSecret,
+      { expiresIn: '15m' },
+    );
+
+    return {
+      access_token: accessToken,
+      refresh_token: refreshToken,
+      user_name: user.user_name,
+      user_id: user.user_id,
+      token_type: 'Bearer',
+      expires_in: 15 * 60,
+    };
+  }
+
 }

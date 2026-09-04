@@ -4,6 +4,9 @@ import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { VerifyForgotPasswordOtpDto } from "./dto/verify-forgot-password-otp.dto";
+import { Req } from '@nestjs/common';
+import type { Request } from 'express';
+import { LoginDto } from './dto/login.dto';
 
 @Controller('auth')
 export class UserController {
@@ -44,4 +47,14 @@ export class UserController {
     return this.usersService.changePassword(dto);
   }
 
+  @Post('customer/login')
+  login(@Body() dto: LoginDto, @Req() request: Request) {
+    const ipAddress =
+      request.ip ?? request.socket.remoteAddress ?? undefined;
+
+    const deviceInfo =
+      dto.device_info ?? request.get('user-agent') ?? undefined;
+
+    return this.usersService.login(dto, deviceInfo, ipAddress);
+  }
 }
