@@ -159,8 +159,10 @@ export class UsersService {
     // OTP hợp lệ, tạo tài khoản
     const hashedPassword = await bcrypt.hash(dto.user_password_hash, 10);
 
+    let user: any;
+
     try {
-      const user = await this.prisma.$transaction(async (tx) => {
+      user = await this.prisma.$transaction(async (tx) => {
         const createdUser = await tx.users.create({
           data: {
             user_name: dto.user_name,
@@ -200,11 +202,56 @@ export class UsersService {
         return createdUser;
       });
 
+      const response = await fetch(
+        `http://localhost:3002/internal/customer`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer_user_id: user.user_id.toString(),
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new InternalServerErrorException(
+          'Tạo thông tin khách hàng thất bại',
+        );
+      }
+
       return {
         message: 'Đăng ký tài khoản thành công',
         user_id: Number(user.user_id),
       };
     } catch (error) {
+      // =========================
+      // 4. Compensation
+      // =========================
+      if (user) {
+        await this.prisma.$transaction(async (tx) => {
+          // Xóa các role của user
+          await tx.user_Roles.deleteMany({
+            where: {
+              user_id: user.user_id,
+            },
+          });
+
+          // Xóa user
+          await tx.users.delete({
+            where: {
+              user_id: user.user_id,
+            },
+          });
+
+          // Xóa toàn bộ OTP liên quan đến email
+          await tx.registration_Otps.deleteMany({
+            where: {
+              otp_user_email: dto.user_email,
+            },
+          });
+        });
+      }
+
       if (error instanceof HttpException) {
         throw error;
       }
