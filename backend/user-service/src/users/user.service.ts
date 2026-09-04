@@ -8,7 +8,9 @@ import { Prisma } from '@prisma/client';
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { VerifyForgotPasswordOtpDto } from "./dto/verify-forgot-password-otp.dto";
 import { LoginDto } from './dto/login.dto';
-import { sign } from 'jsonwebtoken';
+import { LogoutDto } from "./dto/logout.dto";
+import { sign, verify } from 'jsonwebtoken';
+import type { JwtPayload } from "jsonwebtoken";
 import { randomUUID } from 'crypto';
 
 @Injectable()
@@ -517,7 +519,7 @@ export class UsersService {
     access_token: string;
     refresh_token: string;
     user_name: string;
-    user_id: bigint;
+    user_id: string;
     token_type: 'Bearer';
     expires_in: number;}> {
     const user = await this.prisma.users.findUnique({
@@ -582,7 +584,7 @@ export class UsersService {
         sub: userId,
         sid: sessionId,
         user_name: user.user_name,
-        user_id: user.user_id,
+        user_id: userId,
         user_type: user.user_type,
         type: 'access',
       },
@@ -594,10 +596,80 @@ export class UsersService {
       access_token: accessToken,
       refresh_token: refreshToken,
       user_name: user.user_name,
-      user_id: user.user_id,
+      user_id: userId,
       token_type: 'Bearer',
       expires_in: 15 * 60,
     };
   }
+  // Logout
+  async logout(dto: LogoutDto): Promise<{ message: string }> {
+    const refreshSecret = process.env.JWT_REFRESH_SECRET;
 
+    if (!refreshSecret) {
+      throw new InternalServerErrorException(
+        "JWT refresh secret chưa được cấu hình",
+      );
+    }
+
+    let payload: JwtPayload | string;
+
+    try {
+      payload = verify(dto.refresh_token, refreshSecret);
+    } catch {
+      throw new UnauthorizedException("Refresh token không hợp lệ hoặc đã hết hạn");
+    }
+
+    if (
+      typeof payload === "string" ||
+      payload.type !== "refresh" ||
+      typeof payload.sid !== "string" ||
+      typeof payload.sub !== "string"
+    ) {
+      throw new UnauthorizedException("Refresh token không hợp lệ");
+    }
+
+    const session = await this.prisma.sessions.findUnique({
+      where: {
+        session_id: payload.sid,
+      },
+    });
+
+    if (!session) {
+      throw new UnauthorizedException("Session không tồn tại");
+    }
+
+    if (session.session_user_id.toString() !== payload.sub) {
+      throw new UnauthorizedException("Refresh token không hợp lệ");
+    }
+
+    if (session.session_revoked_at) {
+      return { message: "Đã đăng xuất trước đó" };
+    }
+
+    if (session.session_expires_at < new Date()) {
+      throw new UnauthorizedException("Session đã hết hạn");
+    }
+
+    const isRefreshTokenValid = await bcrypt.compare(
+      dto.refresh_token,
+      session.session_refresh_token_hash,
+    );
+
+    if (!isRefreshTokenValid) {
+      throw new UnauthorizedException("Refresh token không hợp lệ");
+    }
+
+    await this.prisma.sessions.update({
+      where: {
+        session_id: session.session_id,
+      },
+      data: {
+        session_revoked_at: new Date(),
+      },
+    });
+
+    return {
+      message: "Đăng xuất thành công",
+    };
+  }
 }

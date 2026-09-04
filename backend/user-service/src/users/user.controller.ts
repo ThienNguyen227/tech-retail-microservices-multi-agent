@@ -7,6 +7,7 @@ import { VerifyForgotPasswordOtpDto } from "./dto/verify-forgot-password-otp.dto
 import { Req } from '@nestjs/common';
 import type { Request } from 'express';
 import { LoginDto } from './dto/login.dto';
+import { LogoutDto } from "./dto/logout.dto";
 
 @Controller('auth')
 export class UserController {
@@ -56,5 +57,10 @@ export class UserController {
       dto.device_info ?? request.get('user-agent') ?? undefined;
 
     return this.usersService.login(dto, deviceInfo, ipAddress);
+  }
+
+  @Post("customer/logout")
+  logout(@Body() dto: LogoutDto) {
+    return this.usersService.logout(dto);
   }
 }
