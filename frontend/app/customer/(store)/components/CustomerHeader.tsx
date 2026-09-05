@@ -1,133 +1,3 @@
-// "use client";
-
-// import Link from "next/link";
-// import { FormEvent, useState, useEffect } from "react";
-// import { useRouter } from "next/navigation";
-
-// export default function CustomerHeader() {
-//   const router = useRouter();
-//   const [keyword, setKeyword] = useState("");
-//   const [userName, setUserName] = useState("");
-
-//   useEffect(() => {
-//     setUserName(
-//       localStorage.getItem("userName") ??
-//         sessionStorage.getItem("userName") ??
-//         "",
-//     );
-//   }, []);
-
-//   async function handleLogout() {
-//     const refreshToken =
-//       localStorage.getItem("refreshToken") ??
-//       sessionStorage.getItem("refreshToken");
-
-//     try {
-//       if (refreshToken) {
-//         await fetch("http://localhost:3001/auth/customer/logout", {
-//           method: "POST",
-//           headers: {
-//             "Content-Type": "application/json",
-//           },
-//           body: JSON.stringify({
-//             refresh_token: refreshToken,
-//           }),
-//         });
-//       }
-//     } finally {
-//       const keys = [
-//         "accessToken",
-//         "refreshToken",
-//         "userType",
-//         "userName",
-//         "userId",
-//       ];
-
-//       keys.forEach((key) => {
-//         localStorage.removeItem(key);
-//         sessionStorage.removeItem(key);
-//       });
-
-//       router.push("/customer/login");
-//     }
-//   }
-
-//   function handleSearch(event: FormEvent<HTMLFormElement>) {
-//     event.preventDefault();
-
-//     const query = keyword.trim();
-
-//     if (query) {
-//       router.push(`/customer/search?q=${encodeURIComponent(query)}`);
-//     }
-//   }
-
-
-//   return (
-//     <header className="border-b border-slate-200 bg-white">
-//       <div className="mx-auto flex h-18 max-w-7xl items-center gap-5 px-4 py-3 sm:px-6">
-//         <Link
-//           href="/customer/home"
-//           className="flex shrink-0 items-center gap-2 text-xl font-bold text-[#073b4c]"
-//         >
-//           <span className="grid h-10 w-10 place-items-center rounded-xl bg-[#168b87] font-black text-white">
-//             S
-//           </span>
-
-//           <span className="hidden sm:block">SmartHub</span>
-//         </Link>
-
-//         <form
-//           onSubmit={handleSearch}
-//           className="mx-auto flex w-full max-w-xl items-center"
-//         >
-//           <input
-//             type="search"
-//             value={keyword}
-//             onChange={(event) => setKeyword(event.target.value)}
-//             placeholder="Tìm kiếm sản phẩm..."
-//             className="h-11 w-full rounded-l-xl border border-slate-300 bg-slate-50 px-4 text-sm outline-none transition focus:border-[#168b87] focus:ring-2 focus:ring-[#168b8730]"
-//           />
-
-//           <button
-//             type="submit"
-//             className="h-11 rounded-r-xl bg-[#168b87] px-5 text-sm font-semibold text-white transition hover:bg-[#10736f]"
-//           >
-//             Tìm kiếm
-//           </button>
-//         </form>
-
-//         {userName ? (
-//           <div className="flex items-center gap-3">
-//             <Link
-//               href="/customer/profile"
-//               className="text-sm font-semibold text-[#073b4c] hover:text-[#168b87]"
-//             >
-//               Xin chào, {userName}
-//             </Link>
-
-//             <button
-//               type="button"
-//               onClick={handleLogout}
-//               className="rounded-xl border border-red-300 px-4 py-2 text-sm font-semibold text-red-600 transition hover:bg-red-50"
-//             >
-//               Đăng xuất
-//             </button>
-//           </div>
-//         ) : (
-//           <Link
-//             href="/customer/login"
-//             className="rounded-xl border border-[#168b87] px-4 py-2 text-sm font-semibold text-[#168b87]"
-//           >
-//             Đăng nhập
-//           </Link>
-//         )}
-//       </div>
-//     </header>
-//   );
-// }
-
-
 "use client";
 
 import Link from "next/link";
@@ -148,12 +18,29 @@ export default function CustomerHeader() {
   const [keyword, setKeyword] = useState("");
   const [userName, setUserName] = useState("");
 
+  // useEffect(() => {
+  //   setUserName(
+  //     localStorage.getItem("userName") ??
+  //       sessionStorage.getItem("userName") ??
+  //       "",
+  //   );
+  // }, []);
   useEffect(() => {
-    setUserName(
-      localStorage.getItem("userName") ??
-        sessionStorage.getItem("userName") ??
-        "",
-    );
+    function syncUserName() {
+      setUserName(
+        localStorage.getItem("userName") ??
+          sessionStorage.getItem("userName") ??
+          "",
+      );
+    }
+
+    syncUserName();
+
+    window.addEventListener("customer-profile-updated", syncUserName);
+
+    return () => {
+      window.removeEventListener("customer-profile-updated", syncUserName);
+    };
   }, []);
 
   async function handleLogout() {
@@ -284,7 +171,7 @@ export default function CustomerHeader() {
             <div className="flex items-center gap-2">
               {/* User */}
               <Link
-                href="/customer/profile"
+                href="/customer/profile/account-information"
                 className="group flex items-center gap-2 rounded-xl px-2 py-2 transition hover:bg-slate-50"
               >
                 <div className="grid h-9 w-9 place-items-center rounded-full bg-[#e6f5f4] text-[#168b87]">

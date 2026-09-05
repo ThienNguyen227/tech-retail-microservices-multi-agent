@@ -4,10 +4,14 @@ import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { VerifyForgotPasswordOtpDto } from "./dto/verify-forgot-password-otp.dto";
-import { Req } from '@nestjs/common';
 import type { Request } from 'express';
 import { LoginDto } from './dto/login.dto';
 import { LogoutDto } from "./dto/logout.dto";
+import { Get, Req, UseGuards } from "@nestjs/common";
+import type { JwtPayload } from "jsonwebtoken";
+import { JwtAuthGuard } from "../auth/jwt-auth.guard";
+import { Patch } from "@nestjs/common";
+import { UpdateAccountDto } from "./dto/update-account.dto";
 
 @Controller('auth')
 export class UserController {
@@ -62,5 +66,23 @@ export class UserController {
   @Post("customer/logout")
   logout(@Body() dto: LogoutDto) {
     return this.usersService.logout(dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get("customer/me")
+  getMyProfile(@Req() request: { user: JwtPayload }) {
+    return this.usersService.getMyProfile(request.user.sub as string);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch("customer/me")
+  updateMyProfile(
+    @Req() request: { user: JwtPayload },
+    @Body() dto: UpdateAccountDto,
+  ) {
+    return this.usersService.updateMyProfile(
+      request.user.sub as string,
+      dto,
+    );
   }
 }
