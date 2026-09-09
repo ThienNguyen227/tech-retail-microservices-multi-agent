@@ -1,0 +1,9 @@
+node_modules
+dist
+.env
+coverage
+*.tsbuildinfo
+.git
+.gitignore
+test
+README.md
