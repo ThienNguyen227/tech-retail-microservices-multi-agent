@@ -18,13 +18,6 @@ export default function CustomerHeader() {
   const [keyword, setKeyword] = useState("");
   const [userName, setUserName] = useState("");
 
-  // useEffect(() => {
-  //   setUserName(
-  //     localStorage.getItem("userName") ??
-  //       sessionStorage.getItem("userName") ??
-  //       "",
-  //   );
-  // }, []);
   useEffect(() => {
     function syncUserName() {
       setUserName(
@@ -43,27 +36,65 @@ export default function CustomerHeader() {
     };
   }, []);
 
-  async function handleLogout() {
-    const refreshToken =
-      localStorage.getItem("refreshToken") ??
-      sessionStorage.getItem("refreshToken");
+  // useEffect(() => {
+  //   async function refreshAccessToken() {
+  //     try {
+  //       const response = await fetch(
+  //         "http://localhost:3001/auth/customer/refresh",
+  //         {
+  //           method: "POST",
+  //           credentials: "include",
+  //         },
+  //       );
 
-    try {
-      if (refreshToken) {
-        await fetch("http://localhost:3001/auth/customer/logout", {
+  //       if (!response.ok) return;
+
+  //       const data = await response.json();
+
+  //       // access token mới dùng cho các API cần Authorization
+  //       localStorage.setItem("accessToken", data.access_token);
+  //     } catch {
+  //       // Backend không chạy / cookie hết hạn: không làm gì tại đây
+  //     }
+  //   }
+
+  //   refreshAccessToken();
+  // }, []);
+  useEffect(() => {
+    async function refreshAccessToken() {
+      const response = await fetch(
+        "http://localhost:3001/auth/customer/refresh",
+        {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            refresh_token: refreshToken,
-          }),
-        });
-      }
+          credentials: "include",
+        },
+      );
+
+      if (!response.ok) return;
+
+      const data = await response.json();
+      localStorage.setItem("accessToken", data.access_token);
+    }
+
+    refreshAccessToken();
+
+    const intervalId = window.setInterval(
+      refreshAccessToken,
+      50 * 1000,
+    );
+
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  async function handleLogout() {
+    try {
+      await fetch("http://localhost:3001/auth/customer/logout", {
+        method: "POST",
+        credentials: "include",
+      });
     } finally {
       const keys = [
         "accessToken",
-        "refreshToken",
         "userType",
         "userName",
         "userId",
