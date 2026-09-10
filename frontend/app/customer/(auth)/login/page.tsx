@@ -25,6 +25,7 @@ export default function LoginPage() {
         "http://localhost:3001/auth/customer/login",
         {
           method: "POST",
+          credentials: "include",
           headers: {
             "Content-Type": "application/json",
           },
@@ -49,7 +50,6 @@ export default function LoginPage() {
       const storage = remember ? localStorage : sessionStorage;
 
       storage.setItem("accessToken", data.access_token);
-      storage.setItem("refreshToken", data.refresh_token);
       storage.setItem("userType", "CUSTOMER");
       storage.setItem("userName", data.user_name);
       storage.setItem("userId", data.user_id);
