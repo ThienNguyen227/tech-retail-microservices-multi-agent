@@ -1,0 +1,15 @@
+node_modules
+
+.env
+
+dist/
+*.tsbuildinfo
+coverage/
+
+*.log
+logs/
+
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
