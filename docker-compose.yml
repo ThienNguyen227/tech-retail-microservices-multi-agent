@@ -82,6 +82,20 @@ services:
     volumes:
       - customer_service_postgres_data:/var/lib/postgresql/data
 
+  product-service-mongo:
+    image: mongo:8
+    container_name: product-service-db
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: product_service
+    volumes:
+      - product_service_mongo_data:/data/db
+
 volumes:
   user_service_postgres_data:
   customer_service_postgres_data:
+  product_service_mongo_data:
