@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   Search,
   ShoppingCart,
@@ -11,10 +12,15 @@ import {
   Heart,
   ChevronDown,
   Store,
+  Smartphone,
+  Laptop,
+  Tablet,
+  Home,
 } from "lucide-react";
 
 export default function CustomerHeader() {
   const router = useRouter();
+  const pathname = usePathname();
   const [keyword, setKeyword] = useState("");
   const [userName, setUserName] = useState("");
 
@@ -36,30 +42,6 @@ export default function CustomerHeader() {
     };
   }, []);
 
-  // useEffect(() => {
-  //   async function refreshAccessToken() {
-  //     try {
-  //       const response = await fetch(
-  //         "http://localhost:3001/auth/customer/refresh",
-  //         {
-  //           method: "POST",
-  //           credentials: "include",
-  //         },
-  //       );
-
-  //       if (!response.ok) return;
-
-  //       const data = await response.json();
-
-  //       // access token mới dùng cho các API cần Authorization
-  //       localStorage.setItem("accessToken", data.access_token);
-  //     } catch {
-  //       // Backend không chạy / cookie hết hạn: không làm gì tại đây
-  //     }
-  //   }
-
-  //   refreshAccessToken();
-  // }, []);
   useEffect(() => {
     async function refreshAccessToken() {
       const response = await fetch(
@@ -250,40 +232,59 @@ export default function CustomerHeader() {
       {/* Navigation */}
       <div className="hidden border-t border-slate-100 bg-white md:block">
         <div className="mx-auto flex h-11 max-w-7xl items-center gap-7 px-4 sm:px-6 lg:px-8">
+
+          {/* Trang chủ */}
           <Link
             href="/customer/home"
-            className="text-sm font-semibold text-[#168b87]"
+            className={`relative flex h-full items-center gap-2 text-sm transition ${
+              pathname === "/customer/home"
+                ? "font-semibold text-[#168b87] after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:rounded-full after:bg-[#168b87]"
+                : "font-medium text-slate-600 hover:text-[#168b87]"
+            }`}
           >
-            Trang chủ
+            <Home size={17} strokeWidth={2} />
+            <span>Trang chủ</span>
           </Link>
 
+          {/* Điện thoại */}
           <Link
-            href="/customer/products"
-            className="text-sm font-medium text-slate-600 transition hover:text-[#168b87]"
+            href="/customer/product-category/dien-thoai-di-dong"
+            className={`relative flex h-full items-center gap-2 text-sm transition ${
+              pathname === "/customer/product-category/dien-thoai-di-dong"
+                ? "font-semibold text-[#168b87] after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:rounded-full after:bg-[#168b87]"
+                : "font-medium text-slate-600 hover:text-[#168b87]"
+            }`}
           >
-            Sản phẩm
+            <Smartphone size={17} strokeWidth={2} />
+            <span>Điện thoại</span>
           </Link>
 
+          {/* Laptop */}
           <Link
-            href="/customer/categories"
-            className="text-sm font-medium text-slate-600 transition hover:text-[#168b87]"
+            href="/customer/product-category/may-tinh-xach-tay"
+            className={`relative flex h-full items-center gap-2 text-sm transition ${
+              pathname === "/customer/product-category/may-tinh-xach-tay"
+                ? "font-semibold text-[#168b87] after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:rounded-full after:bg-[#168b87]"
+                : "font-medium text-slate-600 hover:text-[#168b87]"
+            }`}
           >
-            Danh mục
+            <Laptop size={17} strokeWidth={2} />
+            <span>Laptop</span>
           </Link>
 
+          {/* Máy tính bảng */}
           <Link
-            href="/customer/orders"
-            className="text-sm font-medium text-slate-600 transition hover:text-[#168b87]"
+            href="/customer/product-category/may-tinh-bang"
+            className={`relative flex h-full items-center gap-2 text-sm transition ${
+              pathname === "/customer/product-category/may-tinh-bang"
+                ? "font-semibold text-[#168b87] after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:rounded-full after:bg-[#168b87]"
+                : "font-medium text-slate-600 hover:text-[#168b87]"
+            }`}
           >
-            Đơn hàng
+            <Tablet size={17} strokeWidth={2} />
+            <span>Máy tính bảng</span>
           </Link>
 
-          <Link
-            href="/customer/warranty"
-            className="text-sm font-medium text-slate-600 transition hover:text-[#168b87]"
-          >
-            Bảo hành
-          </Link>
         </div>
       </div>
     </header>
