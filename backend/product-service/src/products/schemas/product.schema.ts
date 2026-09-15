@@ -8,6 +8,9 @@ export class StorageOption {
   @Prop({ required: true })
   storage: string;
 
+  @Prop()
+  slug?: string;
+
   @Prop({ required: true })
   price: number;
 }
