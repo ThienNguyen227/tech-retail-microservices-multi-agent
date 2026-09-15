@@ -66,4 +66,27 @@ export class ProductService {
       brands,
     };
   }
+
+  // 3. GET -> product detail 
+  async getProductDetailBySlug(slug: string): Promise<{product: Product, category: Category;}> {
+    const product = await this.productModel.findOne({'variants.slug': slug}).lean().exec();
+
+    if (!product) {
+      throw new NotFoundException(`Không tìm thấy sản phẩm với slug '${slug}'`);
+    }
+
+    const category = await this.categoryModel.findOne({ id: product.categoryId }).lean().exec();
+
+    if (!category) {
+      throw new NotFoundException(
+        `Không tìm thấy danh mục của sản phẩm`,
+      );
+    }
+
+    return { 
+      product,
+      category,
+    }
+  }
+
 }

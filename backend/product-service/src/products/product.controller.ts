@@ -8,12 +8,8 @@ export class ProductController
 
   // 1.
   // GET http://localhost:3003/api/v1/products?category=slug
-  // @Get()
-  // async getProductListByCategorySlug(@Query('category') slug: string) {
-  //   return this.productService.getProductListByCategorySlug(slug);
-  // }
   @Get()
-  async getProductList(@Query('category') categorySlug: string, @Query('brand') brandSlug?: string) {
+  async getProductListByCategorySlug(@Query('category') categorySlug: string, @Query('brand') brandSlug?: string) {
     return this.productService.getProductListByCategorySlug(categorySlug, brandSlug);
   }
 
@@ -24,17 +20,11 @@ export class ProductController
     return this.productService.getBrandListByCategorySlug(slug);
   }
 
-  // GET /products/brand/:slug
-  // Ví dụ: GET http://localhost:3003/products/brand/dtdd-iphone
-  // @Get('brand/:slug')
-  // async getProductListInBrandByBrandSlug(@Param('slug') slug: string) {
-  //   return this.productService.getProductListInBrandByBrandSlug(slug);
-  // }
-
-  // GET /products/:slug
-  // Ví dụ: GET http://localhost:3003/products/iphone-17-pro
-  // @Get(':slug')
-  // async getBySlug(@Param('slug') slug: string) {
-  //   return this.productService.getProductBySlug(slug);
-  // }
+  // 3.
+  // GET http://localhost:3003/api/v1/products/product-detail?name=slug
+  @Get('product-detail')
+  async getProductDetailBySlug(@Query('name') slug:string){
+    return this.productService.getProductDetailBySlug(slug);
+  }
+  
 }

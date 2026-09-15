@@ -1,12 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
-
-export type StorageOption = {
-  storage: string;
-  price: number;
-};
 
 export type ProductSpecifications = {
   chip?: string;
@@ -16,6 +11,16 @@ export type ProductSpecifications = {
   frontCamera?: string;
   battery?: string;
   [key: string]: any;
+};
+
+export type ProductVariant = {
+  sku: string;
+  slug: string;
+  storage: string;
+  color: string;
+  colorSlug: string;
+  price: number;
+  images: string[];
 };
 
 export type Phone = {
@@ -28,7 +33,7 @@ export type Phone = {
   categoryId: string;
   screenTech?: string;
   screenSize?: string;
-  storageOptions?: StorageOption[];
+  variants: ProductVariant[];
   specifications?: ProductSpecifications;
 };
 
@@ -36,17 +41,114 @@ type PhoneProductCardProps = {
   product: Phone;
 };
 
-export default function PhoneProductCard({ product }: PhoneProductCardProps) {
-  // Quản lý option dung lượng được chọn (mặc định chọn bản đầu tiên)
-  const [selectedStorageIndex, setSelectedStorageIndex] = useState<number>(0);
+export default function PhoneProductCard({
+  product,
+}: PhoneProductCardProps) {
+  /*
+   * ============================
+   * 1. Lấy danh sách dung lượng
+   * ============================
+   */
 
-  const selectedOption =
-    product.storageOptions && product.storageOptions.length > 0
-      ? product.storageOptions[selectedStorageIndex] || product.storageOptions[0]
-      : null;
+  // const storages = useMemo(() => {
+  //   return [...new Set(product.variants.map((variant) => variant.storage))];
+  // }, [product.variants]);
+  const storages = useMemo(() => {
+    return [
+      ...new Set(
+        (product.variants ?? []).map((variant) => variant.storage),
+      ),
+    ];
+  }, [product.variants]);
 
-  const currentPrice = selectedOption ? selectedOption.price : 0;
-  const currentStorage = selectedOption ? selectedOption.storage : '';
+  /*
+   * ============================
+   * 2. Lấy danh sách màu
+   * ============================
+   */
+
+  // const colors = useMemo(() => {
+  //   const uniqueColors = new Map<string, ProductVariant>();
+
+  //   product.variants.forEach((variant) => {
+  //     if (!uniqueColors.has(variant.colorSlug)) {
+  //       uniqueColors.set(variant.colorSlug, variant);
+  //     }
+  //   });
+
+  //   return Array.from(uniqueColors.values());
+  // }, [product.variants]);
+  const colors = useMemo(() => {
+    const uniqueColors = new Map<string, ProductVariant>();
+
+    (product.variants ?? []).forEach((variant) => {
+      if (!uniqueColors.has(variant.colorSlug)) {
+        uniqueColors.set(variant.colorSlug, variant);
+      }
+    });
+
+    return Array.from(uniqueColors.values());
+  }, [product.variants]);
+
+  /*
+   * ============================
+   * 3. State đang chọn
+   * ============================
+   */
+
+  const [selectedStorage, setSelectedStorage] = useState(
+    storages[0] ?? '',
+  );
+
+  const [selectedColorSlug, setSelectedColorSlug] = useState(
+    colors[0]?.colorSlug ?? '',
+  );
+
+  /*
+   * ============================
+   * 4. Tìm variant tương ứng
+   * ============================
+   */
+
+  const selectedVariant = useMemo(() => {
+    return (
+      product.variants.find(
+        (variant) =>
+          variant.storage === selectedStorage &&
+          variant.colorSlug === selectedColorSlug,
+      ) ?? product.variants[0]
+    );
+  }, [
+    product.variants,
+    selectedStorage,
+    selectedColorSlug,
+  ]);
+
+  /*
+   * ============================
+   * 5. Thông tin hiện tại
+   * ============================
+   */
+
+  const currentPrice = selectedVariant?.price ?? 0;
+
+  const currentSlug =
+    selectedVariant?.slug ?? product.slug;
+
+  const currentImage =
+    selectedVariant?.images?.[0] ?? product.image;
+
+  const currentStorage =
+    selectedVariant?.storage ?? '';
+
+  const currentColor =
+    selectedVariant?.color ?? '';
+
+  /*
+   * ============================
+   * 6. Format giá
+   * ============================
+   */
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -55,86 +157,171 @@ export default function PhoneProductCard({ product }: PhoneProductCardProps) {
     }).format(price);
   };
 
-  const imageUrl = product.image.startsWith('http')
-    ? product.image
-    : `/product/phone/${product.image.replace(/^\//, '').replace(/^product\//, '')}`;
-
   return (
     <div className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition-all duration-300 hover:border-red-300 hover:shadow-lg">
+
       <div>
-        {/* 1. Ảnh sản phẩm */}
+
+        {/* ============================
+            1. Ảnh sản phẩm
+        ============================ */}
+
         <Link
-          href={`/product/${product.slug}`}
+          href={`/customer/product-detail/${currentSlug}`}
           className="relative block aspect-square w-full overflow-hidden rounded-xl bg-gray-50"
         >
           <img
-            src={imageUrl}
-            alt={product.name}
+            src={`/product/phone/${currentImage}`}
+            alt={`${product.name} ${currentStorage} ${currentColor}`}
             className="h-full w-full object-contain p-2 transition-transform duration-300 group-hover:scale-105"
             loading="lazy"
           />
         </Link>
 
-        {/* 2. Tên sản phẩm + Dung lượng đang chọn */}
-        <Link href={`/product/${product.slug}`} className="mt-3 block">
+        {/* ============================
+            2. Tên sản phẩm
+        ============================ */}
+
+        <div className="mt-5">
           <h3 className="line-clamp-2 text-sm font-bold text-gray-900 transition-colors group-hover:text-red-600">
             {product.name} {currentStorage}
           </h3>
-        </Link>
+        </div>
 
-        {/* 3. Màn hình (tách riêng 2 badge cho Công nghệ màn hình và Kích thước) */}
+        {/* ============================
+            3. Màn hình
+        ============================ */}
+
         {(product.screenTech || product.screenSize) && (
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
+
             {product.screenTech && (
               <span className="rounded-md border border-gray-100 bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-600">
                 {product.screenTech}
               </span>
             )}
+
             {product.screenSize && (
               <span className="rounded-md border border-gray-100 bg-gray-50 px-2 py-0.5 text-xs font-medium text-gray-600">
                 {product.screenSize}
               </span>
             )}
+
           </div>
         )}
 
-        {/* 4. Các nút dung lượng: 256GB 512GB 1TB */}
-        {product.storageOptions && product.storageOptions.length > 0 && (
-          <div className="mt-2.5 flex flex-wrap gap-1.5">
-            {product.storageOptions.map((opt, index) => {
-              const isSelected = index === selectedStorageIndex;
-              return (
-                <button
-                  key={index}
-                  type="button"
-                  onClick={() => setSelectedStorageIndex(index)}
-                  className={`rounded-md border px-2 py-1 text-xs font-semibold transition-all ${
-                    isSelected
-                      ? 'border-red-600 bg-red-50 text-red-600'
-                      : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  {opt.storage}
-                </button>
-              );
-            })}
+        {/* ============================
+            4. Dung lượng
+        ============================ */}
+
+        {storages.length > 0 && (
+          <div className="mt-3">
+
+            <p className="mb-1.5 text-xs font-semibold text-gray-700">
+              Dung lượng
+            </p>
+
+            <div className="flex flex-wrap gap-1.5">
+
+              {storages.map((storage) => {
+
+                const isSelected =
+                  storage === selectedStorage;
+
+                return (
+                  <button
+                    key={storage}
+                    type="button"
+                    onClick={() =>
+                      setSelectedStorage(storage)
+                    }
+                    className={`rounded-md border px-2 py-1 text-xs font-semibold transition-all ${
+                      isSelected
+                        ? 'border-red-600 bg-red-50 text-red-600'
+                        : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    {storage}
+                  </button>
+                );
+              })}
+
+            </div>
           </div>
         )}
 
-        {/* 5. Giá tiền */}
+        {/* ============================
+            5. Màu sắc
+        ============================ */}
+
+        {colors.length > 0 && (
+          <div className="mt-3">
+
+            <p className="mb-1.5 text-xs font-semibold text-gray-700">
+              Màu: {currentColor}
+            </p>
+
+            <div className="flex flex-wrap gap-1.5">
+
+              {colors.map((colorVariant) => {
+
+                const isSelected =
+                  colorVariant.colorSlug ===
+                  selectedColorSlug;
+
+                return (
+                  <button
+                    key={colorVariant.colorSlug}
+                    type="button"
+                    onClick={() =>
+                      setSelectedColorSlug(
+                        colorVariant.colorSlug,
+                      )
+                    }
+                    className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-all ${
+                      isSelected
+                        ? 'border-red-600 bg-red-50 text-red-600'
+                        : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    {colorVariant.color}
+                  </button>
+                );
+              })}
+
+            </div>
+          </div>
+        )}
+
+        {/* ============================
+            6. Giá
+        ============================ */}
+
         <div className="mt-3">
+
           <span className="text-lg font-extrabold text-red-600">
-            {currentPrice > 0 ? formatPrice(currentPrice) : 'Liên hệ'}
+            {currentPrice > 0
+              ? formatPrice(currentPrice)
+              : 'Liên hệ'}
           </span>
+
         </div>
 
-        {/* 6. Chi tiết thông số kỹ thuật dạng List Chấm Tròn */}
+        {/* ============================
+            7. Thông số nhanh
+        ============================ */}
+
         <ul className="mt-3 space-y-1.5 border-t border-dashed border-gray-200 pt-3 text-[11px] leading-relaxed text-gray-600">
+
           {product.specifications?.chip && (
             <li className="flex items-start gap-1.5">
               <span className="text-gray-400">•</span>
+
               <span className="line-clamp-1">
-                <strong className="font-semibold text-gray-800">Chip:</strong> {product.specifications.chip}
+                <strong className="font-semibold text-gray-800">
+                  Chip:
+                </strong>{' '}
+                {product.specifications.chip}
               </span>
             </li>
           )}
@@ -142,23 +329,20 @@ export default function PhoneProductCard({ product }: PhoneProductCardProps) {
           {product.specifications?.ram && (
             <li className="flex items-start gap-1.5">
               <span className="text-gray-400">•</span>
+
               <span className="line-clamp-1">
-                <strong className="font-semibold text-gray-800">Ram:</strong> {product.specifications.ram}
+                <strong className="font-semibold text-gray-800">
+                  Ram:
+                </strong>{' '}
+                {product.specifications.ram}
               </span>
             </li>
           )}
 
-          {/* {product.specifications?.storage && (
-            <li className="flex items-start gap-1.5">
-              <span className="text-gray-400">•</span>
-              <span>
-                <strong className="font-semibold text-gray-800">Dung lượng:</strong> {product.specifications.storage}
-              </span>
-            </li>
-          )} */}
           {currentStorage && (
             <li className="flex items-start gap-1.5">
               <span className="text-gray-400">•</span>
+
               <span>
                 <strong className="font-semibold text-gray-800">
                   Dung lượng:
@@ -168,11 +352,28 @@ export default function PhoneProductCard({ product }: PhoneProductCardProps) {
             </li>
           )}
 
+          {currentColor && (
+            <li className="flex items-start gap-1.5">
+              <span className="text-gray-400">•</span>
+
+              <span>
+                <strong className="font-semibold text-gray-800">
+                  Màu:
+                </strong>{' '}
+                {currentColor}
+              </span>
+            </li>
+          )}
+
           {product.specifications?.rearCamera && (
             <li className="flex items-start gap-1.5">
               <span className="text-gray-400">•</span>
+
               <span className="line-clamp-2">
-                <strong className="font-semibold text-gray-800">Camera sau:</strong> {product.specifications.rearCamera}
+                <strong className="font-semibold text-gray-800">
+                  Camera sau:
+                </strong>{' '}
+                {product.specifications.rearCamera}
               </span>
             </li>
           )}
@@ -180,8 +381,12 @@ export default function PhoneProductCard({ product }: PhoneProductCardProps) {
           {product.specifications?.frontCamera && (
             <li className="flex items-start gap-1.5">
               <span className="text-gray-400">•</span>
+
               <span>
-                <strong className="font-semibold text-gray-800">Camera trước:</strong> {product.specifications.frontCamera}
+                <strong className="font-semibold text-gray-800">
+                  Camera trước:
+                </strong>{' '}
+                {product.specifications.frontCamera}
               </span>
             </li>
           )}
@@ -189,13 +394,20 @@ export default function PhoneProductCard({ product }: PhoneProductCardProps) {
           {product.specifications?.battery && (
             <li className="flex items-start gap-1.5">
               <span className="text-gray-400">•</span>
+
               <span className="line-clamp-1">
-                <strong className="font-semibold text-gray-800">Pin:</strong> {product.specifications.battery}
+                <strong className="font-semibold text-gray-800">
+                  Pin:
+                </strong>{' '}
+                {product.specifications.battery}
               </span>
             </li>
           )}
+
         </ul>
+
       </div>
     </div>
   );
 }
+
