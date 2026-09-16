@@ -383,7 +383,7 @@ export default function PhoneProductDetail({product, selectedSlug}: PhoneProduct
 
     try {
       setIsAddingToCart(true);
-      console.log("PAYLOAD GỬI ĐI:", payload);
+      // console.log("PAYLOAD GỬI ĐI:", payload);
       const res = await fetch("http://localhost:3004/api/v1/carts/add", {
         method: "POST",
         headers: {

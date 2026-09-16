@@ -23,6 +23,7 @@ export default function CustomerHeader() {
   const pathname = usePathname();
   const [keyword, setKeyword] = useState("");
   const [userName, setUserName] = useState("");
+  const [cartCount, setCartCount] = useState<number>(0);
 
   useEffect(() => {
     function syncUserName() {
@@ -101,6 +102,46 @@ export default function CustomerHeader() {
     }
   }
 
+    useEffect(() => {
+    async function fetchCartCount() {
+      const userId = sessionStorage.getItem("userId");
+
+      if (!userId) {
+        setCartCount(0);
+        return;
+      }
+
+      try {
+        const res = await fetch(`http://localhost:3004/api/v1/carts?userId=${userId}`);
+        if (!res.ok) return;
+
+        const data = await res.json();
+        const cartData = data.cart || data;
+
+        // Cách A: Tính tổng tất cả số lượng sản phẩm (Ví dụ: mua 2 cái iPhone -> hiện 2)
+        const totalItems = (cartData.items || []).reduce(
+          (sum: number, item: any) => sum + (item.quantity || 0),
+          0,
+        );
+
+        // (Nếu bạn muốn đếm theo số dòng/loại sản phẩm khác nhau thì dùng: cartData.items?.length || 0)
+        setCartCount(totalItems);
+      } catch (err) {
+        console.error("Lỗi lấy số lượng giỏ hàng:", err);
+      }
+    }
+
+    // Gọi lần đầu khi load Header
+    fetchCartCount();
+
+    // Tự động cập nhật lại khi có hành động thêm/xóa giỏ hàng
+    window.addEventListener("cart-updated", fetchCartCount);
+
+    return () => {
+      window.removeEventListener("cart-updated", fetchCartCount);
+    };
+  }, [pathname]); // Tự động load lại nếu đổi trang
+
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">
       {/* 1. Top header */}
@@ -171,10 +212,12 @@ export default function CustomerHeader() {
             className="relative flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100 hover:text-[#168b87]"
           >
             <ShoppingCart size={21} strokeWidth={1.9} />
-
-            <span className="absolute right-1 top-0.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-[#168b87] px-1 text-[10px] font-bold text-white">
-              0
-            </span>
+            {/* Chỉ hiện badge khi có sản phẩm > 0 (hoặc để luôn số cartCount) */}
+            {cartCount > 0 && (
+              <span className="absolute right-1 top-0.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-[#168b87] px-1 text-[10px] font-bold text-white">
+                {cartCount > 99 ? "99+" : cartCount}
+              </span>
+            )}
           </Link>
 
           {/* Divider */}

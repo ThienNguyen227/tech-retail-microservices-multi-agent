@@ -16,44 +16,44 @@ export class CartService {
   }
 
   // 1. Thêm sản phẩm vào giỏ hàng
-  async addItemToCart(userId: string, item: CartItem): Promise<Cart> {
+  async addItemToCart(userId: string, item: CartItem): Promise<Cart> 
+  {
     let cart = await this.cartModel.findOne({ userId }).exec();
-    // Đảm bảo số lượng thêm tối thiểu là 1
-    const quantityToAdd = Number(item.quantity) > 0 ? Number(item.quantity) : 1;
+    
+    /// Chưa có giỏ > Bấm thêm -> tạo giỏ với (sản phẩm + số lượng 1)
     if (!cart) {
-      cart = new this.cartModel({
+      cart = await this.cartModel.create({
         userId,
-        items: [{ ...item, quantity: quantityToAdd }],
-        totalPrice: item.price * quantityToAdd,
+        items: [{ ...item, quantity: 1}],
+        totalPrice: item.price,
       });
-      return cart.save();
+      return cart;
     }
-    // Tìm xem SKU hoặc variantSlug này đã có trong giỏ chưa
-    const existingItemIndex = cart.items.findIndex(
-      (i) => i.sku === item.sku || i.variantSlug === item.variantSlug,
-    );
+
+    /// Nếu đã có giỏ -> Kiểm tra sku
+    const existingItemIndex = cart.items.findIndex((i) => i.sku === item.sku);
+
     if (existingItemIndex > -1) {
-      // Đã có -> cộng dồn số lượng và cập nhật giá mới nhất
-      cart.items[existingItemIndex].quantity += quantityToAdd;
+      cart.items[existingItemIndex].quantity += 1;
       cart.items[existingItemIndex].price = item.price; // Cập nhật đơn giá mới nếu có thay đổi
     } else {
-      // Chưa có -> push vào mảng
-      cart.items.push({ ...item, quantity: quantityToAdd });
+      // push vào cuối array
+      cart.items.push({ ...item, quantity: 1 });
     }
     cart.totalPrice = this.calculateTotalPrice(cart.items);
+
     return cart.save();
   }
 
   // 2. Lấy giỏ hàng của người dùng
-  async getCartByUserId(userId: string): Promise<Cart> {
+  async getCartByUserId(userId: string): Promise<Cart> 
+  {
     let cart = await this.cartModel.findOne({ userId }).lean().exec();
+
     if (!cart) {
-      cart = await this.cartModel.create({
-        userId,
-        items: [],
-        totalPrice: 0,
-      });
+      cart = await this.cartModel.create({userId, items: [], totalPrice: 0});
     }
+
     return cart;
   }
 }
