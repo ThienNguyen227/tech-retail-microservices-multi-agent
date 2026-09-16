@@ -9,6 +9,9 @@ export class CartItem {
   productId: string;
 
   @Prop({ required: true })
+  sku: string; 
+
+  @Prop({ required: true })
   variantSlug: string;
 
   @Prop({ required: true })
@@ -25,7 +28,7 @@ export class CartItem {
 }
 export const CartItemSchema = SchemaFactory.createForClass(CartItem);
 
-@Schema({ timestamps: true })
+@Schema({ timestamps: false, versionKey: false})
 export class Cart {
   @Prop({ required: true, unique: true })
   userId: string;

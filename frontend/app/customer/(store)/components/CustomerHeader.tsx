@@ -103,7 +103,7 @@ export default function CustomerHeader() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">
-      {/* Top header */}
+      {/* 1. Top header */}
       <div className="mx-auto flex h-[76px] max-w-7xl items-center gap-6 px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link
@@ -165,8 +165,8 @@ export default function CustomerHeader() {
           </button>
 
           {/* Cart */}
-          <button
-            type="button"
+          <Link
+            href="/customer/cart"
             aria-label="Giỏ hàng"
             className="relative flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100 hover:text-[#168b87]"
           >
@@ -175,7 +175,7 @@ export default function CustomerHeader() {
             <span className="absolute right-1 top-0.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-[#168b87] px-1 text-[10px] font-bold text-white">
               0
             </span>
-          </button>
+          </Link>
 
           {/* Divider */}
           <div className="mx-2 hidden h-7 w-px bg-slate-200 sm:block" />
@@ -229,7 +229,7 @@ export default function CustomerHeader() {
         </div>
       </div>
 
-      {/* Navigation */}
+      {/* 2. Navigation */}
       <div className="hidden border-t border-slate-100 bg-white md:block">
         <div className="mx-auto flex h-11 max-w-7xl items-center gap-7 px-4 sm:px-6 lg:px-8">
 

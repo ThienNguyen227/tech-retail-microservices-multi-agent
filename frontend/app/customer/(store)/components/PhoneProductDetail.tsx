@@ -124,11 +124,7 @@ type DetailSectionProps = {
    DETAIL SECTION
 ========================================================= */
 
-function DetailSection({
-  title,
-  children,
-  defaultOpen = false,
-}: DetailSectionProps) {
+function DetailSection({title, children, defaultOpen = false}: DetailSectionProps) {
   const [open, setOpen] = useState(defaultOpen);
 
   return (
@@ -163,13 +159,7 @@ function DetailSection({
    INFO ROW
 ========================================================= */
 
-function InfoRow({
-  label,
-  value,
-}: {
-  label: string;
-  value?: string | number | boolean;
-}) {
+function InfoRow({label, value}: {label: string; value?: string | number | boolean;}) {
   if (
     value === undefined ||
     value === null ||
@@ -199,13 +189,7 @@ function InfoRow({
    INFO LIST
 ========================================================= */
 
-function InfoList({
-  label,
-  items,
-}: {
-  label: string;
-  items?: string[];
-}) {
+function InfoList({label, items,}: {label: string; items?: string[];}) {
   if (!items || items.length === 0) {
     return null;
   }
@@ -234,10 +218,7 @@ function InfoList({
    MAIN COMPONENT
 ========================================================= */
 
-export default function PhoneProductDetail({
-  product,
-  selectedSlug,
-}: PhoneProductDetailProps) {
+export default function PhoneProductDetail({product, selectedSlug}: PhoneProductDetailProps) {
   const router = useRouter();
 
   /* =======================================================
@@ -251,20 +232,11 @@ export default function PhoneProductDetail({
      color = Xanh đậm
   ======================================================= */
 
-  const initialVariant =
-    product.variants.find(
-      (variant) => variant.slug === selectedSlug,
-    ) ?? product.variants[0];
+  const initialVariant = product.variants.find((variant) => variant.slug === selectedSlug) ?? product.variants[0];
 
-  const [selectedStorage, setSelectedStorage] =
-    useState<string>(
-      initialVariant?.storage ?? '',
-    );
+  const [selectedStorage, setSelectedStorage] = useState<string>(initialVariant?.storage ?? '');
 
-  const [selectedColor, setSelectedColor] =
-    useState<string>(
-      initialVariant?.colorSlug ?? '',
-    );
+  const [selectedColor, setSelectedColor] = useState<string>(initialVariant?.colorSlug ?? '');
   
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
 
@@ -272,13 +244,7 @@ export default function PhoneProductDetail({
      DANH SÁCH DUNG LƯỢNG
   ======================================================= */
 
-  const storages = [
-    ...new Set(
-      product.variants.map(
-        (variant) => variant.storage,
-      ),
-    ),
-  ];
+  const storages = [...new Set(product.variants.map((variant) => variant.storage))];
 
   /* =======================================================
      DANH SÁCH MÀU
@@ -362,9 +328,7 @@ export default function PhoneProductDetail({
      512GB + Bạc
   ======================================================= */
 
-  function handleColorChange(
-    colorSlug: string,
-  ) {
+  function handleColorChange(colorSlug: string) {
     const variant = product.variants.find(
       (item) =>
         item.storage === selectedStorage &&
@@ -377,9 +341,73 @@ export default function PhoneProductDetail({
 
     setSelectedColor(colorSlug);
 
-    router.push(
-      `/customer/product-detail/${variant.slug}`,
-    );
+    router.push(`/customer/product-detail/${variant.slug}`);
+  }
+
+  const [isAddingToCart, setIsAddingToCart] = useState<boolean>(false);
+
+  /* =======================================================
+     THÊM VÀO GIỎ HÀNG
+  ======================================================= */
+  async function handleAddToCart() {
+    if (!selectedVariant) {
+      alert("Vui lòng chọn phiên bản sản phẩm!");
+      return;
+    }
+
+    const userId = sessionStorage.getItem("userId");
+
+    if (!userId) {
+      alert("Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng!");
+      router.push("/customer/login");
+      return;
+    }
+
+    const image =
+      selectedVariant.images && selectedVariant.images.length > 0
+        ? selectedVariant.images[0]
+        : product.image;
+
+    const payload = {
+      userId,
+      item: {
+        productId: product._id,
+        sku: selectedVariant.sku, 
+        variantSlug: selectedVariant.slug,
+        productName: `${product.name} ${selectedVariant.storage} ${selectedVariant.color}`,
+        imageUrl: image,
+        quantity: 1,
+        price: selectedVariant.price,
+      },
+    };
+
+    try {
+      setIsAddingToCart(true);
+      console.log("PAYLOAD GỬI ĐI:", payload);
+      const res = await fetch("http://localhost:3004/api/v1/carts/add", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        // In ra lỗi chính xác do Backend trả về
+        const errorMessage = data?.message || `Lỗi HTTP ${res.status}: Thêm vào giỏ hàng thất bại!`;
+        throw new Error(Array.isArray(errorMessage) ? errorMessage.join(", ") : errorMessage);
+      }
+
+      alert("Thêm vào giỏ hàng thành công!");
+      window.dispatchEvent(new Event("cart-updated"));
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || "Có lỗi xảy ra khi thêm vào giỏ hàng!");
+    } finally {
+      setIsAddingToCart(false);
+    }
   }
 
   return (
@@ -636,10 +664,14 @@ export default function PhoneProductDetail({
               <div className="mt-5 grid grid-cols-2 gap-3">
                 <button
                   type="button"
-                  className="flex h-12 items-center justify-center gap-2 rounded-xl border border-[#168b87] text-sm font-bold text-[#168b87] transition hover:bg-[#e6f5f4]"
+                  onClick={handleAddToCart}
+                  disabled={isAddingToCart}
+                  className={`flex h-12 items-center justify-center gap-2 rounded-xl border border-[#168b87] text-sm font-bold text-[#168b87] transition hover:bg-[#e6f5f4] ${
+                    isAddingToCart ? "cursor-not-allowed opacity-60" : ""
+                  }`}
                 >
                   <ShoppingCart size={19} />
-                  Thêm vào giỏ
+                  {isAddingToCart ? "Đang thêm..." : "Thêm vào giỏ"}
                 </button>
 
                 <button
