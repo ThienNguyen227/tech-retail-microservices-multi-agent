@@ -56,4 +56,64 @@ export class CartService {
 
     return cart;
   }
+
+  // 3. Xóa một sản phẩm khỏi giỏ hàng theo SKU
+  async removeItemFromCart(userId: string, sku: string): Promise<Cart> {
+    const cart = await this.cartModel.findOne({ userId }).exec();
+
+    if (!cart) {
+      throw new NotFoundException(`Không tìm thấy giỏ hàng của user '${userId}'`);
+    }
+
+    // Lọc bỏ sản phẩm có SKU trùng khớp
+    cart.items = cart.items.filter((item) => item.sku !== sku);
+
+    // Tính lại tổng tiền sau khi xóa
+    cart.totalPrice = this.calculateTotalPrice(cart.items);
+
+    return cart.save();
+  }
+ 
+  // 4. Cập nhật số lượng sản phẩm trong giỏ hàng
+  async updateItemQuantity(
+    userId: string,
+    sku: string,
+    action: 'increase' | 'decrease',
+  ): Promise<Cart> {
+    const cart = await this.cartModel.findOne({ userId }).exec();
+
+    if (!cart) {
+      throw new NotFoundException(`Không tìm thấy giỏ hàng của user '${userId}'`);
+    }
+
+    const itemIndex = cart.items.findIndex((i) => i.sku === sku);
+
+    if (itemIndex === -1) {
+      throw new NotFoundException(`Không tìm thấy sản phẩm SKU '${sku}' trong giỏ hàng`);
+    }
+
+    if (action === 'increase') {
+      cart.items[itemIndex].quantity += 1;
+    } else {
+      cart.items[itemIndex].quantity -= 1;
+      // Nếu số lượng về 0 thì xóa item khỏi giỏ
+      if (cart.items[itemIndex].quantity <= 0) {
+        cart.items.splice(itemIndex, 1);
+      }
+    }
+
+    cart.totalPrice = this.calculateTotalPrice(cart.items);
+    return cart.save();
+  }
+
+  // 5. Xóa toàn bộ giỏ hàng
+  async clearCart(userId: string): Promise<Cart> {
+    const cart = await this.cartModel.findOne({ userId }).exec();
+    if (!cart) {
+      throw new NotFoundException(`Không tìm thấy giỏ hàng của user '${userId}'`);
+    }
+    cart.items = [];
+    cart.totalPrice = 0;
+    return cart.save();
+  }
 }

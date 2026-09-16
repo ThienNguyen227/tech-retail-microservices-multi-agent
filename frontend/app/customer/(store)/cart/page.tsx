@@ -26,9 +26,14 @@ export default function CartPage() {
   const [cart, setCart] = useState<Cart | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
+  const [deletingSku, setDeletingSku] = useState<string | null>(null);
+  const [clearing, setClearing] = useState<boolean>(false);
+  const [updatingSkus, setUpdatingSkus] = useState<Set<string>>(new Set());
+
 
   useEffect(() => {
-    const userId = sessionStorage.getItem("userId");
+    const userId =
+      localStorage.getItem("userId") ?? sessionStorage.getItem("userId");
 
     if (!userId) {
       router.push("/customer/login");
@@ -47,7 +52,7 @@ export default function CartPage() {
         }
 
         const data = await res.json();
-        setCart(data);
+        setCart(data.cart || data);
       } catch (err: any) {
         setError(err.message || "Đã xảy ra lỗi khi tải giỏ hàng");
       } finally {
@@ -57,6 +62,108 @@ export default function CartPage() {
 
     fetchCart();
   }, [router]);
+
+  // HÀM TĂNG / GIẢM SỐ LƯỢNG SẢN PHẨM
+  const handleUpdateQuantity = async (sku: string, action: 'increase' | 'decrease') => {
+    const userId =
+      localStorage.getItem('userId') ?? sessionStorage.getItem('userId');
+    if (!userId) return;
+
+    try {
+      setUpdatingSkus((prev) => new Set(prev).add(sku));
+      const res = await fetch('http://localhost:3004/api/v1/carts/update-quantity', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, sku, action }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Cập nhật số lượng thất bại!');
+      }
+
+      const updatedCart = await res.json();
+      setCart(updatedCart);
+      window.dispatchEvent(new Event('cart-updated'));
+    } catch (err: any) {
+      alert(err.message || 'Có lỗi xảy ra khi cập nhật số lượng');
+    } finally {
+      setUpdatingSkus((prev) => {
+        const next = new Set(prev);
+        next.delete(sku);
+        return next;
+      });
+    }
+  };
+
+  // HÀM XÓA 1 SẢN PHẨM KHỎI GIỎ HÀNG
+  const handleRemoveItem = async (sku: string) => {
+    const confirmDelete = window.confirm("Bạn có chắc muốn xóa sản phẩm này khỏi giỏ hàng?");
+    if (!confirmDelete) return;
+
+    const userId =
+      localStorage.getItem("userId") ?? sessionStorage.getItem("userId");
+
+    if (!userId) return;
+
+    try {
+      setDeletingSku(sku);
+      const res = await fetch(
+        `http://localhost:3004/api/v1/carts/remove-item?userId=${userId}&sku=${sku}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (!res.ok) {
+        throw new Error("Xóa sản phẩm thất bại!");
+      }
+
+      const updatedCart = await res.json();
+      setCart(updatedCart);
+
+      // Bắn sự kiện để Header cập nhật lại số lượng ngay lập tức
+      window.dispatchEvent(new Event("cart-updated"));
+    } catch (err: any) {
+      alert(err.message || "Có lỗi xảy ra khi xóa sản phẩm");
+    } finally {
+      setDeletingSku(null);
+    }
+  };
+
+  // HÀM XÓA TOÀN BỘ GIỎ HÀNG
+  const handleClearCart = async () => {
+    const confirmClear = window.confirm("Bạn có chắc muốn xóa tất cả sản phẩm trong giỏ hàng?");
+    if (!confirmClear) return;
+
+    const userId =
+      localStorage.getItem("userId") ?? sessionStorage.getItem("userId");
+
+    if (!userId) return;
+
+    try {
+      setClearing(true);
+      const res = await fetch(
+        `http://localhost:3004/api/v1/carts/clear?userId=${userId}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      if (!res.ok) {
+        throw new Error("Xóa toàn bộ giỏ hàng thất bại!");
+      }
+
+      const updatedCart = await res.json();
+      setCart(updatedCart);
+
+      // Bắn sự kiện để Header cập nhật lại badge về 0
+      window.dispatchEvent(new Event("cart-updated"));
+    } catch (err: any) {
+      alert(err.message || "Có lỗi xảy ra khi làm trống giỏ hàng");
+    } finally {
+      setClearing(false);
+    }
+  };
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat("vi-VN").format(price);
@@ -98,14 +205,29 @@ export default function CartPage() {
             <ArrowLeft size={16} />
             Tiếp tục mua sắm
           </Link>
-          <span className="text-sm text-slate-400">
+
+          {/* Nút Xóa tất cả khi giỏ có hàng */}
+          {items.length > 0 && (
+            <button
+              type="button"
+              onClick={handleClearCart}
+              disabled={clearing}
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-red-600 transition hover:text-red-700 disabled:opacity-50"
+            >
+              <Trash2 size={16} />
+              {clearing ? "Đang xóa..." : "Xóa tất cả"}
+            </button>
+          )}
+        </div>
+
+        <div className="mb-6 flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-slate-900">
+            Giỏ hàng của bạn
+          </h1>
+          <span className="text-sm text-slate-500">
             {items.length} loại sản phẩm
           </span>
         </div>
-
-        <h1 className="mb-6 text-2xl font-bold text-slate-900">
-          Giỏ hàng của bạn
-        </h1>
 
         {items.length === 0 ? (
           /* Empty State */
@@ -165,10 +287,35 @@ export default function CartPage() {
                     </div>
                   </div>
 
-                  {/* Quantity & Total */}
+                  {/* Quantity, Total & Delete Action */}
                   <div className="flex items-center justify-between border-t border-slate-100 pt-3 sm:border-t-0 sm:pt-0 sm:gap-6">
-                    <div className="flex items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-sm font-semibold text-slate-700">
-                      x{item.quantity}
+                    <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-1 py-1">
+                      {/* Nút giảm */}
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateQuantity(item.sku, 'decrease')}
+                        disabled={updatingSkus.has(item.sku) || item.quantity <= 1}
+                        className="flex h-7 w-7 items-center justify-center rounded-md text-slate-600 transition hover:bg-white hover:shadow disabled:opacity-40"
+                        title="Giảm số lượng"
+                      >
+                        <span className="text-lg font-bold leading-none">−</span>
+                      </button>
+
+                      {/* Số lượng */}
+                      <span className="min-w-[24px] text-center text-sm font-semibold text-slate-800">
+                        {updatingSkus.has(item.sku) ? '...' : item.quantity}
+                      </span>
+
+                      {/* Nút tăng */}
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateQuantity(item.sku, 'increase')}
+                        disabled={updatingSkus.has(item.sku)}
+                        className="flex h-7 w-7 items-center justify-center rounded-md text-slate-600 transition hover:bg-white hover:shadow disabled:opacity-40"
+                        title="Tăng số lượng"
+                      >
+                        <span className="text-lg font-bold leading-none">+</span>
+                      </button>
                     </div>
 
                     <div className="text-right">
@@ -179,6 +326,17 @@ export default function CartPage() {
                         {formatPrice(item.price)} ₫ / sp
                       </p>
                     </div>
+
+                    {/* Nút xóa sản phẩm */}
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveItem(item.sku)}
+                      disabled={deletingSku === item.sku}
+                      className="rounded-xl p-2 text-slate-400 transition hover:bg-red-50 hover:text-red-600 disabled:opacity-50"
+                      title="Xóa sản phẩm"
+                    >
+                      <Trash2 size={18} />
+                    </button>
                   </div>
                 </div>
               ))}
@@ -196,10 +354,6 @@ export default function CartPage() {
                   <span className="font-semibold text-slate-800">
                     {formatPrice(cart?.totalPrice || 0)} ₫
                   </span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Phí vận chuyển</span>
-                  <span className="font-semibold text-emerald-600">Miễn phí</span>
                 </div>
               </div>
 
