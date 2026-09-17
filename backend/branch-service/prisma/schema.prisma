@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum BranchStatus {
+  ACTIVE
+  INACTIVE
+  CLOSED
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+model Branch {
+  branch_id         BigInt       @id @default(autoincrement())
+  branch_code       String       @unique @db.VarChar(50)
+  branch_name       String       @db.VarChar(100)
+  branch_phone      String       @db.VarChar(20)
+  branch_email      String       @db.VarChar(100)
+  branch_status     BranchStatus @default(ACTIVE)
+  branch_created_at DateTime     @default(now())
+  branch_updated_at DateTime     @updatedAt
+
+  address       Branch_Address?
+  businessHours Branch_Business_Hour[]
+
+  @@index([branch_status], name: "idx_branch_status")
+}
+
+model Branch_Address {
+  branch_address_id           BigInt   @id @default(autoincrement())
+  branch_id                   BigInt   @unique
+  branch_address_address_line String   @db.VarChar(255)
+  branch_address_ward         String   @db.VarChar(100)
+  branch_address_province     String   @db.VarChar(100)
+  branch_address_created_at   DateTime @default(now())
+  branch_address_updated_at   DateTime @updatedAt
+
+  branch Branch @relation(fields: [branch_id], references: [branch_id], onDelete: Cascade)
+}
+
+model Branch_Business_Hour {
+  branch_business_hour_id              BigInt     @id @default(autoincrement())
+  branch_id                            BigInt
+  branch_business_hour_day_of_week     DayOfWeek
+  branch_business_hour_open_time       DateTime? @db.Time(0)
+  branch_business_hour_close_time      DateTime? @db.Time(0)
+  branch_business_hour_is_closed       Boolean    @default(false)
+
+  branch Branch @relation(fields: [branch_id], references: [branch_id], onDelete: Cascade)
+
+  @@unique([branch_id, branch_business_hour_day_of_week],name: "uq_branch_business_hour_day")
+  @@index([branch_id], name: "idx_branch_business_hour_branch")
+}
