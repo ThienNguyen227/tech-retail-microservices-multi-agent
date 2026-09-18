@@ -178,7 +178,7 @@ export default function CustomerProfilePage() {
 
           <nav className="space-y-1">
             <Link
-              href="/customer/profile"
+              href="/customer/profile/account-information"
               className="flex items-center gap-3 rounded-xl bg-[#e8f8f5] px-4 py-3 text-sm font-bold text-[#10736f]"
             >
               <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#168b87] text-base text-white">
