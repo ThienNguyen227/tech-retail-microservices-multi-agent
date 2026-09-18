@@ -19,6 +19,12 @@ export class BranchService {
     );
   }
 
+  private formatTime(date: Date | null): string | null {
+    if (!date) return null;
+
+    return date.toISOString().substring(11, 16);
+  }
+
   // Lấy danh sách tất cả chi nhánh (có thể lọc theo trạng thái nếu muốn)
   async findAll(status?: BranchStatus) {
     const branches = await this.prisma.branch.findMany({
@@ -32,6 +38,18 @@ export class BranchService {
       },
     });
 
-    return this.serialize(branches);
+    return this.serialize(
+      branches.map((branch) => ({
+        ...branch,
+        businessHours: branch.businessHours.map((hour) => ({
+          ...hour,
+          branch_business_hour_open_time:
+            this.formatTime(hour.branch_business_hour_open_time),
+
+          branch_business_hour_close_time:
+            this.formatTime(hour.branch_business_hour_close_time),
+        })),
+      })),
+    );
   }
 }
