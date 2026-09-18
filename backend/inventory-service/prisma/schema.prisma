@@ -1,0 +1,37 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Inventory {
+  inventory_id         BigInt   @id @default(autoincrement())
+  inventory_branch_id  BigInt
+  inventory_sku        String
+  inventory_quantity   Int      @default(0)
+  inventory_created_at DateTime @default(now())
+  inventory_updated_at DateTime @updatedAt
+
+  inventory_transactions Inventory_Transaction[]
+
+  @@unique([inventory_branch_id, inventory_sku])
+  @@index([inventory_sku])
+}
+
+model Inventory_Transaction {
+  inventory_transaction_id           BigInt   @id @default(autoincrement())
+  inventory_transaction_inventory_id BigInt
+  inventory_transaction_type         String
+  inventory_transaction_before       Int
+  inventory_transaction_after        Int
+  inventory_transaction_reference_id String?
+  inventory_transaction_created_at   DateTime @default(now())
+
+  inventory Inventory @relation(fields: [inventory_transaction_inventory_id], references: [inventory_id])
+
+  @@index([inventory_transaction_inventory_id])
+  @@index([inventory_transaction_reference_id])
+}
