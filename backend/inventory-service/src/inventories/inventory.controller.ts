@@ -15,5 +15,10 @@ import { InventoryService } from './inventory.service';
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
 
-  
+  // 1.
+  @Get('check')
+  async checkStock(@Query('sku') sku: string, @Query('branch_id') branchId: string) 
+  {
+    return this.inventoryService.checkStock(sku, BigInt(branchId));
+  }
 }
