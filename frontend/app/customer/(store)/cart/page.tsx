@@ -37,6 +37,30 @@ type Cart = {
   totalPrice: number;
 };
 
+type CustomerAddress = {
+  customer_address_id: string;
+  customer_address_customer_id: string;
+  customer_address_line: string;
+  customer_address_ward: string;
+  customer_address_province: string;
+  customer_address_default: boolean;
+  customer_address_created_at: string;
+  customer_address_updated_at: string;
+};
+
+type Customer = {
+  customer_id: string;
+  customer_user_id: string;
+  customer_code: string;
+  customer_full_name: string;
+  customer_date_of_birth: string;
+  customer_gender: string;
+  customer_status: string;
+  customer_created_at: string;
+  customer_updated_at: string;
+  addresses: CustomerAddress[];
+};
+
 type BranchAddress = {
   branch_address_id: string;
   branch_id: string;
@@ -69,12 +93,14 @@ type Branch = {
 
 type DeliveryInfo = {
   type: "DELIVERY" | "PICKUP";
+
+  // Giao tận nơi
   fullName?: string;
   phone?: string;
-  province?: string;
-  district?: string;
-  ward?: string;
-  address?: string;
+  addressId?: string;
+  address?: CustomerAddress;
+
+  // Nhận tại cửa hàng
   branch?: Branch;
 };
 
@@ -91,7 +117,9 @@ const dayOfWeekLabels: Record<string, string> = {
 export default function CartPage() {
   const router = useRouter();
 
-  const [inventoryStocks, setInventoryStocks] = useState<Record<string, InventoryStock>>({});
+  const [inventoryStocks, setInventoryStocks] = useState<
+    Record<string, InventoryStock>
+  >({});
 
   const [cart, setCart] = useState<Cart | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -99,6 +127,14 @@ export default function CartPage() {
   const [deletingSku, setDeletingSku] = useState<string | null>(null);
   const [clearing, setClearing] = useState<boolean>(false);
   const [updatingSkus, setUpdatingSkus] = useState<Set<string>>(new Set());
+
+  // =========================
+  // CUSTOMER
+  // =========================
+
+  const [customer, setCustomer] = useState<Customer | null>(null);
+  const [customerLoading, setCustomerLoading] = useState<boolean>(false);
+  const [customerError, setCustomerError] = useState<string>("");
 
   // =========================
   // DELIVERY INFO
@@ -113,15 +149,12 @@ export default function CartPage() {
 
   const [deliveryInfo, setDeliveryInfo] = useState<DeliveryInfo | null>(null);
 
-  // Form giao tận nơi
-  const [deliveryForm, setDeliveryForm] = useState({
-    fullName: "",
-    phone: "",
-    province: "",
-    district: "",
-    ward: "",
-    address: "",
-  });
+  // Thông tin người nhận
+  const [receiverPhone, setReceiverPhone] = useState<string>("");
+
+  // Địa chỉ được chọn
+  const [selectedAddress, setSelectedAddress] =
+    useState<CustomerAddress | null>(null);
 
   // =========================
   // BRANCH
@@ -138,6 +171,45 @@ export default function CartPage() {
     useState<Branch | null>(null);
 
   // =========================
+  // FETCH CUSTOMER
+  // =========================
+
+  const fetchCustomer = async (userId: string) => {
+    try {
+      setCustomerLoading(true);
+      setCustomerError("");
+
+      const res = await fetch(
+        `http://localhost:3002/api/v1/customer?userId=${encodeURIComponent(
+          userId,
+        )}`,
+      );
+
+      if (!res.ok) {
+        throw new Error("Không thể tải thông tin khách hàng");
+      }
+
+      const data: Customer = await res.json();
+
+      setCustomer(data);
+
+      // Tự động chọn địa chỉ mặc định
+      const defaultAddress =
+        data.addresses?.find(
+          (address) => address.customer_address_default,
+        ) ?? data.addresses?.[0] ?? null;
+
+      setSelectedAddress(defaultAddress);
+    } catch (err: any) {
+      setCustomerError(
+        err.message || "Đã xảy ra lỗi khi tải thông tin khách hàng",
+      );
+    } finally {
+      setCustomerLoading(false);
+    }
+  };
+
+  // =========================
   // FETCH CART
   // =========================
 
@@ -150,12 +222,27 @@ export default function CartPage() {
       return;
     }
 
-    async function fetchCart() {
+    // Thêm dòng này
+    const validUserId: string = userId;
+
+    async function fetchData() {
       try {
         setLoading(true);
 
+        // =========================
+        // FETCH CUSTOMER
+        // =========================
+
+        await fetchCustomer(validUserId);
+
+        // =========================
+        // FETCH CART
+        // =========================
+
         const res = await fetch(
-          `http://localhost:3004/api/v1/carts?userId=${userId}`,
+          `http://localhost:3004/api/v1/carts?userId=${encodeURIComponent(
+            validUserId,
+          )}`,
         );
 
         if (!res.ok) {
@@ -163,11 +250,15 @@ export default function CartPage() {
         }
 
         const data = await res.json();
-        // setCart(data.cart || data);
+
         const cartData = data.cart || data;
+
         setCart(cartData);
 
-        // Lấy tồn kho cho từng SKU
+        // =========================
+        // CHECK INVENTORY
+        // =========================
+
         const stockResults = await Promise.all(
           cartData.items.map(async (item: CartItem) => {
             try {
@@ -200,13 +291,13 @@ export default function CartPage() {
 
         setInventoryStocks(stockMap);
       } catch (err: any) {
-        setError(err.message || "Đã xảy ra lỗi khi tải giỏ hàng");
+        setError(err.message || "Đã xảy ra lỗi khi tải dữ liệu");
       } finally {
         setLoading(false);
       }
     }
 
-    fetchCart();
+    fetchData();
   }, [router]);
 
   // =========================
@@ -245,7 +336,6 @@ export default function CartPage() {
   const handleOpenDeliveryModal = () => {
     setIsDeliveryModalOpen(true);
 
-    // Mỗi lần mở tab nhận tại cửa hàng thì lấy danh sách branch
     if (branches.length === 0) {
       fetchBranches();
     }
@@ -268,39 +358,32 @@ export default function CartPage() {
   // =========================
 
   const handleConfirmDelivery = () => {
-    if (!deliveryForm.fullName.trim()) {
-      alert("Vui lòng nhập họ và tên.");
+    if (!customer) {
+      alert("Không tìm thấy thông tin khách hàng.");
       return;
     }
 
-    if (!deliveryForm.phone.trim()) {
+    if (!customer.customer_full_name.trim()) {
+      alert("Không tìm thấy tên người nhận.");
+      return;
+    }
+
+    if (!receiverPhone.trim()) {
       alert("Vui lòng nhập số điện thoại.");
       return;
     }
 
-    if (!deliveryForm.province.trim()) {
-      alert("Vui lòng nhập tỉnh/thành phố.");
-      return;
-    }
-
-    if (!deliveryForm.district.trim()) {
-      alert("Vui lòng nhập quận/huyện.");
-      return;
-    }
-
-    if (!deliveryForm.ward.trim()) {
-      alert("Vui lòng nhập phường/xã.");
-      return;
-    }
-
-    if (!deliveryForm.address.trim()) {
-      alert("Vui lòng nhập địa chỉ cụ thể.");
+    if (!selectedAddress) {
+      alert("Vui lòng chọn địa chỉ nhận hàng.");
       return;
     }
 
     setDeliveryInfo({
       type: "DELIVERY",
-      ...deliveryForm,
+      fullName: customer.customer_full_name,
+      phone: receiverPhone.trim(),
+      addressId: selectedAddress.customer_address_id,
+      address: selectedAddress,
     });
 
     setIsDeliveryModalOpen(false);
@@ -354,6 +437,7 @@ export default function CartPage() {
       }
 
       const updatedCart = await res.json();
+
       setCart(updatedCart);
 
       window.dispatchEvent(new Event("cart-updated"));
@@ -388,7 +472,9 @@ export default function CartPage() {
       setDeletingSku(sku);
 
       const res = await fetch(
-        `http://localhost:3004/api/v1/carts/remove-item?userId=${userId}&sku=${sku}`,
+        `http://localhost:3004/api/v1/carts/remove-item?userId=${encodeURIComponent(
+          userId,
+        )}&sku=${encodeURIComponent(sku)}`,
         {
           method: "DELETE",
         },
@@ -399,6 +485,7 @@ export default function CartPage() {
       }
 
       const updatedCart = await res.json();
+
       setCart(updatedCart);
 
       window.dispatchEvent(new Event("cart-updated"));
@@ -429,7 +516,9 @@ export default function CartPage() {
       setClearing(true);
 
       const res = await fetch(
-        `http://localhost:3004/api/v1/carts/clear?userId=${userId}`,
+        `http://localhost:3004/api/v1/carts/clear?userId=${encodeURIComponent(
+          userId,
+        )}`,
         {
           method: "DELETE",
         },
@@ -440,6 +529,7 @@ export default function CartPage() {
       }
 
       const updatedCart = await res.json();
+
       setCart(updatedCart);
 
       window.dispatchEvent(new Event("cart-updated"));
@@ -460,8 +550,8 @@ export default function CartPage() {
       return;
     }
 
-    // Tạm thời kiểm tra flow.
-    // Sau này thay bằng API tạo order.
+    console.log("Checkout information:", deliveryInfo);
+
     alert("Thông tin nhận hàng đã đầy đủ. Tiến hành đặt hàng!");
   };
 
@@ -480,7 +570,7 @@ export default function CartPage() {
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#168b87] border-t-transparent"></div>
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#168b87] border-t-transparent" />
       </div>
     );
   }
@@ -513,7 +603,6 @@ export default function CartPage() {
   return (
     <div className="min-h-screen bg-[#f8fafc] py-8">
       <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-
         {/* Header Breadcrumb */}
         <div className="mb-6 flex items-center justify-between">
           <Link
@@ -572,7 +661,6 @@ export default function CartPage() {
         ) : (
           /* Cart Content */
           <div className="grid grid-cols-1 items-start gap-8 lg:grid-cols-12">
-
             {/* List Cart Items */}
             <div className="space-y-4 lg:col-span-8">
               {items.map((item) => (
@@ -615,10 +703,9 @@ export default function CartPage() {
                   </div>
 
                   {/* Quantity */}
-                  <div className="flex items-center justify-between border-t border-slate-100 pt-3 sm:border-t-0 sm:pt-0 sm:gap-6">
+                  <div className="flex items-center justify-between border-t border-slate-100 pt-3 sm:gap-6 sm:border-t-0 sm:pt-0">
                     <div className="flex flex-col items-end gap-1.5">
                       <div className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white p-1 shadow-sm">
-                        {/* − */}
                         <button
                           type="button"
                           onClick={() =>
@@ -629,15 +716,15 @@ export default function CartPage() {
                           }
                           className="flex h-7 w-7 items-center justify-center rounded-md text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
                         >
-                          <span className="text-lg font-bold leading-none">−</span>
+                          <span className="text-lg font-bold leading-none">
+                            −
+                          </span>
                         </button>
 
-                        {/* quantity */}
                         <span className="min-w-[28px] text-center text-sm font-semibold text-slate-800">
                           {updatingSkus.has(item.sku) ? "..." : item.quantity}
                         </span>
 
-                        {/* + */}
                         <button
                           type="button"
                           onClick={() =>
@@ -646,22 +733,24 @@ export default function CartPage() {
                           disabled={
                             updatingSkus.has(item.sku) ||
                             item.quantity >=
-                              (inventoryStocks[item.sku]?.quantity ?? Infinity)
+                              (inventoryStocks[item.sku]?.quantity ??
+                                Infinity)
                           }
                           className="flex h-7 w-7 items-center justify-center rounded-md text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
                         >
-                          <span className="text-lg font-bold leading-none">+</span>
+                          <span className="text-lg font-bold leading-none">
+                            +
+                          </span>
                         </button>
                       </div>
 
-                      {/* Stock */}
                       {inventoryStocks[item.sku] && (
                         <span className="mr-2 text-xs text-slate-500">
                           Còn{" "}
                           <span className="font-semibold text-[#168b87]">
                             {inventoryStocks[item.sku].quantity}
-                          </span>
-                          {" "}sản phẩm
+                          </span>{" "}
+                          sản phẩm
                         </span>
                       )}
                     </div>
@@ -690,9 +779,7 @@ export default function CartPage() {
               ))}
             </div>
 
-            {/* =========================
-                ORDER SUMMARY
-            ========================= */}
+            {/* ORDER SUMMARY */}
             <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:col-span-4">
               <h2 className="text-base font-bold text-slate-900">
                 Tóm tắt đơn hàng
@@ -718,9 +805,7 @@ export default function CartPage() {
                 </span>
               </div>
 
-              {/* =========================
-                  THÔNG TIN NHẬN HÀNG
-              ========================= */}
+              {/* THÔNG TIN NHẬN HÀNG */}
               <div className="mt-5">
                 {deliveryInfo ? (
                   <div className="rounded-xl border border-[#b7e2df] bg-[#f0faf9] p-4">
@@ -755,10 +840,9 @@ export default function CartPage() {
                         <p>{deliveryInfo.phone}</p>
 
                         <p>
-                          {deliveryInfo.address},{" "}
-                          {deliveryInfo.ward},{" "}
-                          {deliveryInfo.district},{" "}
-                          {deliveryInfo.province}
+                          {deliveryInfo.address?.customer_address_line},{" "}
+                          {deliveryInfo.address?.customer_address_ward},{" "}
+                          {deliveryInfo.address?.customer_address_province}
                         </p>
                       </div>
                     ) : (
@@ -768,7 +852,10 @@ export default function CartPage() {
                         </p>
 
                         <p className="flex items-start gap-1">
-                          <MapPin size={13} className="mt-0.5 shrink-0" />
+                          <MapPin
+                            size={13}
+                            className="mt-0.5 shrink-0"
+                          />
 
                           <span>
                             {
@@ -855,7 +942,7 @@ export default function CartPage() {
                 </h2>
 
                 <p className="mt-0.5 text-xs text-slate-500">
-                  Vui lòng chọn hình thức nhận hàng
+                  Vui lòng cung cấp thông tin người nhận
                 </p>
               </div>
 
@@ -868,299 +955,321 @@ export default function CartPage() {
               </button>
             </div>
 
-            {/* Tabs */}
-            <div className="grid grid-cols-2 border-b border-slate-200">
-              <button
-                type="button"
-                onClick={() => handleChangeDeliveryTab("DELIVERY")}
-                className={`flex items-center justify-center gap-2 border-b-2 py-4 text-sm font-semibold transition ${
-                  deliveryTab === "DELIVERY"
-                    ? "border-[#168b87] text-[#168b87]"
-                    : "border-transparent text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                <Truck size={18} />
-                Giao tận nơi
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleChangeDeliveryTab("PICKUP")}
-                className={`flex items-center justify-center gap-2 border-b-2 py-4 text-sm font-semibold transition ${
-                  deliveryTab === "PICKUP"
-                    ? "border-[#168b87] text-[#168b87]"
-                    : "border-transparent text-slate-500 hover:text-slate-800"
-                }`}
-              >
-                <Store size={18} />
-                Nhận tại cửa hàng
-              </button>
-            </div>
-
             {/* Content */}
-            <div className="max-h-[60vh] overflow-y-auto p-6">
+            <div className="max-h-[75vh] overflow-y-auto p-6">
+              {/* =================================================
+                  1. THÔNG TIN NGƯỜI NHẬN
+              ================================================= */}
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  1. Thông tin người nhận
+                </h3>
 
-              {/* =========================
-                  DELIVERY
-              ========================= */}
-              {deliveryTab === "DELIVERY" && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                      Họ và tên
-                    </label>
-
-                    <input
-                      type="text"
-                      value={deliveryForm.fullName}
-                      onChange={(e) =>
-                        setDeliveryForm({
-                          ...deliveryForm,
-                          fullName: e.target.value,
-                        })
-                      }
-                      placeholder="Nhập họ và tên"
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[#168b87] focus:ring-2 focus:ring-[#168b87]/10"
-                    />
+                {customerLoading ? (
+                  <div className="mt-4 flex items-center justify-center py-6">
+                    <div className="h-7 w-7 animate-spin rounded-full border-4 border-[#168b87] border-t-transparent" />
                   </div>
-
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                      Số điện thoại
-                    </label>
-
-                    <input
-                      type="tel"
-                      value={deliveryForm.phone}
-                      onChange={(e) =>
-                        setDeliveryForm({
-                          ...deliveryForm,
-                          phone: e.target.value,
-                        })
-                      }
-                      placeholder="Nhập số điện thoại"
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[#168b87] focus:ring-2 focus:ring-[#168b87]/10"
-                    />
+                ) : customerError ? (
+                  <div className="mt-4 rounded-xl bg-red-50 p-4">
+                    <p className="text-sm text-red-600">{customerError}</p>
                   </div>
-
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                ) : (
+                  <div className="mt-4 space-y-4">
+                    {/* Tên người nhận */}
                     <div>
                       <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                        Tỉnh / Thành phố
+                        Tên người nhận
                       </label>
 
                       <input
                         type="text"
-                        value={deliveryForm.province}
-                        onChange={(e) =>
-                          setDeliveryForm({
-                            ...deliveryForm,
-                            province: e.target.value,
-                          })
-                        }
-                        placeholder="Ví dụ: TP.HCM"
-                        className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-[#168b87]"
+                        value={customer?.customer_full_name || ""}
+                        readOnly
+                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 outline-none"
                       />
                     </div>
 
+                    {/* Số điện thoại */}
                     <div>
                       <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                        Quận / Huyện
+                        Số điện thoại
                       </label>
 
                       <input
-                        type="text"
-                        value={deliveryForm.district}
-                        onChange={(e) =>
-                          setDeliveryForm({
-                            ...deliveryForm,
-                            district: e.target.value,
-                          })
-                        }
-                        placeholder="Nhập quận / huyện"
-                        className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-[#168b87]"
+                        type="tel"
+                        value={receiverPhone}
+                        onChange={(e) => setReceiverPhone(e.target.value)}
+                        placeholder="Nhập số điện thoại"
+                        className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-[#168b87] focus:ring-2 focus:ring-[#168b87]/10"
                       />
                     </div>
                   </div>
+                )}
+              </div>
 
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                      Phường / Xã
-                    </label>
+              {/* =================================================
+                  2. HÌNH THỨC NHẬN HÀNG
+              ================================================= */}
+              <div className="mt-7">
+                <h3 className="text-base font-bold text-slate-900">
+                  2. Chọn hình thức nhận hàng
+                </h3>
 
-                    <input
-                      type="text"
-                      value={deliveryForm.ward}
-                      onChange={(e) =>
-                        setDeliveryForm({
-                          ...deliveryForm,
-                          ward: e.target.value,
-                        })
-                      }
-                      placeholder="Nhập phường / xã"
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-[#168b87]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                      Địa chỉ cụ thể
-                    </label>
-
-                    <textarea
-                      rows={3}
-                      value={deliveryForm.address}
-                      onChange={(e) =>
-                        setDeliveryForm({
-                          ...deliveryForm,
-                          address: e.target.value,
-                        })
-                      }
-                      placeholder="Số nhà, tên đường..."
-                      className="w-full resize-none rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-[#168b87]"
-                    />
-                  </div>
+                {/* Tabs */}
+                <div className="mt-4 grid grid-cols-2 rounded-xl border border-slate-200 bg-slate-50 p-1">
+                  <button
+                    type="button"
+                    onClick={() => handleChangeDeliveryTab("DELIVERY")}
+                    className={`flex items-center justify-center gap-2 rounded-lg py-3 text-sm font-semibold transition ${
+                      deliveryTab === "DELIVERY"
+                        ? "bg-white text-[#168b87] shadow-sm"
+                        : "text-slate-500 hover:text-slate-800"
+                    }`}
+                  >
+                    <Truck size={18} />
+                    Giao tận nơi
+                  </button>
 
                   <button
                     type="button"
-                    onClick={handleConfirmDelivery}
-                    className="w-full rounded-xl bg-[#168b87] py-3 font-bold text-white transition hover:bg-[#10736f]"
+                    onClick={() => handleChangeDeliveryTab("PICKUP")}
+                    className={`flex items-center justify-center gap-2 rounded-lg py-3 text-sm font-semibold transition ${
+                      deliveryTab === "PICKUP"
+                        ? "bg-white text-[#168b87] shadow-sm"
+                        : "text-slate-500 hover:text-slate-800"
+                    }`}
                   >
-                    Xác nhận thông tin
+                    <Store size={18} />
+                    Nhận tại cửa hàng
                   </button>
                 </div>
-              )}
 
-              {/* =========================
-                  PICKUP
-              ========================= */}
-              {deliveryTab === "PICKUP" && (
-                <div>
-                  {loadingBranches ? (
-                    <div className="flex min-h-[250px] items-center justify-center">
-                      <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#168b87] border-t-transparent" />
-                    </div>
-                  ) : branchError ? (
-                    <div className="rounded-xl bg-red-50 p-4 text-center">
-                      <p className="text-sm text-red-600">
-                        {branchError}
+                {/* =================================================
+                    DELIVERY
+                ================================================= */}
+                {deliveryTab === "DELIVERY" && (
+                  <div className="mt-5">
+                    <div className="mb-3">
+                      <p className="text-sm font-semibold text-slate-800">
+                        Chọn địa chỉ nhận hàng
                       </p>
 
-                      <button
-                        type="button"
-                        onClick={fetchBranches}
-                        className="mt-3 rounded-lg bg-[#168b87] px-4 py-2 text-sm font-semibold text-white"
-                      >
-                        Thử lại
-                      </button>
+                      <p className="mt-1 text-xs text-slate-500">
+                        Chọn một trong các địa chỉ đã lưu của bạn.
+                      </p>
                     </div>
-                  ) : branches.length === 0 ? (
-                    <div className="py-12 text-center text-sm text-slate-500">
-                      Hiện không có cửa hàng nào đang hoạt động.
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {branches.map((branch) => {
-                        const isSelected =
-                          selectedBranch?.branch_id === branch.branch_id;
 
-                        return (
-                          <div
-                            key={branch.branch_id}
-                            onClick={() => setSelectedBranch(branch)}
-                            className={`cursor-pointer rounded-xl border p-4 transition ${
-                              isSelected
-                                ? "border-[#168b87] bg-[#f0faf9] ring-1 ring-[#168b87]"
-                                : "border-slate-200 hover:border-[#168b87]"
-                            }`}
-                          >
-                            <div className="flex items-start gap-3">
-                              {/* Radio */}
-                              <div
-                                className={`mt-1 grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 ${
-                                  isSelected
-                                    ? "border-[#168b87]"
-                                    : "border-slate-300"
-                                }`}
-                              >
-                                {isSelected && (
-                                  <div className="h-2.5 w-2.5 rounded-full bg-[#168b87]" />
-                                )}
-                              </div>
+                    {customerLoading ? (
+                      <div className="flex min-h-[200px] items-center justify-center">
+                        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#168b87] border-t-transparent" />
+                      </div>
+                    ) : customer?.addresses?.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-slate-300 p-8 text-center">
+                        <MapPin
+                          size={30}
+                          className="mx-auto text-slate-400"
+                        />
 
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-start justify-between gap-3">
-                                  <div>
-                                    <h3 className="font-bold text-slate-800">
-                                      {branch.branch_name}
-                                    </h3>
+                        <p className="mt-3 text-sm font-semibold text-slate-700">
+                          Bạn chưa có địa chỉ nhận hàng
+                        </p>
 
-                                    <p className="mt-1 text-xs text-slate-400">
-                                      {branch.branch_code}
-                                    </p>
-                                  </div>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Vui lòng thêm địa chỉ trong trang thông tin cá nhân.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {customer?.addresses?.map((address) => {
+                          const isSelected =
+                            selectedAddress?.customer_address_id ===
+                            address.customer_address_id;
 
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setBusinessHourBranch(branch);
-                                    }}
-                                    className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-[#168b87] hover:underline"
-                                  >
-                                    <Clock size={14} />
-                                    Xem giờ hoạt động
-                                  </button>
+                          return (
+                            <div
+                              key={address.customer_address_id}
+                              onClick={() => setSelectedAddress(address)}
+                              className={`cursor-pointer rounded-xl border p-4 transition ${
+                                isSelected
+                                  ? "border-[#168b87] bg-[#f0faf9] ring-1 ring-[#168b87]"
+                                  : "border-slate-200 hover:border-[#168b87]"
+                              }`}
+                            >
+                              <div className="flex items-start gap-3">
+                                {/* Radio */}
+                                <div
+                                  className={`mt-1 grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 ${
+                                    isSelected
+                                      ? "border-[#168b87]"
+                                      : "border-slate-300"
+                                  }`}
+                                >
+                                  {isSelected && (
+                                    <div className="h-2.5 w-2.5 rounded-full bg-[#168b87]" />
+                                  )}
                                 </div>
 
-                                {branch.address && (
-                                  <p className="mt-3 flex items-start gap-1.5 text-sm text-slate-600">
-                                    <MapPin
-                                      size={15}
-                                      className="mt-0.5 shrink-0 text-slate-400"
-                                    />
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <p className="text-sm font-semibold text-slate-800">
+                                      {address.customer_address_line}
+                                    </p>
 
-                                    <span>
-                                      {
-                                        branch.address
-                                          .branch_address_address_line
-                                      }
-                                      ,{" "}
-                                      {
-                                        branch.address
-                                          .branch_address_ward
-                                      }
-                                      ,{" "}
-                                      {
-                                        branch.address
-                                          .branch_address_province
-                                      }
-                                    </span>
+                                    {address.customer_address_default && (
+                                      <span className="shrink-0 rounded-full bg-[#e6f5f4] px-2 py-1 text-[10px] font-bold text-[#168b87]">
+                                        Mặc định
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <p className="mt-1 text-sm text-slate-600">
+                                    {address.customer_address_ward},{" "}
+                                    {address.customer_address_province}
                                   </p>
-                                )}
-
-                                <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
-                                  <Phone size={14} />
-                                  {branch.branch_phone}
-                                </p>
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
 
-                      <button
-                        type="button"
-                        onClick={handleConfirmPickup}
-                        disabled={!selectedBranch}
-                        className="mt-4 w-full rounded-xl bg-[#168b87] py-3 font-bold text-white transition hover:bg-[#10736f] disabled:cursor-not-allowed disabled:opacity-40"
-                      >
-                        Xác nhận cửa hàng
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
+                        <button
+                          type="button"
+                          onClick={handleConfirmDelivery}
+                          disabled={!selectedAddress || !receiverPhone.trim()}
+                          className="mt-4 w-full rounded-xl bg-[#168b87] py-3 font-bold text-white transition hover:bg-[#10736f] disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          Xác nhận thông tin
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* =================================================
+                    PICKUP
+                ================================================= */}
+                {deliveryTab === "PICKUP" && (
+                  <div className="mt-5">
+                    {loadingBranches ? (
+                      <div className="flex min-h-[250px] items-center justify-center">
+                        <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#168b87] border-t-transparent" />
+                      </div>
+                    ) : branchError ? (
+                      <div className="rounded-xl bg-red-50 p-4 text-center">
+                        <p className="text-sm text-red-600">{branchError}</p>
+
+                        <button
+                          type="button"
+                          onClick={fetchBranches}
+                          className="mt-3 rounded-lg bg-[#168b87] px-4 py-2 text-sm font-semibold text-white"
+                        >
+                          Thử lại
+                        </button>
+                      </div>
+                    ) : branches.length === 0 ? (
+                      <div className="py-12 text-center text-sm text-slate-500">
+                        Hiện không có cửa hàng nào đang hoạt động.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {branches.map((branch) => {
+                          const isSelected =
+                            selectedBranch?.branch_id === branch.branch_id;
+
+                          return (
+                            <div
+                              key={branch.branch_id}
+                              onClick={() => setSelectedBranch(branch)}
+                              className={`cursor-pointer rounded-xl border p-4 transition ${
+                                isSelected
+                                  ? "border-[#168b87] bg-[#f0faf9] ring-1 ring-[#168b87]"
+                                  : "border-slate-200 hover:border-[#168b87]"
+                              }`}
+                            >
+                              <div className="flex items-start gap-3">
+                                {/* Radio */}
+                                <div
+                                  className={`mt-1 grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 ${
+                                    isSelected
+                                      ? "border-[#168b87]"
+                                      : "border-slate-300"
+                                  }`}
+                                >
+                                  {isSelected && (
+                                    <div className="h-2.5 w-2.5 rounded-full bg-[#168b87]" />
+                                  )}
+                                </div>
+
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                      <h3 className="font-bold text-slate-800">
+                                        {branch.branch_name}
+                                      </h3>
+
+                                      <p className="mt-1 text-xs text-slate-400">
+                                        {branch.branch_code}
+                                      </p>
+                                    </div>
+
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setBusinessHourBranch(branch);
+                                      }}
+                                      className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-[#168b87] hover:underline"
+                                    >
+                                      <Clock size={14} />
+                                      Xem giờ hoạt động
+                                    </button>
+                                  </div>
+
+                                  {branch.address && (
+                                    <p className="mt-3 flex items-start gap-1.5 text-sm text-slate-600">
+                                      <MapPin
+                                        size={15}
+                                        className="mt-0.5 shrink-0 text-slate-400"
+                                      />
+
+                                      <span>
+                                        {
+                                          branch.address
+                                            .branch_address_address_line
+                                        }
+                                        ,{" "}
+                                        {branch.address.branch_address_ward},{" "}
+                                        {
+                                          branch.address
+                                            .branch_address_province
+                                        }
+                                      </span>
+                                    </p>
+                                  )}
+
+                                  <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-500">
+                                    <Phone size={14} />
+                                    {branch.branch_phone}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        <button
+                          type="button"
+                          onClick={handleConfirmPickup}
+                          disabled={!selectedBranch || !receiverPhone.trim()}
+                          className="mt-4 w-full rounded-xl bg-[#168b87] py-3 font-bold text-white transition hover:bg-[#10736f] disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          Xác nhận cửa hàng
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
