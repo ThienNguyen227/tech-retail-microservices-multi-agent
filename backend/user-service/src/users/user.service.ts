@@ -209,7 +209,7 @@ export class UsersService {
       });
 
       const response = await fetch(
-        `http://localhost:3002/internal/customer`,
+        `http://localhost:3002/api/v1/internal/customer`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
