@@ -2,14 +2,13 @@
 
 import Link from "next/link";
 import { FormEvent, useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { usePathname } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import {
   Search,
   ShoppingCart,
   User,
   LogOut,
-  Heart,
+  ClipboardList,
   ChevronDown,
   Store,
   Smartphone,
@@ -21,10 +20,15 @@ import {
 export default function CustomerHeader() {
   const router = useRouter();
   const pathname = usePathname();
+
   const [keyword, setKeyword] = useState("");
   const [userName, setUserName] = useState("");
   const [cartCount, setCartCount] = useState<number>(0);
+  const [orderCount, setOrderCount] = useState<number>(0);
 
+  // =========================
+  // USER NAME
+  // =========================
   useEffect(() => {
     function syncUserName() {
       setUserName(
@@ -39,24 +43,35 @@ export default function CustomerHeader() {
     window.addEventListener("customer-profile-updated", syncUserName);
 
     return () => {
-      window.removeEventListener("customer-profile-updated", syncUserName);
+      window.removeEventListener(
+        "customer-profile-updated",
+        syncUserName,
+      );
     };
   }, []);
 
+  // =========================
+  // REFRESH ACCESS TOKEN
+  // =========================
   useEffect(() => {
     async function refreshAccessToken() {
-      const response = await fetch(
-        "http://localhost:3001/auth/customer/refresh",
-        {
-          method: "POST",
-          credentials: "include",
-        },
-      );
+      try {
+        const response = await fetch(
+          "http://localhost:3001/auth/customer/refresh",
+          {
+            method: "POST",
+            credentials: "include",
+          },
+        );
 
-      if (!response.ok) return;
+        if (!response.ok) return;
 
-      const data = await response.json();
-      localStorage.setItem("accessToken", data.access_token);
+        const data = await response.json();
+
+        localStorage.setItem("accessToken", data.access_token);
+      } catch (error) {
+        console.error("REFRESH TOKEN ERROR:", error);
+      }
     }
 
     refreshAccessToken();
@@ -69,12 +84,18 @@ export default function CustomerHeader() {
     return () => window.clearInterval(intervalId);
   }, []);
 
+  // =========================
+  // LOGOUT
+  // =========================
   async function handleLogout() {
     try {
-      await fetch("http://localhost:3001/auth/customer/logout", {
-        method: "POST",
-        credentials: "include",
-      });
+      await fetch(
+        "http://localhost:3001/auth/customer/logout",
+        {
+          method: "POST",
+          credentials: "include",
+        },
+      );
     } finally {
       const keys = [
         "accessToken",
@@ -92,17 +113,25 @@ export default function CustomerHeader() {
     }
   }
 
+  // =========================
+  // SEARCH
+  // =========================
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
     const query = keyword.trim();
 
     if (query) {
-      router.push(`/customer/search?q=${encodeURIComponent(query)}`);
+      router.push(
+        `/customer/search?q=${encodeURIComponent(query)}`,
+      );
     }
   }
 
-    useEffect(() => {
+  // =========================
+  // CART + ORDER COUNT
+  // =========================
+  useEffect(() => {
     async function fetchCartCount() {
       const userId = sessionStorage.getItem("userId");
 
@@ -112,39 +141,87 @@ export default function CustomerHeader() {
       }
 
       try {
-        const res = await fetch(`http://localhost:3004/api/v1/carts?userId=${userId}`);
+        const res = await fetch(
+          `http://localhost:3004/api/v1/carts?userId=${userId}`,
+        );
+
         if (!res.ok) return;
 
         const data = await res.json();
         const cartData = data.cart || data;
 
-        // Cách A: Tính tổng tất cả số lượng sản phẩm (Ví dụ: mua 2 cái iPhone -> hiện 2)
         const totalItems = (cartData.items || []).reduce(
-          (sum: number, item: any) => sum + (item.quantity || 0),
+          (sum: number, item: any) =>
+            sum + (item.quantity || 0),
           0,
         );
 
-        // (Nếu bạn muốn đếm theo số dòng/loại sản phẩm khác nhau thì dùng: cartData.items?.length || 0)
         setCartCount(totalItems);
       } catch (err) {
-        console.error("Lỗi lấy số lượng giỏ hàng:", err);
+        console.error(
+          "Lỗi lấy số lượng giỏ hàng:",
+          err,
+        );
       }
     }
 
-    // Gọi lần đầu khi load Header
-    fetchCartCount();
+    async function fetchOrderCount() {
+      const userId = sessionStorage.getItem("userId");
 
-    // Tự động cập nhật lại khi có hành động thêm/xóa giỏ hàng
-    window.addEventListener("cart-updated", fetchCartCount);
+      if (!userId) {
+        setOrderCount(0);
+        return;
+      }
+
+      try {
+        const res = await fetch(
+          `http://localhost:3007/api/v1/orders?userId=${userId}`,
+        );
+
+        if (!res.ok) return;
+
+        const data = await res.json();
+
+        setOrderCount(Array.isArray(data) ? data.length : 0);
+      } catch (err) {
+        console.error(
+          "Lỗi lấy số lượng đơn hàng:",
+          err,
+        );
+      }
+    }
+
+    fetchCartCount();
+    fetchOrderCount();
+
+    window.addEventListener(
+      "cart-updated",
+      fetchCartCount,
+    );
+
+    window.addEventListener(
+      "order-updated",
+      fetchOrderCount,
+    );
 
     return () => {
-      window.removeEventListener("cart-updated", fetchCartCount);
+      window.removeEventListener(
+        "cart-updated",
+        fetchCartCount,
+      );
+
+      window.removeEventListener(
+        "order-updated",
+        fetchOrderCount,
+      );
     };
-  }, [pathname]); // Tự động load lại nếu đổi trang
+  }, [pathname]);
 
   return (
     <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">
-      {/* 1. Top header */}
+      {/* =========================
+          TOP HEADER
+      ========================== */}
       <div className="mx-auto flex h-[76px] max-w-7xl items-center gap-6 px-4 sm:px-6 lg:px-8">
         {/* Logo */}
         <Link
@@ -152,13 +229,17 @@ export default function CustomerHeader() {
           className="group flex shrink-0 items-center gap-3"
         >
           <div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-[#168b87] to-[#073b4c] text-white shadow-md transition-transform group-hover:scale-105">
-            <Store size={23} strokeWidth={2.4} />
+            <Store
+              size={23}
+              strokeWidth={2.4}
+            />
           </div>
 
           <div className="hidden sm:block">
             <div className="text-lg font-extrabold tracking-tight text-[#073b4c]">
               SmartHub
             </div>
+
             <div className="text-[10px] font-medium uppercase tracking-[0.18em] text-slate-400">
               Smart Technology
             </div>
@@ -179,7 +260,9 @@ export default function CustomerHeader() {
             <input
               type="search"
               value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
+              onChange={(event) =>
+                setKeyword(event.target.value)
+              }
               placeholder="Tìm kiếm sản phẩm, thương hiệu..."
               className="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-[#168b87] focus:bg-white focus:ring-4 focus:ring-[#168b8715]"
             />
@@ -190,20 +273,32 @@ export default function CustomerHeader() {
             className="ml-2 flex h-11 shrink-0 items-center gap-2 rounded-xl bg-[#168b87] px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#10736f] hover:shadow-md active:scale-[0.98]"
           >
             <Search size={17} />
-            <span className="hidden md:inline">Tìm kiếm</span>
+
+            <span className="hidden md:inline">
+              Tìm kiếm
+            </span>
           </button>
         </form>
 
         {/* Actions */}
         <div className="flex shrink-0 items-center gap-1">
-          {/* Wishlist */}
-          <button
-            type="button"
-            aria-label="Sản phẩm yêu thích"
-            className="relative hidden h-10 w-10 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100 hover:text-[#168b87] sm:flex"
+          {/* Orders */}
+          <Link
+            href="/customer/order"
+            aria-label="Đơn hàng"
+            className="relative flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100 hover:text-[#168b87]"
           >
-            <Heart size={21} strokeWidth={1.9} />
-          </button>
+            <ClipboardList
+              size={21}
+              strokeWidth={1.9}
+            />
+
+            {orderCount > 0 && (
+              <span className="absolute right-1 top-0.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-[#168b87] px-1 text-[10px] font-bold text-white">
+                {orderCount > 99 ? "99+" : orderCount}
+              </span>
+            )}
+          </Link>
 
           {/* Cart */}
           <Link
@@ -211,8 +306,11 @@ export default function CustomerHeader() {
             aria-label="Giỏ hàng"
             className="relative flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100 hover:text-[#168b87]"
           >
-            <ShoppingCart size={21} strokeWidth={1.9} />
-            {/* Chỉ hiện badge khi có sản phẩm > 0 (hoặc để luôn số cartCount) */}
+            <ShoppingCart
+              size={21}
+              strokeWidth={1.9}
+            />
+
             {cartCount > 0 && (
               <span className="absolute right-1 top-0.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-[#168b87] px-1 text-[10px] font-bold text-white">
                 {cartCount > 99 ? "99+" : cartCount}
@@ -223,19 +321,25 @@ export default function CustomerHeader() {
           {/* Divider */}
           <div className="mx-2 hidden h-7 w-px bg-slate-200 sm:block" />
 
+          {/* User */}
           {userName ? (
             <div className="flex items-center gap-2">
-              {/* User */}
               <Link
                 href="/customer/profile/account-information"
                 className="group flex items-center gap-2 rounded-xl px-2 py-2 transition hover:bg-slate-50"
               >
                 <div className="grid h-9 w-9 place-items-center rounded-full bg-[#e6f5f4] text-[#168b87]">
-                  <User size={18} strokeWidth={2} />
+                  <User
+                    size={18}
+                    strokeWidth={2}
+                  />
                 </div>
 
                 <div className="hidden max-w-[120px] lg:block">
-                  <p className="text-[11px] text-slate-400">Xin chào</p>
+                  <p className="text-[11px] text-slate-400">
+                    Xin chào
+                  </p>
+
                   <p className="truncate text-sm font-semibold text-[#073b4c] group-hover:text-[#168b87]">
                     {userName}
                   </p>
@@ -255,6 +359,7 @@ export default function CustomerHeader() {
                 className="flex h-10 items-center gap-2 rounded-xl px-3 text-slate-500 transition hover:bg-red-50 hover:text-red-600"
               >
                 <LogOut size={18} />
+
                 <span className="hidden text-sm font-medium xl:inline">
                   Đăng xuất
                 </span>
@@ -266,16 +371,18 @@ export default function CustomerHeader() {
               className="flex h-10 items-center gap-2 rounded-xl bg-[#168b87] px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-[#10736f] hover:shadow-md"
             >
               <User size={17} />
+
               <span>Đăng nhập</span>
             </Link>
           )}
         </div>
       </div>
 
-      {/* 2. Navigation */}
+      {/* =========================
+          NAVIGATION
+      ========================== */}
       <div className="hidden border-t border-slate-100 bg-white md:block">
         <div className="mx-auto flex h-11 max-w-7xl items-center gap-7 px-4 sm:px-6 lg:px-8">
-
           {/* Trang chủ */}
           <Link
             href="/customer/home"
@@ -285,7 +392,11 @@ export default function CustomerHeader() {
                 : "font-medium text-slate-600 hover:text-[#168b87]"
             }`}
           >
-            <Home size={17} strokeWidth={2} />
+            <Home
+              size={17}
+              strokeWidth={2}
+            />
+
             <span>Trang chủ</span>
           </Link>
 
@@ -293,12 +404,17 @@ export default function CustomerHeader() {
           <Link
             href="/customer/product-category/dien-thoai-di-dong"
             className={`relative flex h-full items-center gap-2 text-sm transition ${
-              pathname === "/customer/product-category/dien-thoai-di-dong"
+              pathname ===
+              "/customer/product-category/dien-thoai-di-dong"
                 ? "font-semibold text-[#168b87] after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:rounded-full after:bg-[#168b87]"
                 : "font-medium text-slate-600 hover:text-[#168b87]"
             }`}
           >
-            <Smartphone size={17} strokeWidth={2} />
+            <Smartphone
+              size={17}
+              strokeWidth={2}
+            />
+
             <span>Điện thoại</span>
           </Link>
 
@@ -306,12 +422,17 @@ export default function CustomerHeader() {
           <Link
             href="/customer/product-category/may-tinh-xach-tay"
             className={`relative flex h-full items-center gap-2 text-sm transition ${
-              pathname === "/customer/product-category/may-tinh-xach-tay"
+              pathname ===
+              "/customer/product-category/may-tinh-xach-tay"
                 ? "font-semibold text-[#168b87] after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:rounded-full after:bg-[#168b87]"
                 : "font-medium text-slate-600 hover:text-[#168b87]"
             }`}
           >
-            <Laptop size={17} strokeWidth={2} />
+            <Laptop
+              size={17}
+              strokeWidth={2}
+            />
+
             <span>Laptop</span>
           </Link>
 
@@ -319,18 +440,21 @@ export default function CustomerHeader() {
           <Link
             href="/customer/product-category/may-tinh-bang"
             className={`relative flex h-full items-center gap-2 text-sm transition ${
-              pathname === "/customer/product-category/may-tinh-bang"
+              pathname ===
+              "/customer/product-category/may-tinh-bang"
                 ? "font-semibold text-[#168b87] after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:rounded-full after:bg-[#168b87]"
                 : "font-medium text-slate-600 hover:text-[#168b87]"
             }`}
           >
-            <Tablet size={17} strokeWidth={2} />
+            <Tablet
+              size={17}
+              strokeWidth={2}
+            />
+
             <span>Máy tính bảng</span>
           </Link>
-
         </div>
       </div>
     </header>
   );
 }
-

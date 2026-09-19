@@ -21,4 +21,10 @@ export class InventoryController {
   {
     return this.inventoryService.checkStock(sku, BigInt(branchId));
   }
+
+  // 2.
+  @Post('reserve')
+  async reserveStock(@Body() body: any) {
+    return this.inventoryService.reserveStock(body);
+  }
 }

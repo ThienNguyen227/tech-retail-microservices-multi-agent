@@ -394,13 +394,35 @@ export default function CartPage() {
   // =========================
 
   const handleConfirmPickup = () => {
+    if (!customer) {
+      alert("Không tìm thấy thông tin khách hàng.");
+      return;
+    }
+
+    if (!customer.customer_full_name.trim()) {
+      alert("Không tìm thấy tên người nhận.");
+      return;
+    }
+
+    if (!receiverPhone.trim()) {
+      alert("Vui lòng nhập số điện thoại.");
+      return;
+    }
+
     if (!selectedBranch) {
       alert("Vui lòng chọn cửa hàng nhận hàng.");
       return;
     }
 
+    if (!selectedBranch.address) {
+      alert("Cửa hàng chưa có thông tin địa chỉ.");
+      return;
+    }
+
     setDeliveryInfo({
       type: "PICKUP",
+      fullName: customer.customer_full_name,
+      phone: receiverPhone.trim(),
       branch: selectedBranch,
     });
 
@@ -541,18 +563,157 @@ export default function CartPage() {
   };
 
   // =========================
-  // CHECKOUT
+  // CHECKOUT Tiến hành đặt hàng
   // =========================
 
-  const handleCheckout = () => {
+  const handleCheckout = async () => {
+    const userId = sessionStorage.getItem("userId");
+
+    if (!userId) {
+      router.push("/customer/login");
+      return;
+    }
+
+    if (!cart || cart.items.length === 0) {
+      alert("Giỏ hàng đang trống.");
+      return;
+    }
+
     if (!deliveryInfo) {
       handleOpenDeliveryModal();
       return;
     }
 
-    console.log("Checkout information:", deliveryInfo);
+    if (!deliveryInfo.fullName?.trim()) {
+      alert("Vui lòng cung cấp tên người nhận.");
+      return;
+    }
 
-    alert("Thông tin nhận hàng đã đầy đủ. Tiến hành đặt hàng!");
+    if (!deliveryInfo.phone?.trim()) {
+      alert("Vui lòng cung cấp số điện thoại.");
+      return;
+    }
+
+    // =========================
+    // THÔNG TIN SẢN PHẨM
+    // =========================
+
+    const items = cart.items.map((item) => ({
+      sku: item.sku,
+      productName: item.productName,
+      imageUrl: item.imageUrl,
+      quantity: item.quantity,
+      price: item.price,
+      subtotal: item.price * item.quantity,
+    }));
+
+    // =========================
+    // THÔNG TIN NHẬN HÀNG
+    // =========================
+
+    let orderData: any;
+
+    if (deliveryInfo.type === "DELIVERY") {
+      const address = deliveryInfo.address;
+
+      if (!address) {
+        alert("Vui lòng chọn địa chỉ nhận hàng.");
+        return;
+      }
+
+      orderData = {
+        userId,
+
+        fulfillmentType: "HOME_DELIVERY",
+
+        recipientName: deliveryInfo.fullName.trim(),
+        recipientPhone: deliveryInfo.phone.trim(),
+
+        addressLine: address.customer_address_line,
+        ward: address.customer_address_ward,
+        province: address.customer_address_province,
+
+        items,
+
+        subtotal: cart.totalPrice,
+        shippingFee: 0,
+        discountAmount: 0,
+        totalAmount: cart.totalPrice,
+      };
+    }
+
+    // =========================
+    // NHẬN TẠI CỬA HÀNG
+    // =========================
+
+    else {
+      const branch = deliveryInfo.branch;
+
+      if (!branch) {
+        alert("Vui lòng chọn cửa hàng nhận hàng.");
+        return;
+      }
+
+      if (!branch.address) {
+        alert("Cửa hàng chưa có thông tin địa chỉ.");
+        return;
+      }
+
+      orderData = {
+        userId,
+        fulfillmentType: "STORE_PICKUP",
+        recipientName: deliveryInfo.fullName.trim(),
+        recipientPhone: deliveryInfo.phone.trim(),
+        addressLine: branch.address.branch_address_address_line,
+        ward: branch.address.branch_address_ward,
+        province: branch.address.branch_address_province,
+
+        items,
+
+        subtotal: cart.totalPrice,
+        shippingFee: 0,
+        discountAmount: 0,
+        totalAmount: cart.totalPrice,
+      };
+    }
+
+    // =========================
+    // DEBUG
+    // =========================
+
+    console.log("ORDER DATA:", orderData);
+
+    // =========================
+    // CREATE ORDER
+    // =========================
+
+    try {
+      const res = await fetch("http://localhost:3007/api/v1/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(orderData),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Đặt hàng thất bại.");
+      }
+
+      console.log("ORDER CREATED:", data);
+
+      alert("Đặt hàng thành công!");
+      
+      window.dispatchEvent(new Event("order-updated"));
+
+      router.push("/customer/order");
+    } catch (err: any) {
+      console.error("CREATE ORDER ERROR:", err);
+
+      alert(err.message || "Có lỗi xảy ra khi đặt hàng.");
+    }
   };
 
   // =========================
