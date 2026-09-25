@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+// ================================
+// 1. Promotion
+// ================================
+
+model Promotion {
+  promotion_id                 Int      @id @default(autoincrement())
+  promotion_name               String
+  promotion_description        String
+  promotion_start_at           DateTime
+  promotion_end_at             DateTime
+  promotion_created_at         DateTime @default(now())
+  promotion_updated_at         DateTime @updatedAt
+  promotion_promotion_type_id  Int
+  promotion_status_id          Int
+
+  promotion_type               PromotionType   @relation(fields: [promotion_promotion_type_id], references: [promotion_type_id])
+  promotion_status             PromotionStatus @relation(fields: [promotion_status_id], references: [promotion_status_id])
+
+  promotion_skus               PromotionSKU[]
+  promotion_coupons            PromotionCoupon[]
+
+  @@index([promotion_promotion_type_id])
+  @@index([promotion_status_id])
+  @@map("promotion")
+}
+
+
+// ================================
+// 2. Promotion Type (MATERDATA)
+// ================================
+
+// 1, Giảm giá trực tiếp, DIRECT_DISCOUNT, Giảm giá trực tiếp theo SKU của sản phẩm.
+// 2, Giảm giá bằng mã, COUPON, Giảm giá khi áp dụng mã coupon.
+
+model PromotionType {
+  promotion_type_id          Int     @id @default(autoincrement())
+  promotion_type_name        String
+  promotion_type_code        String  @unique
+  promotion_type_description String
+
+  promotions                 Promotion[]
+
+  @@map("promotion_type")
+}
+
+
+// ================================
+// 3. Promotion Status (MATERDATA)
+// ================================
+
+// 1, Nháp, DRAFT, Chương trình khuyến mãi đang được tạo và chưa được áp dụng.
+// 2, Đã lên lịch, SCHEDULED, Chương trình khuyến mãi đã được thiết lập và chờ đến thời gian bắt đầu.
+// 3, Đang diễn ra, ACTIVE, Chương trình khuyến mãi đang trong thời gian áp dụng.
+// 4, Đã hết hạn, EXPIRED, Chương trình khuyến mãi đã kết thúc do quá thời gian áp dụng.
+// 5, Đã hủy, CANCELLED, Chương trình khuyến mãi đã bị hủy trước khi kết thúc.
+
+model PromotionStatus {
+  promotion_status_id          Int     @id @default(autoincrement())
+  promotion_status_name        String
+  promotion_status_code        String  @unique
+  promotion_status_description String
+
+  promotions                   Promotion[]
+
+  @@map("promotion_status")
+}
+
+
+// ================================
+// 4. Promotion SKU
+// ================================
+
+model PromotionSKU {
+  promotion_sku_id                 Int     @id @default(autoincrement())
+  promotion_sku_sku                String
+  promotion_sku_discount_value     Decimal @db.Decimal(15, 2)
+  promotion_sku_promotion_id       Int
+  promotion_sku_promotion_discount_type_id   Int
+
+  promotion                       Promotion    @relation(fields: [promotion_sku_promotion_id], references: [promotion_id])
+  promotion_discount_type         PromotionDiscountType @relation(fields: [promotion_sku_promotion_discount_type_id], references: [promotion_discount_type_id])
+
+  @@unique([promotion_sku_promotion_id, promotion_sku_sku])
+  @@index([promotion_sku_sku])
+  @@index([promotion_sku_promotion_discount_type_id])
+  @@map("promotion_sku")
+}
+
+
+// ================================
+// 5. Promotion Coupon
+// ================================
+
+model PromotionCoupon {
+  promotion_coupon_id                 Int     @id @default(autoincrement())
+  promotion_coupon_code               String  @unique
+  promotion_coupon_value              Decimal @db.Decimal(15, 2)
+  promotion_coupon_min_order_value    Decimal @db.Decimal(15, 2)
+  promotion_coupon_max_discount_value Decimal? @db.Decimal(15, 2)
+  promotion_coupon_usage_limit        Int
+  promotion_coupon_used_count         Int     @default(0)
+  promotion_coupon_promotion_id       Int
+  promotion_coupon_promotion_discount_type_id   Int
+
+  promotion                       Promotion    @relation(fields: [promotion_coupon_promotion_id], references: [promotion_id])
+  promotion_discount_type         PromotionDiscountType @relation(fields: [promotion_coupon_promotion_discount_type_id], references: [promotion_discount_type_id])
+
+  @@index([promotion_coupon_promotion_id])
+  @@index([promotion_coupon_promotion_discount_type_id])
+  @@map("promotion_coupon")
+}
+
+
+// ================================
+// 6. Discount Type (MATERDATA)
+// ================================
+
+// 1, Giảm theo phần trăm, PERCENTAGE, Giảm giá theo tỷ lệ phần trăm của giá sản phẩm/đơn hàng.
+// 2, Giảm số tiền cố định, FIXED_AMOUNT, Giảm một số tiền cố định trên sản phẩm/đơn hàng.
+
+model PromotionDiscountType {
+  promotion_discount_type_id          Int     @id @default(autoincrement())
+  promotion_discount_type_name        String
+  promotion_discount_type_code        String  @unique
+  promotion_discount_type_description String
+
+  promotion_skus                      PromotionSKU[]
+  promotion_coupons                   PromotionCoupon[]
+
+  @@map("promotion_discount_type")
+}
