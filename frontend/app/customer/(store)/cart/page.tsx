@@ -3,17 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  ShoppingBag,
-  ArrowLeft,
-  Trash2,
-  Truck,
-  Store,
-  Clock,
-  X,
-  MapPin,
-  Phone,
-} from "lucide-react";
+import {ShoppingBag, ArrowLeft, Trash2, Truck, Store, Clock, X, MapPin, Phone} from "lucide-react";
 
 type InventoryStock = {
   sku: string;
@@ -114,19 +104,104 @@ const dayOfWeekLabels: Record<string, string> = {
   SUNDAY: "Chủ nhật",
 };
 
+// COUPON
+type Coupon = {
+  couponId: number;
+  discountValue: string;
+  minOrderValue: string;
+  maxDiscountValue: string | null;
+  discountType: "PERCENTAGE" | "FIXED_AMOUNT";
+};
+
 export default function CartPage() {
   const router = useRouter();
 
-  const [inventoryStocks, setInventoryStocks] = useState<
-    Record<string, InventoryStock>
-  >({});
+  // COUPON
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [couponLoading, setCouponLoading] = useState<boolean>(false);
+  const [couponError, setCouponError] = useState<string>("");
+  const [isCouponModalOpen, setIsCouponModalOpen] = useState<boolean>(false);
+  const [selectedCoupon, setSelectedCoupon] = useState<Coupon | null>(null);
 
+  const fetchCoupons = async () => {
+    try {
+      setCouponLoading(true);
+      setCouponError("");
+
+      const res = await fetch(
+        "http://localhost:3008/api/v1/promotion/coupons",
+      );
+
+      if (!res.ok) {
+        throw new Error("Không thể tải danh sách mã giảm giá");
+      }
+
+      const data: Coupon[] = await res.json();
+
+      setCoupons(data);
+    } catch (err: any) {
+      setCouponError(
+        err.message || "Đã xảy ra lỗi khi tải danh sách mã giảm giá",
+      );
+    } finally {
+      setCouponLoading(false);
+    }
+  };
+
+  const handleOpenCouponModal = () => {
+    setIsCouponModalOpen(true);
+
+    if (coupons.length === 0) {
+      fetchCoupons();
+    }
+  };
+
+  const calculateDiscount = (coupon: Coupon) => {
+    const subtotal = cart?.totalPrice || 0;
+
+    const discountValue = Number(coupon.discountValue);
+    const minOrderValue = Number(coupon.minOrderValue);
+
+    if (subtotal < minOrderValue) {
+      return 0;
+    }
+
+    if (coupon.discountType === "FIXED_AMOUNT") {
+      return Math.min(discountValue, subtotal);
+    }
+
+    if (coupon.discountType === "PERCENTAGE") {
+      const discount = subtotal * (discountValue / 100);
+
+      if (coupon.maxDiscountValue) {
+        return Math.min(discount, Number(coupon.maxDiscountValue));
+      }
+
+      return discount;
+    }
+
+    return 0;
+  };
+
+  
+
+  
+
+  // INVENTORY
+  const [inventoryStocks, setInventoryStocks] = useState<Record<string, InventoryStock>>({});
+
+  // CART
   const [cart, setCart] = useState<Cart | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string>("");
   const [deletingSku, setDeletingSku] = useState<string | null>(null);
   const [clearing, setClearing] = useState<boolean>(false);
   const [updatingSkus, setUpdatingSkus] = useState<Set<string>>(new Set());
+
+  // COUPON
+  const discountAmount = selectedCoupon ? calculateDiscount(selectedCoupon): 0;
+
+const totalAmount = (cart?.totalPrice || 0) - discountAmount;
 
   // =========================
   // CUSTOMER
@@ -140,12 +215,9 @@ export default function CartPage() {
   // DELIVERY INFO
   // =========================
 
-  const [isDeliveryModalOpen, setIsDeliveryModalOpen] =
-    useState<boolean>(false);
+  const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState<boolean>(false);
 
-  const [deliveryTab, setDeliveryTab] = useState<"DELIVERY" | "PICKUP">(
-    "DELIVERY",
-  );
+  const [deliveryTab, setDeliveryTab] = useState<"DELIVERY" | "PICKUP">("DELIVERY");
 
   const [deliveryInfo, setDeliveryInfo] = useState<DeliveryInfo | null>(null);
 
@@ -153,8 +225,7 @@ export default function CartPage() {
   const [receiverPhone, setReceiverPhone] = useState<string>("");
 
   // Địa chỉ được chọn
-  const [selectedAddress, setSelectedAddress] =
-    useState<CustomerAddress | null>(null);
+  const [selectedAddress, setSelectedAddress] = useState<CustomerAddress | null>(null);
 
   // =========================
   // BRANCH
@@ -167,8 +238,7 @@ export default function CartPage() {
   const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
 
   // Popup giờ hoạt động
-  const [businessHourBranch, setBusinessHourBranch] =
-    useState<Branch | null>(null);
+  const [businessHourBranch, setBusinessHourBranch] = useState<Branch | null>(null);
 
   // =========================
   // FETCH CUSTOMER
@@ -179,11 +249,7 @@ export default function CartPage() {
       setCustomerLoading(true);
       setCustomerError("");
 
-      const res = await fetch(
-        `http://localhost:3002/api/v1/customer?userId=${encodeURIComponent(
-          userId,
-        )}`,
-      );
+      const res = await fetch(`http://localhost:3002/api/v1/customer?userId=${encodeURIComponent(userId)}`);
 
       if (!res.ok) {
         throw new Error("Không thể tải thông tin khách hàng");
@@ -214,15 +280,13 @@ export default function CartPage() {
   // =========================
 
   useEffect(() => {
-    const userId =
-      localStorage.getItem("userId") ?? sessionStorage.getItem("userId");
+    const userId = sessionStorage.getItem("userId");
 
     if (!userId) {
       router.push("/customer/login");
       return;
     }
 
-    // Thêm dòng này
     const validUserId: string = userId;
 
     async function fetchData() {
@@ -239,11 +303,7 @@ export default function CartPage() {
         // FETCH CART
         // =========================
 
-        const res = await fetch(
-          `http://localhost:3004/api/v1/carts?userId=${encodeURIComponent(
-            validUserId,
-          )}`,
-        );
+        const res = await fetch(`http://localhost:3004/api/v1/carts?userId=${encodeURIComponent(validUserId)}`);
 
         if (!res.ok) {
           throw new Error("Không thể tải thông tin giỏ hàng");
@@ -262,11 +322,7 @@ export default function CartPage() {
         const stockResults = await Promise.all(
           cartData.items.map(async (item: CartItem) => {
             try {
-              const res = await fetch(
-                `http://localhost:3006/api/v1/inventories/check?sku=${encodeURIComponent(
-                  item.sku,
-                )}&branch_id=1`,
-              );
+              const res = await fetch(`http://localhost:3006/api/v1/inventories/check?sku=${encodeURIComponent(item.sku)}&branch_id=1`);
 
               if (!res.ok) {
                 return null;
@@ -309,9 +365,7 @@ export default function CartPage() {
       setLoadingBranches(true);
       setBranchError("");
 
-      const res = await fetch(
-        "http://localhost:3005/api/v1/branches?status=ACTIVE",
-      );
+      const res = await fetch("http://localhost:3005/api/v1/branches?status=ACTIVE");
 
       if (!res.ok) {
         throw new Error("Không thể tải danh sách cửa hàng");
@@ -637,8 +691,10 @@ export default function CartPage() {
 
         subtotal: cart.totalPrice,
         shippingFee: 0,
-        discountAmount: 0,
-        totalAmount: cart.totalPrice,
+        // discountAmount: 0,
+        // totalAmount: cart.totalPrice,
+        discountAmount,
+        totalAmount,
       };
     }
 
@@ -956,13 +1012,49 @@ export default function CartPage() {
                 </div>
               </div>
 
+              <div className="mt-4">
+                <button
+                  type="button"
+                  onClick={handleOpenCouponModal}
+                  className="flex w-full items-center justify-between rounded-xl border border-dashed border-[#168b87] bg-[#f0faf9] px-4 py-3 text-sm transition hover:bg-[#e6f5f4]"
+                >
+                  <span className="font-semibold text-[#168b87]">
+                    {selectedCoupon
+                      ? `Mã giảm giá: ${selectedCoupon.couponId}`
+                      : "Áp dụng mã giảm giá"}
+                  </span>
+
+                  <span className="text-[#168b87]">›</span>
+                </button>
+
+                {selectedCoupon && (
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCoupon(null)}
+                    className="mt-2 text-xs font-medium text-red-500 hover:underline"
+                  >
+                    Bỏ mã giảm giá
+                  </button>
+                )}
+              </div>
+
+              {selectedCoupon && (
+                <div className="mt-4 flex items-center justify-between text-sm">
+                  <span className="text-slate-600">Giảm giá</span>
+
+                  <span className="font-semibold text-green-600">
+                    -{formatPrice(discountAmount)} ₫
+                  </span>
+                </div>
+              )}
+
               <div className="mt-4 flex items-center justify-between">
                 <span className="text-base font-bold text-slate-900">
                   Tổng cộng
                 </span>
 
                 <span className="text-xl font-extrabold text-red-600">
-                  {formatPrice(cart?.totalPrice || 0)} ₫
+                  {formatPrice(totalAmount)} ₫
                 </span>
               </div>
 
@@ -1502,6 +1594,146 @@ export default function CartPage() {
               >
                 Đóng
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* =====================================================
+          POPUP COUPON
+      ===================================================== */}
+      {isCouponModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          onClick={() => setIsCouponModalOpen(false)}
+        >
+          <div
+            className="max-h-[90vh] w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">
+                  Chọn mã giảm giá
+                </h2>
+
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Chỉ được áp dụng một mã giảm giá
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsCouponModalOpen(false)}
+                className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="max-h-[70vh] overflow-y-auto p-6">
+              {couponLoading ? (
+                <div className="flex justify-center py-10">
+                  <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#168b87] border-t-transparent" />
+                </div>
+              ) : couponError ? (
+                <div className="rounded-xl bg-red-50 p-4 text-center">
+                  <p className="text-sm text-red-600">
+                    {couponError}
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={fetchCoupons}
+                    className="mt-3 rounded-lg bg-[#168b87] px-4 py-2 text-sm font-semibold text-white"
+                  >
+                    Thử lại
+                  </button>
+                </div>
+              ) : coupons.length === 0 ? (
+                <div className="py-10 text-center text-sm text-slate-500">
+                  Hiện không có mã giảm giá.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {coupons.map((coupon) => {
+                    const discount = calculateDiscount(coupon);
+                    const isSelected =
+                      selectedCoupon?.couponId === coupon.couponId;
+
+                    const isEligible =
+                      (cart?.totalPrice || 0) >=
+                      Number(coupon.minOrderValue);
+
+                    return (
+                      <div
+                        key={coupon.couponId}
+                        className={`rounded-xl border p-4 transition ${
+                          isSelected
+                            ? "border-[#168b87] bg-[#f0faf9] ring-1 ring-[#168b87]"
+                            : "border-slate-200"
+                        } ${
+                          !isEligible
+                            ? "opacity-60"
+                            : ""
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <p className="font-bold text-slate-800">
+                              Coupon #{coupon.couponId}
+                            </p>
+
+                            <p className="mt-1 text-sm font-semibold text-red-600">
+                              {coupon.discountType === "PERCENTAGE"
+                                ? `Giảm ${coupon.discountValue}%`
+                                : `Giảm ${formatPrice(
+                                    Number(coupon.discountValue),
+                                  )} ₫`}
+                            </p>
+
+                            <p className="mt-1 text-xs text-slate-500">
+                              Đơn tối thiểu{" "}
+                              {formatPrice(
+                                Number(coupon.minOrderValue),
+                              )} ₫
+                            </p>
+
+                            {!isEligible && (
+                              <p className="mt-1 text-xs font-medium text-red-500">
+                                Chưa đủ điều kiện áp dụng
+                              </p>
+                            )}
+                          </div>
+
+                          <button
+                            type="button"
+                            disabled={!isEligible}
+                            onClick={() => {
+                              setSelectedCoupon(coupon);
+                              setIsCouponModalOpen(false);
+                            }}
+                            className="shrink-0 rounded-lg bg-[#168b87] px-4 py-2 text-xs font-bold text-white transition hover:bg-[#10736f] disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            {isSelected ? "Đã chọn" : "Áp dụng"}
+                          </button>
+                        </div>
+
+                        {isEligible && (
+                          <p className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-500">
+                            Bạn được giảm{" "}
+                            <span className="font-bold text-green-600">
+                              {formatPrice(discount)} ₫
+                            </span>
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>
