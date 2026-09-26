@@ -20,6 +20,6 @@ async function bootstrap() {
 
   const port = process.env.PORT ?? 3005;
   await app.listen(port);
-  console.log(`Branch service is running on: http://localhost:${port}`);
+  console.log(`Branch-Service is running on: http://localhost:${port}`);
 }
 bootstrap();
