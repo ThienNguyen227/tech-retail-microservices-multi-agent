@@ -1,6 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { promotionApi } from '@/lib/axios/promotion-api';
+
+import { useEffect, useMemo, useState } from 'react';
+
 import Link from 'next/link';
 
 export type ProductSpecifications = {
@@ -48,11 +51,7 @@ export default function PhoneProductCard({
    * ============================
    * 1. Lấy danh sách dung lượng
    * ============================
-   */
-
-  // const storages = useMemo(() => {
-  //   return [...new Set(product.variants.map((variant) => variant.storage))];
-  // }, [product.variants]);
+  */
   const storages = useMemo(() => {
     return [
       ...new Set(
@@ -65,19 +64,7 @@ export default function PhoneProductCard({
    * ============================
    * 2. Lấy danh sách màu
    * ============================
-   */
-
-  // const colors = useMemo(() => {
-  //   const uniqueColors = new Map<string, ProductVariant>();
-
-  //   product.variants.forEach((variant) => {
-  //     if (!uniqueColors.has(variant.colorSlug)) {
-  //       uniqueColors.set(variant.colorSlug, variant);
-  //     }
-  //   });
-
-  //   return Array.from(uniqueColors.values());
-  // }, [product.variants]);
+  */
   const colors = useMemo(() => {
     const uniqueColors = new Map<string, ProductVariant>();
 
@@ -94,21 +81,16 @@ export default function PhoneProductCard({
    * ============================
    * 3. State đang chọn
    * ============================
-   */
+  */
+  const [selectedStorage, setSelectedStorage] = useState(storages[0] ?? '');
 
-  const [selectedStorage, setSelectedStorage] = useState(
-    storages[0] ?? '',
-  );
-
-  const [selectedColorSlug, setSelectedColorSlug] = useState(
-    colors[0]?.colorSlug ?? '',
-  );
+  const [selectedColorSlug, setSelectedColorSlug] = useState(colors[0]?.colorSlug ?? '');
 
   /*
    * ============================
    * 4. Tìm variant tương ứng
    * ============================
-   */
+  */
 
   const selectedVariant = useMemo(() => {
     return (
@@ -128,8 +110,7 @@ export default function PhoneProductCard({
    * ============================
    * 5. Thông tin hiện tại
    * ============================
-   */
-
+  */
   const currentPrice = selectedVariant?.price ?? 0;
 
   const currentSlug =
@@ -148,14 +129,64 @@ export default function PhoneProductCard({
    * ============================
    * 6. Format giá
    * ============================
-   */
-
+  */
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('vi-VN', {
       style: 'currency',
       currency: 'VND',
     }).format(price);
   };
+
+  //  {#b32,49}
+  /*
+   * ============================
+   * 7. Giảm giá trực tiếp
+   * ============================
+  */
+  const [promotion, setPromotion] = useState<PromotionDiscount | null>(null);
+
+  type PromotionDiscount = {
+    promotionId: number;
+    promotionName: string;
+    sku: string;
+    discountType: string;
+    discountValue: string;
+  };
+
+  useEffect(() => {
+    if (!selectedVariant?.sku) {
+      setPromotion(null);
+      return;
+    }
+
+    const fetchPromotion = async () => {
+      try {
+        const response = await promotionApi.get('/api/v1/promotion/direct-discount',
+          {
+            params: {
+              sku: selectedVariant.sku,
+            },
+          },
+        );
+
+        console.log('Promotion API response:', response.data);
+
+        setPromotion(response.data);
+      } catch (error) {
+        console.error('Fetch promotion error:', error);
+        setPromotion(null);
+      }
+    };
+
+    fetchPromotion();
+  }, [selectedVariant?.sku]);
+
+  const discountValue = Number(promotion?.discountValue ?? 0);
+
+  const finalPrice = promotion?.discountType === 'PERCENTAGE' ? currentPrice * (1 - discountValue / 100)
+      : promotion?.discountType === 'FIXED_AMOUNT'
+        ? Math.max(0, currentPrice - discountValue)
+        : currentPrice;
 
   return (
     <div className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition-all duration-300 hover:border-red-300 hover:shadow-lg">
@@ -296,16 +327,36 @@ export default function PhoneProductCard({
         {/* ============================
             6. Giá
         ============================ */}
-
         <div className="mt-3">
+          {promotion ? (
+            <div className="flex flex-col">
+              {/* Giá gốc + mức giảm */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500 line-through">
+                  {formatPrice(currentPrice)}
+                </span>
 
-          <span className="text-lg font-extrabold text-red-600">
-            {currentPrice > 0
-              ? formatPrice(currentPrice)
-              : 'Liên hệ'}
-          </span>
+                <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-bold text-red-600">
+                  {promotion.discountType === 'PERCENTAGE'
+                    ? `-${discountValue}%`
+                    : `-${formatPrice(discountValue)}`}
+                </span>
+              </div>
 
+              {/* Giá sau giảm */}
+              <span className="mt-0.5 text-xl font-extrabold text-red-600">
+                {formatPrice(finalPrice)}
+              </span>
+            </div>
+          ) : (
+            <span className="text-lg font-extrabold text-red-600">
+              {currentPrice > 0
+                ? formatPrice(currentPrice)
+                : 'Liên hệ'}
+            </span>
+          )}
         </div>
+        
 
         {/* ============================
             7. Thông số nhanh
