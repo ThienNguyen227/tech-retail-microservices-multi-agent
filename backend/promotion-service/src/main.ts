@@ -20,6 +20,6 @@ async function bootstrap() {
 
   const port = process.env.PORT ?? 3008;
   await app.listen(port);
-  console.log(`Promotion service is running on: http://localhost:${port}`);
+  console.log(`Promotion-Service is running on: http://localhost:${port}`);
 }
 bootstrap();

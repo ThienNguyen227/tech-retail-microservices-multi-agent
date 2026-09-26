@@ -20,6 +20,6 @@ async function bootstrap() {
 
   const port = process.env.PORT ?? 3006;
   await app.listen(port);
-  console.log(`Inventory service is running on: http://localhost:${port}`);
+  console.log(`Inventory-Service is running on: http://localhost:${port}`);
 }
 bootstrap();

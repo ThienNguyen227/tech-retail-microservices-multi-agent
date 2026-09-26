@@ -20,6 +20,6 @@ async function bootstrap() {
 
   const port = process.env.PORT ?? 3007;
   await app.listen(port);
-  console.log(`Order service is running on: http://localhost:${port}`);
+  console.log(`Order-Service is running on: http://localhost:${port}`);
 }
 bootstrap();
