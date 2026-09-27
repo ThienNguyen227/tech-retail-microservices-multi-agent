@@ -21,8 +21,9 @@ export class OrderController {
   //   return this.orderService.createOrder(body);
   // }
 
-  @Get()
-  getOrders(@Query('userId') userId: string) {
-    return this.orderService.getOrders(userId);
-  }
+  // @Get()
+  // getOrders(@Query('userId') userId: string) {
+  //   return this.orderService.getOrders(userId);
+  // }
 }
+
