@@ -1,14 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  Package,
-  Calendar,
-  MapPin,
-  Phone,
-  User,
-  X,
-} from "lucide-react";
+import {Package, Calendar, MapPin, Phone, User, X,} from "lucide-react";
 
 type OrderItem = {
   order_item_id: string;
@@ -186,7 +179,7 @@ export default function OrdersPage() {
                     </p>
 
                     <p className="mt-1 font-semibold text-[#12313a]">
-                      {order.order_items.reduce(
+                      {order.order_item.reduce(
                         (total, item) =>
                           total + Number(item.order_item_quantity),
                         0,
@@ -367,13 +360,13 @@ export default function OrdersPage() {
                   Sản phẩm
                 </h3>
 
-                {selectedOrder.order_items.length === 0 ? (
+                {selectedOrder.order_item.length === 0 ? (
                   <div className="rounded-xl border border-gray-200 bg-gray-50 p-5 text-center text-sm font-medium text-gray-600">
                     Không có sản phẩm.
                   </div>
                 ) : (
                   <div className="divide-y overflow-hidden rounded-xl border border-gray-200">
-                    {selectedOrder.order_items.map((item) => (
+                    {selectedOrder.order_item.map((item) => (
                       <div
                         key={item.order_item_id}
                         className="flex gap-4 p-4"
