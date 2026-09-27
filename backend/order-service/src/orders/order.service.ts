@@ -268,33 +268,33 @@ export class OrderService {
   //   return this.serialize(order);
   // }
 
-  private serialize(data: any): any {
-    return JSON.parse(
-      JSON.stringify(data, (_, value) =>
-        typeof value === 'bigint'
-          ? value.toString()
-          : value,
-      ),
-    );
-  }
+  // private serialize(data: any): any {
+  //   return JSON.parse(
+  //     JSON.stringify(data, (_, value) =>
+  //       typeof value === 'bigint'
+  //         ? value.toString()
+  //         : value,
+  //     ),
+  //   );
+  // }
 
-  async getOrders(userId?: string) {
-    const orders = await this.prisma.order.findMany({
-      where: userId
-        ? {
-            order_user_id: BigInt(userId),
-          }
-        : undefined,
+  // async getOrders(userId?: string) {
+  //   const orders = await this.prisma.order.findMany({
+  //     where: userId
+  //       ? {
+  //           order_user_id: BigInt(userId),
+  //         }
+  //       : undefined,
 
-      include: {
-        order_item: true,
-      },
+  //     include: {
+  //       order_item: true,
+  //     },
 
-      orderBy: {
-        order_created_at: 'desc',
-      },
-    });
+  //     orderBy: {
+  //       order_created_at: 'desc',
+  //     },
+  //   });
 
-    return this.serialize(orders);
-  }
+  //   return this.serialize(orders);
+  // }
 }
