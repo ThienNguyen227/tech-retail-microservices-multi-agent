@@ -196,38 +196,70 @@ export class CreatePaymentService {
       // ============================================================
 
       if (paymentMethod.payment_method_code === 'MOMO') {
-        const payUrl =
-          await this.createMomoPayment({
+        try {
+          const payUrl = await this.createMomoPayment({
             payment,
             transactionCode,
             amount,
           });
 
-        return {
-          payment: {
-            payment_id: payment.payment_id,
-            order_id: payment.payment_order_id,
-            order_code: payment.payment_order_code,
-            amount: payment.payment_amount,
-            currency: payment.payment_currency,
-            method: paymentMethod.payment_method_code,
-            status: 'UNPAID',
-          },
+          return {
+            payment: {
+              payment_id: payment.payment_id,
+              order_id: payment.payment_order_id,
+              order_code: payment.payment_order_code,
+              amount: payment.payment_amount,
+              currency: payment.payment_currency,
+              method: paymentMethod.payment_method_code,
+              status: 'UNPAID',
+            },
 
-          transaction: {
-            transaction_id:
-              transaction.payment_transaction_id,
+            transaction: {
+              transaction_id:
+                transaction.payment_transaction_id,
 
-            transaction_code:
-              transaction.payment_transaction_transaction_code,
+              transaction_code:
+                transaction.payment_transaction_transaction_code,
 
-            status: 'PENDING',
-          },
+              status: 'PENDING',
+            },
 
-          payUrl,
+            payUrl,
 
-          message: 'Tạo thanh toán MoMo thành công',
-        };
+            message: 'Tạo thanh toán MoMo thành công',
+          };
+        } catch (error) {
+          // ============================================================
+          // MoMo thất bại → PENDING → FAILED
+          // ============================================================
+
+          const failedStatus =
+            await this.prisma.paymentTransactionStatus.findUnique({
+              where: {
+                payment_transaction_status_code: 'FAILED',
+              },
+            });
+
+          if (!failedStatus) {
+            throw new InternalServerErrorException(
+              'Không tìm thấy trạng thái FAILED',
+            );
+          }
+
+          await this.prisma.paymentTransaction.update({
+            where: {
+              payment_transaction_id:
+                transaction.payment_transaction_id,
+            },
+
+            data: {
+              payment_transaction_status_id:
+                failedStatus.payment_transaction_status_id,
+            },
+          });
+
+          throw error;
+        }
       }
 
       // ============================================================
@@ -301,7 +333,7 @@ export class CreatePaymentService {
 
     const orderId = transactionCode;
 
-    const orderInfo = `Thanh toan don hang ${payment.payment_order_code}`;
+    const orderInfo = `Thanh toán hóa đơn ${payment.payment_order_code}`;
 
     const requestType = 'payWithATM';
 
@@ -327,10 +359,6 @@ export class CreatePaymentService {
         .update(rawSignature)
         .digest('hex');
 
-    // ============================================================
-    // Gọi MoMo
-    // ============================================================
-
     try {
       const response = await axios.post(
         'https://test-payment.momo.vn/v2/gateway/api/create',
@@ -348,6 +376,8 @@ export class CreatePaymentService {
           lang: 'vi',
         },
       );
+
+      // console.log('MOMO RESPONSE:', response.data);
 
       const payUrl = response.data?.payUrl;
 

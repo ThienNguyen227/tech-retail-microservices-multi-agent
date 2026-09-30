@@ -1,16 +1,10 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import {BadRequestException, Injectable, NotFoundException} from '@nestjs/common';
 
 import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class MomoIpnService {
-  constructor(
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async handleIpn(data: any) {
     console.log('========== MOMO IPN ==========');
@@ -51,8 +45,6 @@ export class MomoIpnService {
     // 2. Tìm PaymentTransaction
     // ============================================================
 
-    // orderId của MoMo chính là
-    // payment_transaction_transaction_code
     const transaction =
       await this.prisma.paymentTransaction.findUnique({
         where: {
@@ -76,8 +68,7 @@ export class MomoIpnService {
     // ============================================================
 
     if (
-      Number(payment.payment_amount) !==
-      Number(amount)
+      Number(payment.payment_amount) !== Number(amount)
     ) {
       throw new BadRequestException(
         'Số tiền MoMo không khớp với Payment',
@@ -139,20 +130,28 @@ export class MomoIpnService {
     }
 
     // ============================================================
-    // 6. MOMO SUCCESS
+    // 6. Xác định kết quả thanh toán
     // ============================================================
 
-    if (Number(resultCode) === 0) {
-      await this.prisma.$transaction([
-        // --------------------------------------------------------
-        // PaymentTransaction = SUCCESS
-        // --------------------------------------------------------
+    const isSuccess = Number(resultCode) === 0;
 
-        this.prisma.paymentTransaction.update({
+    // ============================================================
+    // 7. Transaction cập nhật PaymentTransaction + Payment
+    // ============================================================
+
+    await this.prisma.$transaction(async (tx) => {
+      // ==========================================================
+      // 7.1. SUCCESS
+      // ==========================================================
+
+      if (isSuccess) {
+        // PaymentTransaction -> SUCCESS
+        await tx.paymentTransaction.update({
           where: {
             payment_transaction_id:
               transaction.payment_transaction_id,
           },
+
           data: {
             payment_transaction_status_id:
               successTransactionStatus.payment_transaction_status_id,
@@ -171,43 +170,34 @@ export class MomoIpnService {
             payment_transaction_gateway_response:
               data,
           },
-        }),
+        });
 
-        // --------------------------------------------------------
-        // Payment = PAID
-        // --------------------------------------------------------
-
-        this.prisma.payment.update({
+        // Payment -> PAID
+        await tx.payment.update({
           where: {
             payment_id: payment.payment_id,
           },
+
           data: {
             payment_status_id:
               paidPaymentStatus.payment_status_id,
           },
-        }),
-      ]);
+        });
 
-      return {
-        resultCode: 0,
-        message: 'Success',
-      };
-    }
+        return;
+      }
 
-    // ============================================================
-    // 7. MOMO FAILED
-    // ============================================================
+      // ==========================================================
+      // 7.2. FAILED / CANCEL
+      // ==========================================================
 
-    await this.prisma.$transaction([
-      // ----------------------------------------------------------
-      // PaymentTransaction = FAILED
-      // ----------------------------------------------------------
-
-      this.prisma.paymentTransaction.update({
+      // PaymentTransaction -> FAILED
+      await tx.paymentTransaction.update({
         where: {
           payment_transaction_id:
             transaction.payment_transaction_id,
         },
+
         data: {
           payment_transaction_status_id:
             failedTransactionStatus.payment_transaction_status_id,
@@ -226,35 +216,44 @@ export class MomoIpnService {
           payment_transaction_gateway_response:
             data,
         },
-      }),
+      });
 
       // ----------------------------------------------------------
-      // Payment = UNPAID
+      // Chỉ chuyển Payment -> UNPAID nếu Payment
+      // chưa PAID.
       //
-      // Chỉ chuyển về UNPAID nếu Payment chưa PAID.
-      // Không được làm PAID -> UNPAID.
+      // Không bao giờ:
+      // PAID -> UNPAID
       // ----------------------------------------------------------
 
-      ...(payment.payment_status_id !==
-      paidPaymentStatus.payment_status_id
-        ? [
-            this.prisma.payment.update({
-              where: {
-                payment_id: payment.payment_id,
-              },
-              data: {
-                payment_status_id:
-                  unpaidPaymentStatus.payment_status_id,
-              },
-            }),
-          ]
-        : []),
-    ]);
+      if (
+        payment.payment_status_id !==
+        paidPaymentStatus.payment_status_id
+      ) {
+        await tx.payment.update({
+          where: {
+            payment_id: payment.payment_id,
+          },
+
+          data: {
+            payment_status_id:
+              unpaidPaymentStatus.payment_status_id,
+          },
+        });
+      }
+    });
+
+    // ============================================================
+    // 8. Trả kết quả cho MoMo
+    // ============================================================
 
     return {
       resultCode,
-      message,
+      message: isSuccess
+        ? 'Success'
+        : message,
     };
   }
+
 }
 
