@@ -12,35 +12,32 @@ datasource db {
 // ========================================
 
 model Payment {
-  payment_id                  Int      @id @default(autoincrement())
+  payment_id                Int      @id @default(autoincrement())
+  payment_order_id          Int      @unique // LR -> Order-Service (order_id)
+  payment_order_code        String
+  payment_user_id           Int      // LR -> User-Service (user_id)
+  payment_amount            Decimal  @db.Decimal(15, 2)
+  payment_currency          String   @default("VND")
+  payment_created_at        DateTime @default(now())
+  payment_updated_at        DateTime @updatedAt
 
-  payment_order_id            Int      // LR -> Order-Service (order_id)
-  payment_order_code          String
-
-  payment_user_id             Int      // LR -> User-Service (user_id)
-
-  payment_amount              Decimal
-  payment_currency            String   @default("VND")
-
-  payment_payment_method_id   Int
-  payment_status_id           Int
-
-  payment_created_at          DateTime @default(now())
-  payment_updated_at          DateTime @updatedAt
+  // FK
+  payment_method_id         Int
+  payment_status_id         Int
 
   // Relations
-  payment_method              PaymentMethod @relation(fields: [payment_payment_method_id], references: [payment_method_id])
+  payment_method            PaymentMethod @relation(fields: [payment_method_id], references: [payment_method_id])
 
-  payment_status              PaymentStatus @relation(fields: [payment_status_id], references: [payment_status_id])
+  payment_status            PaymentStatus @relation(fields: [payment_status_id], references: [payment_status_id])
 
-  payment_transaction         PaymentTransaction[]
+  payment_transaction       PaymentTransaction[]
 
   @@map("payment")
 
   @@index([payment_order_id])
   @@index([payment_order_code])
   @@index([payment_user_id])
-  @@index([payment_payment_method_id])
+  @@index([payment_method_id])
   @@index([payment_status_id])
 }
 
@@ -50,36 +47,27 @@ model Payment {
 // ========================================
 
 model PaymentTransaction {
-  payment_transaction_id             Int      @id @default(autoincrement())
-
-  payment_transaction_payment_id     Int
-
-  payment_transaction_transaction_code String @unique
-
+  payment_transaction_id                     Int      @id @default(autoincrement())
+  payment_transaction_transaction_code       String   @unique
   payment_transaction_gateway_transaction_id String?
+  payment_transaction_gateway_response_code  String?
+  payment_transaction_gateway_message        String?
+  payment_transaction_gateway_response       Json?
+  payment_transaction_created_at             DateTime @default(now())
+  payment_transaction_updated_at             DateTime @updatedAt
 
-  payment_transaction_amount         Decimal
-  payment_transaction_currency       String   @default("VND")
-
-  payment_transaction_status_id      Int
-
-  // Request/response information
-  payment_transaction_gateway_response_code String?
-  payment_transaction_gateway_message      String?
-
-  payment_transaction_gateway_response     Json?
-
-  payment_transaction_created_at     DateTime @default(now())
-  payment_transaction_updated_at     DateTime @updatedAt
+  // FK
+  payment_id                                 Int
+  payment_transaction_status_id              Int
 
   // Relations
-  payment                         Payment @relation(fields: [payment_transaction_payment_id],references: [payment_id], onDelete: Cascade)
+  payment                              Payment @relation(fields: [payment_id], references: [payment_id], onDelete: Cascade)
 
-  payment_status                  PaymentStatus @relation(fields: [payment_transaction_status_id], references: [payment_status_id])
+  payment_transaction_status           PaymentTransactionStatus @relation(fields: [payment_transaction_status_id], references: [payment_transaction_status_id])
 
   @@map("payment_transaction")
 
-  @@index([payment_transaction_payment_id])
+  @@index([payment_id])
   @@index([payment_transaction_gateway_transaction_id])
   @@index([payment_transaction_status_id])
 }
@@ -89,25 +77,43 @@ model PaymentTransaction {
 // 3. PAYMENT STATUS (MASTERDATA)
 // ========================================
 //
-// 1, PENDING, Đang chờ thanh toán
-// 2, SUCCESS, Thanh toán thành công
-// 3, FAILED, Thanh toán thất bại
-// 4, CANCELLED, Đã hủy
+// 1, UNPAID, Chưa thanh toán
+// 2, PAID, Đã thanh toán
 
 model PaymentStatus {
-  payment_status_id   Int      @id @default(autoincrement())
-  payment_status_code String   @unique
-  payment_status_name String
+  payment_status_id      Int    @id @default(autoincrement())
+  payment_status_code    String @unique
+  payment_status_name    String
 
-  payment             Payment[]
-  payment_transaction PaymentTransaction[]
+  payment Payment[]
 
   @@map("payment_status")
 }
 
 
 // ========================================
-// 4. PAYMENT METHOD (MASTERDATA)
+// 4. PAYMENT TRANSACTION STATUS (MASTERDATA)
+// ========================================
+//
+// 1, PENDING, Giao dịch đang thực hiện
+// 2, SUCCESS, Giao dịch thành công
+// 3, FAILED, Giao dịch thất bại
+// 4, CANCELLED, Giao dịch bị hủy
+// 5, EXPIRED, Giao dịch hết hạn
+
+model PaymentTransactionStatus {
+  payment_transaction_status_id      Int    @id @default(autoincrement())
+  payment_transaction_status_code    String @unique
+  payment_transaction_status_name    String
+
+  payment_transaction PaymentTransaction[]
+
+  @@map("payment_transaction_status")
+}
+
+
+// ========================================
+// 5. PAYMENT METHOD (MASTERDATA) 
 // ========================================
 //
 // 1, COD
@@ -118,10 +124,9 @@ model PaymentMethod {
   payment_method_id       Int      @id @default(autoincrement())
   payment_method_code     String   @unique
   payment_method_name     String
-
   payment_method_status   Boolean  @default(true)
 
-  payment               Payment[]
+  payment Payment[]
 
   @@map("payment_method")
 }
