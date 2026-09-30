@@ -7,7 +7,7 @@ export class GetOrderListController {
   constructor(private readonly getOrderListService: GetOrderListService) {}
 
   @Get()
-  getOrders(@Query() dto: GetOrderListDto) {
+  getOrderList(@Query() dto: GetOrderListDto) {
     return this.getOrderListService.getOrderList(dto);
   }
 }

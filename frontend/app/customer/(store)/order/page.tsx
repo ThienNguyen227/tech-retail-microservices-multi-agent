@@ -181,6 +181,58 @@ const getProcessingStatusIcon = (statusId: number) => {
   }
 };
 
+  // ============================================================
+  // Payment
+  // ============================================================
+
+  const handlePayment = async (order: Order) => {
+    try {
+      // COD
+      if (order.order_order_payment_method_id === 1) {
+        alert("Đơn hàng này sẽ được thanh toán khi nhận hàng.");
+        return;
+      }
+
+      const response = await fetch(
+        `http://localhost:3009/api/v1/payment`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            order_id: order.order_id,
+            payment_method_id: order.order_order_payment_method_id,
+          }),
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.message || "Không thể thực hiện thanh toán.",
+        );
+      }
+
+      // MoMo / VNPay trả về URL thanh toán
+      if (data.payUrl) {
+        window.location.href = data.payUrl;
+        return;
+      }
+
+      alert("Không nhận được đường dẫn thanh toán.");
+    } catch (error) {
+      console.error("PAYMENT ERROR:", error);
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Không thể thực hiện thanh toán.",
+      );
+    }
+  };
+
 // ============================================================
 // Page
 // ============================================================
@@ -862,6 +914,37 @@ export default function OrdersPage() {
                       }
                     </span>
                   </div>
+
+                  {/* Payment Button */}
+
+                  {selectedOrder.order_order_payment_status_id === 1 && (
+                    <div className="border-t border-gray-100 pt-4">
+                      {selectedOrder.order_order_payment_method_id === 1 ? (
+                        <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-center">
+                          <p className="text-sm font-semibold text-blue-700">
+                            Thanh toán khi nhận hàng
+                          </p>
+
+                          <p className="mt-1 text-xs text-blue-600">
+                            Bạn sẽ thanh toán cho nhân viên giao hàng khi nhận
+                            được sản phẩm.
+                          </p>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handlePayment(selectedOrder)}
+                          className="flex w-full items-center justify-center gap-2 rounded-lg bg-[#12313a] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#1d4651]"
+                        >
+                          <CreditCard className="h-4 w-4" />
+
+                          {selectedOrder.order_order_payment_method_id === 2
+                            ? "Thanh toán qua MoMo"
+                            : "Thanh toán qua VNPay"}
+                        </button>
+                      )}
+                    </div>
+                  )}
 
                   {/* Subtotal */}
 
