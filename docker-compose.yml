@@ -1,19 +1,4 @@
 services:
-  # frontend:
-  #   build:
-  #     context: ./frontend
-  #     dockerfile: Dockerfile
-  #   container_name: frontend
-  #   ports:
-  #     - "3000:3000"
-  #   environment:
-  #     - NODE_ENV=development
-  #     - WATCHPACK_POLLING=true
-  #   volumes:
-  #     - ./frontend:/app
-  #     - /app/node_modules
-  #   command: npm run dev -- --hostname 0.0.0.0 --port 3000
-  
   mongodb:
     image: mongo:8
     container_name: mongodb
@@ -42,7 +27,21 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  rabbitmq:
+    image: rabbitmq:4-management
+    container_name: rabbitmq
+    restart: unless-stopped
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: password
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
     
 volumes:
   mongodb_data:
   postgresdb_data:
+  rabbitmq_data:
