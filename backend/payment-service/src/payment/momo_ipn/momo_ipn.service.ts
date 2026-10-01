@@ -1,10 +1,14 @@
 import {BadRequestException, Injectable, NotFoundException} from '@nestjs/common';
 
 import { PrismaService } from '../../prisma/prisma.service';
+import { RabbitMQService } from '../../rabbitmq/rabbitmq.service';
 
 @Injectable()
 export class MomoIpnService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly rabbitMQService: RabbitMQService,
+  ) {}
 
   async handleIpn(data: any) {
     console.log('========== MOMO IPN ==========');
@@ -242,6 +246,12 @@ export class MomoIpnService {
         });
       }
     });
+
+    // Publish event to RabbitMQ chưa Outbox Pattern
+    await this.rabbitMQService.publish( 
+      isSuccess ? 'payment.succeeded' : 'payment.failed',
+      { orderId: payment.payment_order_id, }, 
+    );
 
     // ============================================================
     // 8. Trả kết quả cho MoMo
