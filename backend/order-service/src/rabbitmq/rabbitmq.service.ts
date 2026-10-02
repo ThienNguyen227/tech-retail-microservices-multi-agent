@@ -19,42 +19,85 @@ export class RabbitMQService
     private readonly updateOrderStatusService: UpdateOrderStatusService,
   ) {}
 
+  // async onModuleInit() {
+  //   // 1. Kết nối RabbitMQ
+  //   this.connection = await amqp.connect(
+  //     'amqp://admin:password@localhost:5672',
+  //   );
+
+  //   // 2. Tạo channel
+  //   this.channel = await this.connection.createChannel();
+
+  //   // 3. Tạo Queue
+  //   await this.channel.assertQueue(
+  //     'payment.order.queue',
+  //     {
+  //       durable: true,
+  //     },
+  //   );
+
+  //   // 4. Binding: payment.succeeded
+  //   await this.channel.bindQueue(
+  //     'payment.order.queue',
+  //     'payment.events',
+  //     'payment.succeeded',
+  //   );
+
+  //   // 5. Binding: payment.failed
+  //   await this.channel.bindQueue(
+  //     'payment.order.queue',
+  //     'payment.events',
+  //     'payment.failed',
+  //   );
+
+  //   console.log('RabbitMQ connected');
+  //   console.log('Queue "payment.order.queue" is ready');
+
+  //   // 6. Bắt đầu Consumer
+  //   await this.consume();
+  // }
   async onModuleInit() {
-    // 1. Kết nối RabbitMQ
-    this.connection = await amqp.connect(
-      'amqp://admin:password@localhost:5672',
-    );
+    try {
+      // 1. Kết nối RabbitMQ
+      this.connection = await amqp.connect(
+        'amqp://admin:password@localhost:5672',
+      );
 
-    // 2. Tạo channel
-    this.channel = await this.connection.createChannel();
+      // 2. Tạo channel
+      this.channel = await this.connection.createChannel();
 
-    // 3. Tạo Queue
-    await this.channel.assertQueue(
-      'payment.order.queue',
-      {
-        durable: true,
-      },
-    );
+      // 3. Tạo Queue
+      await this.channel.assertQueue(
+        'payment.order.queue',
+        {
+          durable: true,
+        },
+      );
 
-    // 4. Binding: payment.succeeded
-    await this.channel.bindQueue(
-      'payment.order.queue',
-      'payment.events',
-      'payment.succeeded',
-    );
+      // 4. Binding: payment.succeeded
+      await this.channel.bindQueue(
+        'payment.order.queue',
+        'payment.events',
+        'payment.succeeded',
+      );
 
-    // 5. Binding: payment.failed
-    await this.channel.bindQueue(
-      'payment.order.queue',
-      'payment.events',
-      'payment.failed',
-    );
+      // 5. Binding: payment.failed
+      await this.channel.bindQueue(
+        'payment.order.queue',
+        'payment.events',
+        'payment.failed',
+      );
 
-    console.log('RabbitMQ connected');
-    console.log('Queue "payment.order.queue" is ready');
+      console.log('RabbitMQ connected');
+      console.log('Queue "payment.order.queue" is ready');
 
-    // 6. Bắt đầu Consumer
-    await this.consume();
+      // 6. Bắt đầu Consumer
+      await this.consume();
+    } catch (error) {
+      console.error(
+        'RabbitMQ is unavailable. Order-Service will continue without RabbitMQ.',
+      );
+    }
   }
 
   async consume() {

@@ -15,16 +15,16 @@ import { InventoryService } from './inventory.service';
 export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
 
-  // 1.
-  @Get('check')
-  async checkStock(@Query('sku') sku: string, @Query('branch_id') branchId: string) 
-  {
-    return this.inventoryService.checkStock(sku, BigInt(branchId));
-  }
+  // // 1.
+  // @Get('check')
+  // async checkStock(@Query('sku') sku: string, @Query('branch_id') branchId: string) 
+  // {
+  //   return this.inventoryService.checkStock(sku, BigInt(branchId));
+  // }
 
-  // 2.
-  @Post('reserve')
-  async reserveStock(@Body() body: any) {
-    return this.inventoryService.reserveStock(body);
-  }
+  // // 2.
+  // @Post('reserve')
+  // async reserveStock(@Body() body: any) {
+  //   return this.inventoryService.reserveStock(body);
+  // }
 }

@@ -3,7 +3,20 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {ShoppingBag, ArrowLeft, Trash2, Truck, Store, Clock, X, MapPin, Phone} from "lucide-react";
+import {
+  ShoppingBag,
+  ArrowLeft,
+  Trash2,
+  Truck,
+  Store,
+  Clock,
+  X,
+  MapPin,
+  Phone,
+  CreditCard,
+  Banknote,
+  Wallet,
+} from "lucide-react";
 
 type InventoryStock = {
   sku: string;
@@ -113,8 +126,37 @@ type Coupon = {
   discountType: "PERCENTAGE" | "FIXED_AMOUNT";
 };
 
+// PAYMENT METHODS
+const PAYMENT_METHODS = [
+  {
+    id: 1,
+    code: "COD",
+    name: "Thanh toán khi nhận hàng (COD)",
+    description: "Thanh toán bằng tiền mặt khi nhận hàng",
+    icon: Banknote,
+  },
+  {
+    id: 2,
+    code: "MOMO",
+    name: "Ví điện tử MoMo",
+    description: "Thanh toán qua ứng dụng Ví MoMo",
+    icon: Wallet,
+  },
+  // {
+  //   id: 3,
+  //   code: "VNPAY",
+  //   name: "Cổng thanh toán VNPAY",
+  //   description: "Thanh toán qua quét mã QR hoặc thẻ ATM / Visa",
+  //   icon: CreditCard,
+  // },
+  
+];
+
 export default function CartPage() {
   const router = useRouter();
+
+  // PAYMENT METHOD
+  const [paymentMethod, setPaymentMethod] = useState<string>("COD");
 
   // COUPON
   const [coupons, setCoupons] = useState<Coupon[]>([]);
@@ -319,33 +361,33 @@ const totalAmount = (cart?.totalPrice || 0) - discountAmount;
         // CHECK INVENTORY
         // =========================
 
-        const stockResults = await Promise.all(
-          cartData.items.map(async (item: CartItem) => {
-            try {
-              const res = await fetch(`http://localhost:3006/api/v1/inventories/check?sku=${encodeURIComponent(item.sku)}&branch_id=1`);
+        // const stockResults = await Promise.all(
+        //   cartData.items.map(async (item: CartItem) => {
+        //     try {
+        //       const res = await fetch(`http://localhost:3006/api/v1/inventories/check?sku=${encodeURIComponent(item.sku)}&branch_id=1`);
 
-              if (!res.ok) {
-                return null;
-              }
+        //       if (!res.ok) {
+        //         return null;
+        //       }
 
-              const stock: InventoryStock = await res.json();
+        //       const stock: InventoryStock = await res.json();
 
-              return stock;
-            } catch {
-              return null;
-            }
-          }),
-        );
+        //       return stock;
+        //     } catch {
+        //       return null;
+        //     }
+        //   }),
+        // );
 
-        const stockMap: Record<string, InventoryStock> = {};
+        // const stockMap: Record<string, InventoryStock> = {};
 
-        stockResults.forEach((stock) => {
-          if (stock) {
-            stockMap[stock.sku] = stock;
-          }
-        });
+        // stockResults.forEach((stock) => {
+        //   if (stock) {
+        //     stockMap[stock.sku] = stock;
+        //   }
+        // });
 
-        setInventoryStocks(stockMap);
+        // setInventoryStocks(stockMap);
       } catch (err: any) {
         setError(err.message || "Đã xảy ra lỗi khi tải dữ liệu");
       } finally {
@@ -616,6 +658,7 @@ const totalAmount = (cart?.totalPrice || 0) - discountAmount;
     }
   };
 
+  //  {#a1a,159}
   // =========================
   // CHECKOUT Tiến hành đặt hàng
   // =========================
@@ -695,6 +738,7 @@ const totalAmount = (cart?.totalPrice || 0) - discountAmount;
         // totalAmount: cart.totalPrice,
         discountAmount,
         totalAmount,
+        paymentMethod,
       };
     }
 
@@ -732,6 +776,7 @@ const totalAmount = (cart?.totalPrice || 0) - discountAmount;
         // totalAmount: cart.totalPrice,
         discountAmount,
         totalAmount,
+        paymentMethod,
       };
     }
 
@@ -1162,6 +1207,67 @@ const totalAmount = (cart?.totalPrice || 0) - discountAmount;
                     </div>
                   </button>
                 )}
+              </div>
+
+              {/* PHƯƠNG THỨC THANH TOÁN */}
+              <div className="mt-5 border-t border-slate-100 pt-5">
+                <h3 className="mb-3 text-sm font-bold text-slate-800">
+                  Phương thức thanh toán
+                </h3>
+
+                <div className="space-y-2">
+                  {PAYMENT_METHODS.map((pm) => {
+                    const Icon = pm.icon;
+                    const isSelected = paymentMethod === pm.code;
+
+                    return (
+                      <div
+                        key={pm.code}
+                        onClick={() => setPaymentMethod(pm.code)}
+                        className={`flex cursor-pointer items-center justify-between rounded-xl border p-3 transition ${
+                          isSelected
+                            ? "border-[#168b87] bg-[#f0faf9] shadow-sm"
+                            : "border-slate-200 bg-white hover:border-slate-300"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition ${
+                              isSelected
+                                ? "bg-[#168b87] text-white"
+                                : "bg-slate-100 text-slate-600"
+                            }`}
+                          >
+                            <Icon size={18} />
+                          </div>
+
+                          <div>
+                            <p
+                              className={`text-xs font-bold ${
+                                isSelected ? "text-[#168b87]" : "text-slate-800"
+                              }`}
+                            >
+                              {pm.name}
+                            </p>
+
+                            <p className="mt-0.5 text-[11px] text-slate-500">
+                              {pm.description}
+                            </p>
+                          </div>
+                        </div>
+
+                        <input
+                          type="radio"
+                          name="paymentMethod"
+                          value={pm.code}
+                          checked={isSelected}
+                          onChange={() => setPaymentMethod(pm.code)}
+                          className="h-4 w-4 accent-[#168b87] cursor-pointer"
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* CHECKOUT */}
