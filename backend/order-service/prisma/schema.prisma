@@ -166,3 +166,19 @@ model OrderPaymentMethod {
 
   @@map("order_payment_method")
 }
+
+// ========================================
+// 6. OutboxEvent
+// ========================================
+model OutboxEvent {
+  outbox_event_id          Int       @id @default(autoincrement())
+  outbox_event_type        String
+  outbox_event_payload     Json
+  outbox_event_status      String    @default("PENDING")
+  outbox_event_retry_count Int       @default(0)
+  outbox_event_created_at  DateTime  @default(now())
+  outbox_event_published_at DateTime?
+
+  @@index([outbox_event_status])
+  @@map("outbox_event")
+}

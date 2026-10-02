@@ -233,6 +233,7 @@ const getProcessingStatusIcon = (statusId: number) => {
     }
   };
 
+
 // ============================================================
 // Page
 // ============================================================
@@ -287,6 +288,70 @@ export default function OrdersPage() {
 
     fetchOrders();
   }, []);
+
+  // ============================================================
+  // Cancel Order
+  // ============================================================
+
+  const handleCancelOrder = async (order: Order) => {
+    const confirmed = window.confirm(
+      `Bạn có chắc muốn hủy đơn hàng #${order.order_code}?`,
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(
+        `http://localhost:3007/api/v1/order/${order.order_id}/cancel`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        },
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data?.message || "Không thể hủy đơn hàng.",
+        );
+      }
+
+      // Cập nhật trạng thái đơn hàng trên UI
+      setOrders((prevOrders) =>
+        prevOrders.map((item) =>
+          item.order_id === order.order_id
+            ? {
+                ...item,
+                order_order_processing_status_id: 8,
+              }
+            : item,
+        ),
+      );
+
+      // Nếu modal đang mở thì cập nhật luôn
+      setSelectedOrder((prev) =>
+        prev && prev.order_id === order.order_id
+          ? {
+              ...prev,
+              order_order_processing_status_id: 8,
+            }
+          : prev,
+      );
+
+      alert("Hủy đơn hàng thành công.");
+    } catch (error) {
+      console.error("CANCEL ORDER ERROR:", error);
+
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Không thể hủy đơn hàng.",
+      );
+    }
+  };
 
   // ============================================================
   // Loading
@@ -526,7 +591,28 @@ export default function OrdersPage() {
                   {/* Footer */}
                   {/* ================================================== */}
 
-                  <div className="flex justify-end border-t border-gray-100 px-5 py-4">
+                  {/* <div className="flex justify-end border-t border-gray-100 px-5 py-4">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedOrder(order)}
+                      className="rounded-lg bg-[#12313a] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1d4651]"
+                    >
+                      Xem chi tiết
+                    </button>
+                  </div> */}
+                  <div className="flex justify-end gap-2 border-t border-gray-100 px-5 py-4">
+                    {/* Hủy đơn - chỉ khi Chờ xác nhận */}
+                    {order.order_order_processing_status_id === 1 && order.order_order_payment_status_id === 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleCancelOrder(order)}
+                        className="rounded-lg border border-red-200 bg-red-50 px-5 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-100"
+                      >
+                        Hủy đơn
+                      </button>
+                    )}
+
+                    {/* Xem chi tiết */}
                     <button
                       type="button"
                       onClick={() => setSelectedOrder(order)}

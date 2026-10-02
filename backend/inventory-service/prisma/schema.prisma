@@ -172,3 +172,13 @@ model InventoryTransactionItem {
 
   @@map("inventory_transaction_item")
 }
+
+
+model ProcessedEvent {
+  processed_event_id         Int      @id @default(autoincrement())
+  processed_event_event_id   Int      @unique
+  processed_event_event_type String
+  processed_event_created_at DateTime @default(now())
+
+  @@map("processed_event")
+}
