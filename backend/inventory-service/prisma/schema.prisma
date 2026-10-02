@@ -138,9 +138,6 @@ model InventoryTransaction {
 // 2, Xuất kho, EXPORT, Xuất hàng khỏi kho cho nguồn bên ngoài.
 // 3, Chuyển vào, TRANSFER_IN, Nhận hàng được chuyển từ kho khác vào kho.
 // 4, Chuyển ra, TRANSFER_OUT, Chuyển hàng từ kho hiện tại sang kho khác.
-// 5, Bán hàng, SALE, Hàng được xuất kho do bán cho khách hàng.
-// 6, Đã đặt hàng, RESERVED, Hàng đã được khách hàng đặt và số lượng được giữ lại.
-// 7, Đã hủy, CANCELLED, Đơn hàng đã bị hủy và số lượng hàng được giải phóng.
 
 model InventoryTransactionType {
   inventory_transaction_type_id   Int    @id @default(autoincrement())

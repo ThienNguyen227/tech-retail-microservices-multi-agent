@@ -7,6 +7,7 @@ import { OrderModule } from './orders/order.module';
 import { GetOrderListModule } from './orders/get_order_list/get_order_list.module';
 import { GetOrderModule } from './orders/get_order/get_order.module';
 import { UpdateOrderStatusModule } from './orders/update_order_status/update_order_status.module';
+import { CreateOrderModule } from './orders/create_order/create_order.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { UpdateOrderStatusModule } from './orders/update_order_status/update_ord
     GetOrderListModule,
     GetOrderModule,
     UpdateOrderStatusModule,
+    CreateOrderModule,
   ],
 
   controllers: [],
