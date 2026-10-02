@@ -1,149 +1,245 @@
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+
+interface CheckStockItem {
+  sku: string;
+  quantity: number;
+}
+
+export interface ReservedSerial {
+  sku: string;
+  serial_numbers: string[];
+}
 
 @Injectable()
 export class InventoryService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // // 1. 
-  // async checkStock(sku: string, branchId: bigint) {
-  //   if (!sku) {
-  //     throw new BadRequestException('SKU là bắt buộc');
-  //   }
+  /**
+   * Kiểm tra và TRỪ TỒN KHO + RESERVE SERIAL trong cùng Transaction.
+   *
+   * Chống Race Condition:
+   * - UPDATE stock với điều kiện gte
+   * - PostgreSQL tự xử lý row-level lock khi UPDATE
+   * - Nếu không đủ stock -> count = 0
+   * - Nếu lỗi -> toàn bộ transaction ROLLBACK
+   */
+  async checkStock(branchId: number, items: CheckStockItem[]) {
+    const targetBranchId = branchId > 0 ? branchId : 1;
 
-  //   const inventory = await this.prisma.inventory.findUnique({
-  //     where: {
-  //       inventory_branch_id_inventory_sku: {
-  //         inventory_branch_id: branchId,
-  //         inventory_sku: sku,
-  //       },
-  //     },
-  //     select: {
-  //       inventory_sku: true,
-  //       inventory_quantity: true,
-  //     },
-  //   });
+    try {
+      return await this.prisma.$transaction(async (tx) => {
+        // ==========================================
+        // 1. TÌM INVENTORY THEO CHI NHÁNH
+        // ==========================================
+        const inventory = await tx.inventory.findUnique({
+          where: {
+            inventory_branch_id: targetBranchId,
+          },
+        });
 
-  //   if (!inventory) {
-  //     throw new NotFoundException(
-  //       'Không tìm thấy sản phẩm trong kho',
-  //     );
-  //   }
+        if (!inventory) {
+          return {
+            is_valid: false,
+            message: `Không tìm thấy kho hàng của chi nhánh ${targetBranchId}`,
+            reserved_serials: [],
+          };
+        }
 
-  //   return {
-  //     sku: inventory.inventory_sku,
-  //     quantity: inventory.inventory_quantity,
-  //     inStock: inventory.inventory_quantity > 0,
-  //   };
-  // }
+        // ==========================================
+        // 2. LẤY STATUS AVAILABLE / RESERVED
+        // ==========================================
+        const availableStatus =
+          await tx.inventorySkuSerialStatus.findUnique({
+            where: {
+              inventory_sku_serial_status_code: 'AVAILABLE',
+            },
+          });
 
-  // // 2.
-  // async reserveStock(data: any) {
-  //   // =========================
-  //   // 1. VALIDATE REQUEST
-  //   // =========================
+        const reservedStatus =
+          await tx.inventorySkuSerialStatus.findUnique({
+            where: {
+              inventory_sku_serial_status_code: 'RESERVED',
+            },
+          });
 
-  //   const branchId = Number(data.branchId);
+        if (!availableStatus || !reservedStatus) {
+          throw new Error(
+            'Không tìm thấy trạng thái AVAILABLE hoặc RESERVED',
+          );
+        }
 
-  //   if (!Number.isInteger(branchId) || branchId <= 0) {
-  //     throw new BadRequestException(
-  //       'Branch ID không hợp lệ',
-  //     );
-  //   }
+        // Lưu các serial đã reserve để trả về Order-Service
+        const reservedSerials: ReservedSerial[] = [];
 
-  //   if (!Array.isArray(data.items) || data.items.length === 0) {
-  //     throw new BadRequestException(
-  //       'Danh sách sản phẩm không được để trống',
-  //     );
-  //   }
+        // ==========================================
+        // 3. XỬ LÝ TỪNG SKU
+        // ==========================================
+        for (const item of items) {
+          // ------------------------------------------
+          // 3.1. Tìm SKU
+          // ------------------------------------------
+          const skuRecord = await tx.inventorySku.findUnique({
+            where: {
+              inventory_sku_code: item.sku,
+            },
+          });
 
-  //   for (const item of data.items) {
-  //     if (!item.sku?.trim()) {
-  //       throw new BadRequestException(
-  //         'Sản phẩm thiếu SKU',
-  //       );
-  //     }
+          if (!skuRecord) {
+            throw new Error(
+              `Sản phẩm với mã SKU ${item.sku} không tồn tại trong hệ thống kho`,
+            );
+          }
 
-  //     if (
-  //       !Number.isInteger(Number(item.quantity)) ||
-  //       Number(item.quantity) <= 0
-  //     ) {
-  //       throw new BadRequestException(
-  //         `Số lượng sản phẩm ${item.sku} không hợp lệ`,
-  //       );
-  //     }
-  //   }
+          // ------------------------------------------
+          // TEST RACE CONDITION
+          // ------------------------------------------
+          console.log(
+            `[${item.sku}] Đã check SKU, chuẩn bị delay...`,
+          );
 
-  //   // =========================
-  //   // 2. TRANSACTION
-  //   // =========================
+          await new Promise((resolve) => setTimeout(resolve, 3000));
 
-  //   await this.prisma.$transaction(async (tx) => {
-  //     for (const item of data.items) {
-  //       const sku = item.sku.trim();
-  //       const quantity = Number(item.quantity);
+          console.log(
+            `[${item.sku}] Hết delay, bắt đầu UPDATE`,
+          );
 
-  //       // =========================
-  //       // TÌM INVENTORY
-  //       // =========================
+          // ==========================================
+          // 3.2. TRỪ INVENTORY STOCK ATOMIC
+          // ==========================================
+          const updateResult = await tx.inventoryStock.updateMany({
+            where: {
+              inventory_id: inventory.inventory_id,
+              inventory_sku_id: skuRecord.inventory_sku_id,
 
-  //       const inventory = await tx.inventory.findUnique({
-  //         where: {
-  //           inventory_branch_id_inventory_sku: {
-  //             inventory_branch_id: branchId,
-  //             inventory_sku: sku,
-  //           },
-  //         },
-  //       });
+              // Chỉ update nếu stock còn đủ
+              inventory_stock_quantity: {
+                gte: item.quantity,
+              },
+            },
 
-  //       if (!inventory) {
-  //         throw new NotFoundException(
-  //           `Không tìm thấy tồn kho cho SKU ${sku} tại chi nhánh ${branchId}`,
-  //         );
-  //       }
+            data: {
+              // Trừ stock
+              inventory_stock_quantity: {
+                decrement: item.quantity,
+              },
+            },
+          });
 
-  //       // =========================
-  //       // KIỂM TRA TỒN KHO
-  //       // =========================
+          // ==========================================
+          // 3.3. KHÔNG ĐỦ STOCK
+          // ==========================================
+          if (updateResult.count === 0) {
+            const currentStock = await tx.inventoryStock.findUnique({
+              where: {
+                inventory_id_inventory_sku_id: {
+                  inventory_id: inventory.inventory_id,
+                  inventory_sku_id: skuRecord.inventory_sku_id,
+                },
+              },
+            });
 
-  //       if (inventory.inventory_quantity < quantity) {
-  //         throw new BadRequestException(
-  //           `Sản phẩm ${sku} không đủ tồn kho. Còn ${inventory.inventory_quantity}, cần ${quantity}`,
-  //         );
-  //       }
+            const availableQty =
+              currentStock?.inventory_stock_quantity ?? 0;
 
-  //       // =========================
-  //       // TRỪ TỒN KHO
-  //       // =========================
+            throw new Error(
+              `Sản phẩm ${item.sku} không đủ số lượng ` +
+                `(còn ${availableQty}, yêu cầu ${item.quantity})`,
+            );
+          }
 
-  //       await tx.inventory.update({
-  //         where: {
-  //           inventory_branch_id_inventory_sku: {
-  //             inventory_branch_id: branchId,
-  //             inventory_sku: sku,
-  //           },
-  //         },
-  //         data: {
-  //           inventory_quantity: {
-  //             decrement: quantity,
-  //           },
-  //         },
-  //       });
-  //     }
-  //   });
+          // ==========================================
+          // 3.4. TÌM SERIAL AVAILABLE
+          // ==========================================
+          const serials = await tx.inventorySkuSerial.findMany({
+            where: {
+              inventory_id: inventory.inventory_id,
+              inventory_sku_id: skuRecord.inventory_sku_id,
 
-  //   // =========================
-  //   // 3. SUCCESS
-  //   // =========================
+              inventory_sku_serial_status_id:
+                availableStatus.inventory_sku_serial_status_id,
+            },
 
-  //   return {
-  //     success: true,
-  //     message: 'Đặt giữ tồn kho thành công',
-  //     branchId,
-  //   };
-  // }
+            take: item.quantity,
+          });
+
+          // ==========================================
+          // 3.5. KHÔNG ĐỦ SERIAL
+          // ==========================================
+          if (serials.length < item.quantity) {
+            throw new Error(
+              `SKU ${item.sku} không đủ serial khả dụng ` +
+                `(còn ${serials.length}, yêu cầu ${item.quantity})`,
+            );
+          }
+
+          // ==========================================
+          // 3.6. AVAILABLE → RESERVED
+          // ==========================================
+          await tx.inventorySkuSerial.updateMany({
+            where: {
+              inventory_sku_serial_id: {
+                in: serials.map(
+                  (serial) =>
+                    serial.inventory_sku_serial_id,
+                ),
+              },
+
+              // Đảm bảo serial vẫn đang AVAILABLE
+              inventory_sku_serial_status_id:
+                availableStatus.inventory_sku_serial_status_id,
+            },
+
+            data: {
+              inventory_sku_serial_status_id:
+                reservedStatus.inventory_sku_serial_status_id,
+            },
+          });
+
+          // ==========================================
+          // 3.7. LƯU SERIAL ĐỂ TRẢ VỀ ORDER
+          // ==========================================
+          reservedSerials.push({
+            sku: item.sku,
+            serial_numbers: serials.map(
+              (serial) =>
+                serial.inventory_sku_serial_number,
+            ),
+          });
+
+          console.log(
+            `[${item.sku}] Đã RESERVED serial:`,
+            serials.map(
+              (serial) =>
+                serial.inventory_sku_serial_number,
+            ),
+          );
+        }
+
+        // ==========================================
+        // 4. TRANSACTION THÀNH CÔNG
+        // ==========================================
+        return {
+          is_valid: true,
+          message: 'Đã kiểm tra và giữ tồn kho thành công',
+          reserved_serials: reservedSerials,
+        };
+      });
+    } catch (error: any) {
+      // ==========================================
+      // 5. CÓ LỖI → ROLLBACK TOÀN BỘ TRANSACTION
+      // ==========================================
+      console.error(
+        '[INVENTORY] Transaction rollback:',
+        error.message,
+      );
+
+      return {
+        is_valid: false,
+        message:
+          error.message || 'Không thể xử lý tồn kho',
+        reserved_serials: [],
+      };
+    }
+  }
 }

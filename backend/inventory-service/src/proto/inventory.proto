@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package inventory;
+
+service InventoryService {
+  rpc CheckStock (CheckStockRequest) returns (CheckStockResponse);
+}
+
+message CheckStockItem {
+  string sku = 1;
+  int32 quantity = 2;
+}
+
+message CheckStockRequest {
+  int32 branch_id = 1;
+  repeated CheckStockItem items = 2;
+}
+
+// Serial được Inventory giữ cho từng SKU
+message ReservedSerial {
+  string sku = 1;
+  repeated string serial_numbers = 2;
+}
+
+message CheckStockResponse {
+  bool is_valid = 1;
+  string message = 2;
+  repeated ReservedSerial reserved_serials = 3;
+}
