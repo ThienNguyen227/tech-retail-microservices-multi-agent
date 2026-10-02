@@ -124,9 +124,7 @@ export default function CustomerInformationPage() {
   // =========================
   useEffect(() => {
     async function loadCustomerProfile() {
-      const accessToken =
-        localStorage.getItem("accessToken") ??
-        sessionStorage.getItem("accessToken");
+      const accessToken = sessionStorage.getItem("accessToken");
 
       if (!accessToken) {
         router.replace("/customer/login");

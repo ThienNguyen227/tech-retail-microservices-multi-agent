@@ -44,9 +44,7 @@ export default function CustomerProfilePage() {
 
   useEffect(() => {
     async function loadProfile() {
-      const accessToken =
-        localStorage.getItem("accessToken") ??
-        sessionStorage.getItem("accessToken");
+      const accessToken = sessionStorage.getItem("accessToken");
 
       if (!accessToken) {
         router.replace("/customer/login");
