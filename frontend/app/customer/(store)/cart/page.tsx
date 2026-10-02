@@ -728,8 +728,10 @@ const totalAmount = (cart?.totalPrice || 0) - discountAmount;
 
         subtotal: cart.totalPrice,
         shippingFee: 0,
-        discountAmount: 0,
-        totalAmount: cart.totalPrice,
+        // discountAmount: 0,
+        // totalAmount: cart.totalPrice,
+        discountAmount,
+        totalAmount,
       };
     }
 
