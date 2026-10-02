@@ -7,31 +7,171 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+
+// ========================================
+// 1. Inventory
+// ========================================
+
 model Inventory {
-  inventory_id         BigInt   @id @default(autoincrement())
-  inventory_branch_id  BigInt
-  inventory_sku        String
-  inventory_quantity   Int      @default(0)
+  inventory_id         Int      @id @default(autoincrement())
+  inventory_branch_id  Int      @unique
   inventory_created_at DateTime @default(now())
   inventory_updated_at DateTime @updatedAt
 
-  inventory_transactions Inventory_Transaction[]
+  stocks       InventoryStock[]
+  serials      InventorySkuSerial[]
+  transactions InventoryTransaction[]
 
-  @@unique([inventory_branch_id, inventory_sku])
-  @@index([inventory_sku])
+  @@map("inventory")
 }
 
-model Inventory_Transaction {
-  inventory_transaction_id           BigInt   @id @default(autoincrement())
-  inventory_transaction_inventory_id BigInt
-  inventory_transaction_type         String
-  inventory_transaction_before       Int
-  inventory_transaction_after        Int
-  inventory_transaction_reference_id String?
-  inventory_transaction_created_at   DateTime @default(now())
 
-  inventory Inventory @relation(fields: [inventory_transaction_inventory_id], references: [inventory_id])
+// ========================================
+// 2. Inventory SKU
+// ========================================
 
-  @@index([inventory_transaction_inventory_id])
-  @@index([inventory_transaction_reference_id])
+model InventorySku {
+  inventory_sku_id   Int    @id @default(autoincrement())
+  inventory_sku_code String @unique
+
+  stocks            InventoryStock[]
+  serials           InventorySkuSerial[]
+  transaction_items InventoryTransactionItem[]
+
+  @@map("inventory_sku")
+}
+
+
+// ========================================
+// 3. Inventory Stock
+// ========================================
+
+model InventoryStock {
+  inventory_id     Int
+  inventory_sku_id Int
+
+  inventory_stock_quantity Int @default(0)
+
+  inventory Inventory    @relation(fields: [inventory_id], references: [inventory_id])
+  sku       InventorySku @relation(fields: [inventory_sku_id], references: [inventory_sku_id])
+
+  @@id([inventory_id, inventory_sku_id])
+
+  @@map("inventory_stock")
+}
+
+
+// ========================================
+// 4. Inventory SKU Serial
+// ========================================
+
+model InventorySkuSerial {
+  inventory_sku_serial_id        Int    @id @default(autoincrement())
+  inventory_sku_serial_number    String @unique
+  inventory_sku_serial_status_id Int
+  inventory_sku_id               Int
+  inventory_id                   Int
+
+  status InventorySkuSerialStatus @relation(fields: [inventory_sku_serial_status_id], references: [inventory_sku_serial_status_id])
+
+  sku InventorySku @relation(fields: [inventory_sku_id], references: [inventory_sku_id])
+
+  inventory Inventory @relation(fields: [inventory_id], references: [inventory_id])
+
+  @@index([inventory_sku_id])
+  @@index([inventory_id])
+
+  @@map("inventory_sku_serial")
+}
+
+
+// ========================================
+// 5. Inventory SKU Serial Status (MASTER-DATA)
+// ========================================
+
+// 1, Có sẵn, AVAILABLE, Serial đang có sẵn trong kho và có thể bán.
+// 2, Đã đặt , RESERVED, Serial đã được giữ cho một đơn hàng.
+// 3, Đã hủy đặt, CANCELLED, Serial đã được trả lại.
+// 4, Đã bán, SOLD, Serial đã được bán cho khách hàng.
+
+model InventorySkuSerialStatus {
+  inventory_sku_serial_status_id   Int    @id @default(autoincrement())
+  inventory_sku_serial_status_code String @unique
+  inventory_sku_serial_status_name String
+
+  serials InventorySkuSerial[]
+
+  @@map("inventory_sku_serial_status")
+}
+
+
+// ========================================
+// 6. Inventory Transaction
+// ========================================
+
+model InventoryTransaction {
+  inventory_transaction_id         Int      @id @default(autoincrement())
+  inventory_transaction_from       String?
+  inventory_transaction_to         String?
+  inventory_transaction_created_at DateTime @default(now())
+  inventory_transaction_updated_at DateTime @updatedAt
+  inventory_transaction_type_id    Int
+  inventory_id                     Int
+
+  type InventoryTransactionType @relation(fields: [inventory_transaction_type_id], references: [inventory_transaction_type_id])
+
+  inventory Inventory @relation(fields: [inventory_id], references: [inventory_id])
+
+  items InventoryTransactionItem[]
+
+  @@index([inventory_transaction_type_id])
+  @@index([inventory_id])
+
+  @@map("inventory_transaction")
+}
+
+// ========================================
+// 7. Inventory Transaction Type (MASTER-DATA)
+// ========================================
+
+// 1, Nhập kho, IMPORT, Nhập hàng từ nhà cung cấp hoặc nguồn bên ngoài vào kho.
+// 2, Xuất kho, EXPORT, Xuất hàng khỏi kho cho nguồn bên ngoài.
+// 3, Chuyển vào, TRANSFER_IN, Nhận hàng được chuyển từ kho khác vào kho.
+// 4, Chuyển ra, TRANSFER_OUT, Chuyển hàng từ kho hiện tại sang kho khác.
+// 5, Bán hàng, SALE, Hàng được xuất kho do bán cho khách hàng.
+// 6, Đã đặt hàng, RESERVED, Hàng đã được khách hàng đặt và số lượng được giữ lại.
+// 7, Đã hủy, CANCELLED, Đơn hàng đã bị hủy và số lượng hàng được giải phóng.
+
+model InventoryTransactionType {
+  inventory_transaction_type_id   Int    @id @default(autoincrement())
+  inventory_transaction_type_code String @unique
+  inventory_transaction_type_name String
+
+  transactions InventoryTransaction[]
+
+  @@map("inventory_transaction_type")
+}
+
+
+// ========================================
+// 8. Inventory Transaction Item
+// ========================================
+
+model InventoryTransactionItem {
+  inventory_sku_id         Int
+  inventory_transaction_id Int
+
+  inventory_transaction_item_quantity Int
+  inventory_transaction_item_before   Int
+  inventory_transaction_item_after    Int
+
+  sku InventorySku @relation(fields: [inventory_sku_id], references: [inventory_sku_id])
+
+  transaction InventoryTransaction @relation(fields: [inventory_transaction_id], references: [inventory_transaction_id])
+
+  @@id([inventory_sku_id, inventory_transaction_id])
+  @@index([inventory_transaction_id])
+  @@index([inventory_sku_id])
+
+  @@map("inventory_transaction_item")
 }
