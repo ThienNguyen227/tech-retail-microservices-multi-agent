@@ -74,6 +74,19 @@ CREATE TABLE "order_payment_method" (
     CONSTRAINT "order_payment_method_pkey" PRIMARY KEY ("payment_method_id")
 );
 
+-- CreateTable
+CREATE TABLE "outbox_event" (
+    "outbox_event_id" SERIAL NOT NULL,
+    "outbox_event_type" TEXT NOT NULL,
+    "outbox_event_payload" JSONB NOT NULL,
+    "outbox_event_status" TEXT NOT NULL DEFAULT 'PENDING',
+    "outbox_event_retry_count" INTEGER NOT NULL DEFAULT 0,
+    "outbox_event_created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "outbox_event_published_at" TIMESTAMP(3),
+
+    CONSTRAINT "outbox_event_pkey" PRIMARY KEY ("outbox_event_id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "order_order_code_key" ON "order"("order_code");
 
@@ -112,6 +125,9 @@ CREATE UNIQUE INDEX "order_delivery_method_delivery_method_code_key" ON "order_d
 
 -- CreateIndex
 CREATE UNIQUE INDEX "order_payment_method_payment_method_code_key" ON "order_payment_method"("payment_method_code");
+
+-- CreateIndex
+CREATE INDEX "outbox_event_outbox_event_status_idx" ON "outbox_event"("outbox_event_status");
 
 -- AddForeignKey
 ALTER TABLE "order" ADD CONSTRAINT "order_order_order_processing_status_id_fkey" FOREIGN KEY ("order_order_processing_status_id") REFERENCES "order_processing_status"("order_processing_status_id") ON DELETE RESTRICT ON UPDATE CASCADE;
