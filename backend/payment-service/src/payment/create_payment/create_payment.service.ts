@@ -93,6 +93,18 @@ export class CreatePaymentService {
       throw new InternalServerErrorException('Không tìm thấy trạng thái PENDING');
     }
 
+    const paidStatus = await this.prisma.paymentStatus.findUnique({
+      where: {
+        payment_status_code: 'PAID',
+      },
+    });
+
+    if (!paidStatus) {
+      throw new InternalServerErrorException(
+        'Không tìm thấy trạng thái PAID',
+      );
+    }
+
     // ============================================================
     // 6. Payment + PaymentTransaction
     //    Thực hiện trong cùng một Database Transaction
@@ -110,6 +122,12 @@ export class CreatePaymentService {
               payment_order_id: orderId,
             },
           });
+
+          if (payment) {
+            if (payment.payment_status_id === paidStatus.payment_status_id) {
+              throw new ConflictException('Đơn hàng đã được thanh toán');
+            }
+          }
 
           // ========================================================
           // 6.2. Nếu chưa có Payment → tạo Payment
