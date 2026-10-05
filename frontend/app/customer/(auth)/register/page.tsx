@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import axios from "axios";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -29,26 +30,58 @@ export default function RegisterPage() {
 
     setLoading(true);
 
+    // try {
+    //   const sendOtpResponse = await fetch(
+    //     "http://localhost:3001/auth/customer/register/send-otp",
+    //     {
+    //       method: "POST",
+    //       headers: {
+    //         "Content-Type": "application/json",
+    //       },
+    //       body: JSON.stringify({
+    //         user_email: email,
+    //       }),
+    //     }
+    //   );
+
+    //   const sendOtpData = await sendOtpResponse.json();
+
+    //   if (!sendOtpResponse.ok) {
+    //     setError(sendOtpData.message || "Không thể gửi mã OTP.");
+    //     return;
+    //   }
+
+    //   const registerDraft = {
+    //     user_name: fullName,
+    //     user_email: email,
+    //     user_phone: phone,
+    //     user_password_hash: password,
+    //   };
+
+    //   sessionStorage.setItem("registerDraft", JSON.stringify(registerDraft));
+    //   sessionStorage.setItem("otpExpiresAt", sendOtpData.otp_expires_at);
+
+    //   router.push(`/customer/otp?email=${encodeURIComponent(email)}`);
+    // } catch (err) {
+    //   console.error(err);
+    //   setError("Lỗi kết nối đến server.");
+    // } finally {
+    //   setLoading(false);
+    // }
+
     try {
-      const sendOtpResponse = await fetch(
-        "http://localhost:3001/auth/customer/register/send-otp",
+      const response = await axios.post(
+        "http://localhost:3001/api/v1/user-service/register/otp-sending",
         {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            user_email: email,
-          }),
-        }
+          user_email: email,
+          user_phone: phone,
+        },
+        {
+          timeout: 10_000, // 10 giây
+        },
       );
 
-      const sendOtpData = await sendOtpResponse.json();
-
-      if (!sendOtpResponse.ok) {
-        setError(sendOtpData.message || "Không thể gửi mã OTP.");
-        return;
-      }
+      const sendOtpData = response.data;
 
       const registerDraft = {
         user_name: fullName,
@@ -57,13 +90,37 @@ export default function RegisterPage() {
         user_password_hash: password,
       };
 
-      sessionStorage.setItem("registerDraft", JSON.stringify(registerDraft));
-      sessionStorage.setItem("otpExpiresAt", sendOtpData.otp_expires_at);
+      sessionStorage.setItem(
+        "registerDraft",
+        JSON.stringify(registerDraft),
+      );
+
+      sessionStorage.setItem(
+        "otpExpiresAt",
+        sendOtpData.otp_expires_at,
+      );
 
       router.push(`/customer/otp?email=${encodeURIComponent(email)}`);
-    } catch (err) {
-      console.error(err);
-      setError("Lỗi kết nối đến server.");
+    } catch (error) {
+      console.error(error);
+
+      if (axios.isAxiosError(error)) {
+        // Server không phản hồi / không kết nối được
+        if (!error.response) {
+          if (error.code === "ECONNABORTED") {
+            setError("Server phản hồi quá lâu. Vui lòng thử lại sau!");
+          } else {
+            setError("Lỗi kết nối đến Server. Vui lòng thử lại sau!");
+          }
+
+          return;
+        }
+
+        // Có response từ server → lấy message của BE
+        setError(error.response.data?.message || "Không thể gửi mã OTP.");
+      } else {
+        setError("Đã xảy ra lỗi.");
+      }
     } finally {
       setLoading(false);
     }
