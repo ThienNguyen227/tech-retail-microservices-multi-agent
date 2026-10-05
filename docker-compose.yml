@@ -40,8 +40,18 @@ services:
       RABBITMQ_DEFAULT_PASS: password
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
+
+  redisdb:
+    image: redis:7
+    container_name: redisdb
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdb_data:/data
     
 volumes:
   mongodb_data:
   postgresdb_data:
   rabbitmq_data:
+  redisdb_data:
