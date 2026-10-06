@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import axios from "axios";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   FormEvent,
@@ -181,36 +182,54 @@ export default function OtpPage() {
 
   const handleResend = async () => {
     if (!email || resending) return;
+
     setResending(true);
     setError("");
+
     try {
-      const response = await fetch(
-        "http://localhost:3001/auth/customer/register/resend-otp",
+      const response = await axios.post(
+        "http://localhost:3001/api/v1/user-service/register/otp-resending",
         {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            user_email: email,
-          }),
+          user_email: email,
+        },
+        {
+          timeout: 10_000,
         }
       );
-      const data = await response.json();
 
-      if (!response.ok) {
-        setError(data.message || "Gửi lại OTP thất bại.");
-        return;
-      }
+      const data = response.data;
 
+      // Cập nhật thời gian hết hạn OTP mới
       sessionStorage.setItem("otpExpiresAt", data.otp_expires_at);
       setExpiresAt(data.otp_expires_at);
+
+      // Xóa OTP cũ trên giao diện
       setOtp(Array(OTP_LENGTH).fill(""));
-      setError("");
-      setVerified(false);
+
+      // Focus lại ô OTP đầu tiên
       inputRefs.current[0]?.focus();
-    } catch {
-      setError("Gửi lại OTP thất bại. Vui lòng thử lại.");
+
+      setVerified(false);
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        // Server không phản hồi
+        if (!error.response) {
+          if (error.code === "ECONNABORTED") {
+            setError("Server phản hồi quá lâu. Vui lòng thử lại sau!");
+          } else {
+            setError("Lỗi kết nối đến Server. Vui lòng thử lại sau!");
+          }
+
+          return;
+        }
+
+        // Backend trả lỗi
+        setError(
+          error.response.data?.message || "Gửi lại OTP thất bại."
+        );
+      } else {
+        setError("Gửi lại OTP thất bại. Vui lòng thử lại.");
+      }
     } finally {
       setResending(false);
     }
@@ -269,12 +288,33 @@ export default function OtpPage() {
                 <span className="text-lg font-bold text-[#073b4c]">SmartHub</span>
               </div>
 
-              <p className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-[#168b87]">
-                Bước 2/2
-              </p>
-              <h2 className="text-3xl font-bold tracking-tight text-[#12313a]">
+              <h2 className="text-3xl mb-4 font-bold tracking-tight text-[#12313a]">
                 Xác thực OTP
               </h2>
+              {/* Progress */}
+              <div className="mx-auto mb-4 flex max-w-md items-center">
+                {/* Bước 1 - Đã hoàn thành */}
+                <div className="flex items-center gap-2">
+                  <div className="grid h-8 w-8 place-items-center rounded-full bg-[#168b87] text-sm font-bold text-white">
+                    ✓
+                  </div>
+                  <span className="text-sm font-semibold text-[#168b87]">
+                    Tạo tài khoản
+                  </span>
+                </div>
+
+                <div className="mx-3 h-px flex-1 bg-[#168b87]" />
+
+                {/* Bước 2 - Đang focus */}
+                <div className="flex items-center gap-2">
+                  <div className="grid h-8 w-8 place-items-center rounded-full bg-[#168b87] text-sm font-bold text-white">
+                    2
+                  </div>
+                  <span className="text-sm font-semibold text-[#168b87]">
+                    Xác thực OTP
+                  </span>
+                </div>
+              </div>
               <p className="mt-3 text-sm leading-6 text-[#70858b]">
                 Mã xác thực đã được gửi tới{" "}
                 <span className="font-semibold text-[#12313a]">
@@ -322,7 +362,7 @@ export default function OtpPage() {
 
               <div className="flex items-center justify-between gap-3 text-sm text-[#70858b]">
                 <span>
-                  {countdown > 0 ? `Gửi lại sau ${countdown}s` : "Bạn chưa nhận được mã?"}
+                  {countdown > 0 ? `Gửi lại sau ${countdown}s` : "Bạn chưa nhận được mã OTP?"}
                 </span>
                 <button
                   type="button"

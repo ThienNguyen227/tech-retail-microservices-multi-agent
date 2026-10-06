@@ -24,50 +24,11 @@ export default function RegisterPage() {
     const confirmPassword = String(form.get("confirmPassword") ?? "");
 
     if (password !== confirmPassword) {
-      setError("Mật khẩu xác nhận không khớp.");
+      setError("Mật khẩu xác nhận không khớp!");
       return;
     }
 
     setLoading(true);
-
-    // try {
-    //   const sendOtpResponse = await fetch(
-    //     "http://localhost:3001/auth/customer/register/send-otp",
-    //     {
-    //       method: "POST",
-    //       headers: {
-    //         "Content-Type": "application/json",
-    //       },
-    //       body: JSON.stringify({
-    //         user_email: email,
-    //       }),
-    //     }
-    //   );
-
-    //   const sendOtpData = await sendOtpResponse.json();
-
-    //   if (!sendOtpResponse.ok) {
-    //     setError(sendOtpData.message || "Không thể gửi mã OTP.");
-    //     return;
-    //   }
-
-    //   const registerDraft = {
-    //     user_name: fullName,
-    //     user_email: email,
-    //     user_phone: phone,
-    //     user_password_hash: password,
-    //   };
-
-    //   sessionStorage.setItem("registerDraft", JSON.stringify(registerDraft));
-    //   sessionStorage.setItem("otpExpiresAt", sendOtpData.otp_expires_at);
-
-    //   router.push(`/customer/otp?email=${encodeURIComponent(email)}`);
-    // } catch (err) {
-    //   console.error(err);
-    //   setError("Lỗi kết nối đến server.");
-    // } finally {
-    //   setLoading(false);
-    // }
 
     try {
       const response = await axios.post(
@@ -115,8 +76,7 @@ export default function RegisterPage() {
 
           return;
         }
-
-        // Có response từ server → lấy message của BE
+        
         setError(error.response.data?.message || "Không thể gửi mã OTP.");
       } else {
         setError("Đã xảy ra lỗi.");
@@ -194,6 +154,29 @@ export default function RegisterPage() {
                 Bắt đầu quản lý chuỗi cửa hàng thiết bị thông minh của bạn.
               </p>
             </div>
+
+            {/* Progress */}
+<div className="mx-auto mb-8 flex max-w-md items-center">
+  <div className="flex items-center gap-2">
+    <div className="grid h-8 w-8 place-items-center rounded-full bg-[#168b87] text-sm font-bold text-white">
+      1
+    </div>
+    <span className="text-sm font-semibold text-[#168b87]">
+      Tạo tài khoản
+    </span>
+  </div>
+
+  <div className="mx-3 h-px flex-1 bg-[#d9e4e5]" />
+
+  <div className="flex items-center gap-2">
+    <div className="grid h-8 w-8 place-items-center rounded-full border-2 border-[#d9e4e5] text-sm font-bold text-[#9aabad]">
+      2
+    </div>
+    <span className="text-sm text-[#9aabad]">
+      Xác thực OTP
+    </span>
+  </div>
+</div>
 
             <form className="space-y-5" onSubmit={handleSubmit}>
               <div>

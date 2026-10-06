@@ -31,11 +31,6 @@ export class UserController {
     return this.usersService.verifyOtp(dto);
   }
 
-  @Post('customer/register/resend-otp')
-  resendOtp(@Body() dto: SendOtpDto) {
-    return this.usersService.sendOtp(dto);
-  }
-
   @Post('customer/forgot-password/send-otp')
   sendForgotPasswordOtp(@Body() dto: SendOtpDto) {
     return this.usersService.sendForgotPasswordOtp(dto);
