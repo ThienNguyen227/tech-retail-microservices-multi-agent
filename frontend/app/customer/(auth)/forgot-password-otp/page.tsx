@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import axios from "axios";
 
 const getRemainingSeconds = (expiresAt: string | null): number => {
   if (!expiresAt) return 0;
@@ -41,6 +42,14 @@ export default function ForgotPasswordOtpPage() {
 
     return () => window.clearInterval(timer);
   }, [expiresAt]);
+
+  useEffect(() => {
+    const email = sessionStorage.getItem("forgotPasswordEmail");
+
+    if (!email) {
+      router.replace("/customer/forgot-password");
+    }
+  }, [router]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -97,34 +106,46 @@ export default function ForgotPasswordOtpPage() {
     setResending(true);
 
     try {
-      const response = await fetch(
-        "http://localhost:3001/auth/customer/forgot-password/resend-otp",
+      const response = await axios.post(
+        "http://localhost:3001/api/v1/user-service/forgot-password/otp-resending",
         {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            user_email: email,
-          }),
+          user_email: email,
+        },
+        {
+          timeout: 10_000,
         },
       );
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.message || "Gửi lại OTP thất bại.");
-        return;
-      }
+      const data = response.data;
 
       sessionStorage.setItem(
         "forgotPasswordOtpExpiresAt",
         data.otp_expires_at,
       );
+
       setExpiresAt(data.otp_expires_at);
       setOtp("");
-    } catch {
-      setError("Không thể kết nối đến server. Vui lòng thử lại.");
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        // Server không phản hồi
+        if (!error.response) {
+          if (error.code === "ECONNABORTED") {
+            setError("Server phản hồi quá lâu. Vui lòng thử lại sau!");
+          } else {
+            setError("Không thể kết nối đến server. Vui lòng thử lại.");
+          }
+
+          return;
+        }
+
+        // Server trả về lỗi 4xx / 5xx
+        setError(
+          error.response.data?.message ||
+          "Gửi lại OTP thất bại.",
+        );
+      } else {
+        setError("Đã xảy ra lỗi. Vui lòng thử lại.");
+      }
     } finally {
       setResending(false);
     }

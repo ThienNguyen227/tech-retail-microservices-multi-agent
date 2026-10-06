@@ -17,6 +17,7 @@ import { RedisService } from '../../redis/redis.service';
 import { SendOtpForgotPasswordDto } from '../dto/forgot_password/send_otp.dto';
 import { ReSendOtpDto } from '../dto/register/resend_otp.dto';
 import { VerifyOtpDto } from '../dto/register/verify_otp.dto';
+import { ReSendOtpForgotPasswordDto } from '../dto/forgot_password/resend_otp.dto';
 
 @Injectable()
 export class ForgotPasswordService {
@@ -103,43 +104,58 @@ export class ForgotPasswordService {
     };
   }
 
-  // // 2. Resend OTP
-  // async resendOtp(dto: ReSendOtpDto): Promise<{ message: string; otp_expires_at: Date }> {
 
-  //   const redisKey = `register:otp:${dto.user_email}`;
+  // 2. Resend OTP Forgot Password
+  async reSendOtpForgotPassword(dto: ReSendOtpForgotPasswordDto): Promise<{ message: string; otp_expires_at: Date }> {
 
-  //   // 2. Generate OTP mới
-  //   const otp = this.generateOtp();
+    const redisKey = `forgot-password:otp:${dto.user_email}`;
 
-  //   // 3. Hash OTP
-  //   const otpCodeHash = await bcrypt.hash(otp, 10);
+    // 1. Generate OTP mới
+    const otp = this.generateOtp();
 
-  //   // TEST: 1. Trả lỗi Server Phản hồi quá lâu, 2. Trace condition 
-  //   // await new Promise((resolve) => setTimeout(resolve, 5_000));
+    // 2. Hash OTP
+    const otpCodeHash = await bcrypt.hash(otp, 10);
 
-  //   // 5. Lưu OTP mới, hết hạn sau 60 giây
-  //   const saved = await this.redisService.setIfNotExists(redisKey, otpCodeHash, 60);
+    await new Promise((resolve) => setTimeout(resolve, 5_000));
 
-  //   if (!saved) 
-  //   {
-  //     throw new ConflictException('Tài khoản này đang được đăng ký ở một nơi khác!');
-  //   }
+    // 3. Lưu OTP mới vào Redis
+    const saved = await this.redisService.setIfNotExists(
+      redisKey,
+      otpCodeHash,
+      60,
+    );
 
-  //   // 6. Thời gian hết hạn
-  //   const expiresAt = new Date(Date.now() + 60 * 1000);
+    if (!saved) {
+      throw new ConflictException(
+        'Email này đang trong quá trình xác nhận OTP!',
+      );
+    }
 
-  //   // 7. Gửi OTP mới
-  //   try {
-  //     await this.emailService.sendOtpEmail(dto.user_email, otp);
-  //   } catch (error) {
-  //     // Gửi thất bại → xóa OTP mới
-  //     await this.redisService.delete(redisKey);
+    // 4. Thời gian hết hạn OTP
+    const expiresAt = new Date(Date.now() + 60 * 1000);
 
-  //     throw new InternalServerErrorException('Không thể gửi OTP. Vui lòng thử lại sau!');
-  //   }
+    // 5. Gửi OTP qua email
+    try {
+      await this.emailService.sendOtpEmailForgotPassword(
+        dto.user_email,
+        otp,
+      );
+    } catch (error) {
+      // Gửi email thất bại → xóa OTP khỏi Redis
+      await this.redisService.delete(redisKey);
 
-  //   return {message: 'OTP mới đã được gửi đến email của người dùng!', otp_expires_at: expiresAt};
-  // }
+      throw new InternalServerErrorException(
+        'Không thể gửi OTP. Vui lòng thử lại sau!',
+      );
+    }
+
+    return {
+      message: 'OTP mới đã được gửi đến email của người dùng!',
+      otp_expires_at: expiresAt,
+    };
+  }
+
+
 
   // // 3. Verify OTP
   // async verifyOtp(dto: VerifyOtpDto): Promise<{ message: string }> {

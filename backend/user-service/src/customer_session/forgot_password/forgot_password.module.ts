@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 // import { PrismaModule } from '../../prisma/prisma.module';
 import { EmailModule } from '../../email/email.module';
 
-import { ForgotPasswordController } from './register.controller';
+import { ForgotPasswordController } from './forgot_password.controller';
 import { ForgotPasswordService } from './forgot_password.service';
 
 @Module({
