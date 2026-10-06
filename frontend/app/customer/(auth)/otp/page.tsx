@@ -143,29 +143,19 @@ export default function OtpPage() {
     setLoading(true);
 
     try {
-      const response = await fetch(
-        "http://localhost:3001/auth/customer/register/verify-otp",
+      await axios.post(
+        "http://localhost:3001/api/v1/user-service/register/otp-verifying",
         {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            user_email: email,
-            otp_code: otpCode,
-            user_name: userName,
-            user_phone: userPhone,
-            user_password_hash: passwordHash,
-          }),
-        }
+          user_email: email,
+          otp_code: otpCode,
+          user_name: userName,
+          user_phone: userPhone,
+          user_password_hash: passwordHash,
+        },
+        {
+          timeout: 10_000,
+        },
       );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.message || "Xác thực OTP thất bại.");
-        return;
-      }
 
       setVerified(true);
       sessionStorage.removeItem("registerDraft");
@@ -173,8 +163,26 @@ export default function OtpPage() {
       setTimeout(() => {
         router.push("/customer/login");
       }, 1200);
-    } catch {
-      setError("Xác thực OTP thất bại. Vui lòng thử lại.");
+
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        // Server không phản hồi
+        if (!error.response) {
+          if (error.code === "ECONNABORTED") {
+            setError("Server phản hồi quá lâu. Vui lòng thử lại sau!");
+          } else {
+            setError("Lỗi kết nối đến Server. Vui lòng thử lại sau!");
+          }
+
+          return;
+        }
+
+        // Backend trả lỗi
+        setError(error.response.data?.message || "Xác thực OTP thất bại.");
+      } else {
+        setError("Xác thực OTP thất bại. Vui lòng thử lại.");
+      }
+
     } finally {
       setLoading(false);
     }
