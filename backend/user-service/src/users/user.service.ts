@@ -36,78 +36,7 @@ export class UsersService {
   private generateOtp(): string {
     return Math.floor(100000 + Math.random() * 900000).toString();
   }
-  // Register 
-  async sendOtp(dto: SendOtpDto): Promise<{ message: string; otp_expires_at: Date }> {
-    const existedUser = await this.findByEmail(dto.user_email);
-
-    if (existedUser) {
-      throw new BadRequestException('Email đã tồn tại');
-    }
-
-    const pendingOtp = await this.prisma.registration_Otps.findFirst({
-      where: {
-        otp_user_email: dto.user_email,
-        otp_status: 'PENDING',
-      },
-      orderBy: {
-        otp_created_at: 'desc',
-      },
-    });
-
-    if (pendingOtp && pendingOtp.otp_expires_at > new Date()) {
-      throw new ConflictException(
-        'Tài khoản này đang được đăng ký trên một nơi khác.',
-      );
-    }
-
-    // Chỉ dùng tạm để test race condition
-    // await new Promise((resolve) => setTimeout(resolve, 3000));
-
-    // OTP PENDING cũ đã hết hạn thì xóa trước khi tạo OTP mới
-    if (pendingOtp) {
-      await this.prisma.registration_Otps.delete({
-        where: { otp_id: pendingOtp.otp_id },
-      });
-    }
-
-    const otp = this.generateOtp();
-    const otpHashedPassword = await bcrypt.hash(otp, 10);
-    const expiresAt = new Date(Date.now() + 1 * 60 * 1000); // 1 phút
-
-    try {
-      await this.prisma.registration_Otps.create({
-        data: {
-          otp_user_email: dto.user_email,
-          otp_code_hash: otpHashedPassword,
-          otp_status: 'PENDING',
-          otp_expires_at: expiresAt,
-        },
-      });
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
-        throw new ConflictException(
-          'Tài khoản này đang được đăng ký trên một nơi khác.',
-        );
-      }
-
-      throw error;
-    }
-
-    // Gửi email
-    try {
-      await this.emailService.sendOtpEmail(dto.user_email, otp);
-    } catch (error) {
-      throw new InternalServerErrorException('Không thể gửi OTP. Vui lòng thử lại.');
-    }
-
-    return {
-      message: 'OTP đã được gửi đến email của bạn',
-      otp_expires_at: expiresAt,
-    };
-  }
+  
   // Register
   async verifyOtp(dto: VerifyOtpDto): Promise<{ message: string; user_id: number }> {
     // Kiểm tra email chưa được đăng ký
