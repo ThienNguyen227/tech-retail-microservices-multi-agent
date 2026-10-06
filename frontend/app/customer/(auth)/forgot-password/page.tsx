@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import axios from "axios";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -16,27 +17,19 @@ export default function ForgotPasswordPage() {
     setLoading(true);
 
     try {
-      const response = await fetch(
-        "http://localhost:3001/auth/customer/forgot-password/send-otp",
+      const response = await axios.post(
+        "http://localhost:3001/api/v1/user-service/forgot-password/otp-sending",
         {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            user_email: email,
-          }),
+          user_email: email,
+        },
+        {
+          timeout: 10_000,
         },
       );
 
-      const data = await response.json();
+      const data = response.data;
 
-      if (!response.ok) {
-        setError(data.message || "Không thể kiểm tra email.");
-        return;
-      }
-
-      // Dùng cho trang OTP hiển thị đếm ngược theo thời điểm hết hạn từ BE.
+      // Lưu email và thời gian hết hạn OTP
       sessionStorage.setItem("forgotPasswordEmail", email);
       sessionStorage.setItem(
         "forgotPasswordOtpExpiresAt",
@@ -46,8 +39,31 @@ export default function ForgotPasswordPage() {
       router.push(
         `/customer/forgot-password-otp?email=${encodeURIComponent(email)}`,
       );
-    } catch {
-      setError("Không thể kết nối đến server. Vui lòng thử lại.");
+
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+
+        // Không nhận được response từ server
+        if (!error.response) {
+          if (error.code === "ECONNABORTED") {
+            setError("Server phản hồi quá lâu. Vui lòng thử lại sau!");
+          } else {
+            setError("Không thể kết nối đến server. Vui lòng thử lại.");
+          }
+
+          return;
+        }
+
+        // Backend trả về lỗi 400/409/500...
+        setError(
+          error.response.data?.message ||
+          "Không thể kiểm tra email.",
+        );
+
+      } else {
+        setError("Đã xảy ra lỗi. Vui lòng thử lại.");
+      }
+
     } finally {
       setLoading(false);
     }
@@ -118,6 +134,41 @@ export default function ForgotPasswordPage() {
             </div>
 
             <div className="mb-9">
+              {/* STEP INDICATOR */}
+              <div className="mb-8">
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col items-center">
+                    <div className="grid h-9 w-9 place-items-center rounded-full bg-[#168b87] text-sm font-bold text-white">
+                      1
+                    </div>
+                    <span className="mt-2 text-xs font-semibold text-[#168b87]">
+                      Kiểm tra email
+                    </span>
+                  </div>
+
+                  <div className="mx-3 h-[2px] flex-1 bg-[#d9e4e5]" />
+
+                  <div className="flex flex-col items-center">
+                    <div className="grid h-9 w-9 place-items-center rounded-full bg-[#e8eeee] text-sm font-bold text-[#8ca0a4]">
+                      2
+                    </div>
+                    <span className="mt-2 text-xs text-[#8ca0a4]">
+                      Xác thực OTP
+                    </span>
+                  </div>
+
+                  <div className="mx-3 h-[2px] flex-1 bg-[#d9e4e5]" />
+
+                  <div className="flex flex-col items-center">
+                    <div className="grid h-9 w-9 place-items-center rounded-full bg-[#e8eeee] text-sm font-bold text-[#8ca0a4]">
+                      3
+                    </div>
+                    <span className="mt-2 text-xs text-[#8ca0a4]">
+                      Thay đổi mật khẩu
+                    </span>
+                  </div>
+                </div>
+              </div>
               <p className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-[#168b87]">
                 Khôi phục tài khoản
               </p>
@@ -130,6 +181,8 @@ export default function ForgotPasswordPage() {
                 Nhập email đã đăng ký để nhận mã OTP khôi phục mật khẩu.
               </p>
             </div>
+
+            
 
             <form className="space-y-5" onSubmit={handleSubmit}>
               <div>
