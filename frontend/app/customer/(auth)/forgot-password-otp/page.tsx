@@ -197,9 +197,48 @@ export default function ForgotPasswordOtpPage() {
             </div>
 
             <div className="mb-7">
-              <p className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-[#168b87]">
-                Bước 2/3
-              </p>
+              <div className="mb-8">
+                <div className="flex items-center justify-between">
+                  {/* Bước 1 - Hoàn thành */}
+                  <div className="flex flex-col items-center">
+                    <div className="grid h-9 w-9 place-items-center rounded-full bg-[#168b87] text-sm font-bold text-white">
+                      ✓
+                    </div>
+
+                    <span className="mt-2 text-xs font-semibold text-[#168b87]">
+                      Kiểm tra email
+                    </span>
+                  </div>
+
+                  {/* Line 1 - Đã hoàn thành */}
+                  <div className="mx-3 h-[2px] flex-1 bg-[#168b87]" />
+
+                  {/* Bước 2 - Đang focus */}
+                  <div className="flex flex-col items-center">
+                    <div className="grid h-9 w-9 place-items-center rounded-full bg-[#168b87] text-sm font-bold text-white">
+                      2
+                    </div>
+
+                    <span className="mt-2 text-xs font-semibold text-[#168b87]">
+                      Xác thực OTP
+                    </span>
+                  </div>
+
+                  {/* Line 2 - Chưa đến */}
+                  <div className="mx-3 h-[2px] flex-1 bg-[#d9e4e5]" />
+
+                  {/* Bước 3 - Chưa thực hiện */}
+                  <div className="flex flex-col items-center">
+                    <div className="grid h-9 w-9 place-items-center rounded-full bg-[#e8eeee] text-sm font-bold text-[#8ca0a4]">
+                      3
+                    </div>
+
+                    <span className="mt-2 text-xs text-[#8ca0a4]">
+                      Thay đổi mật khẩu
+                    </span>
+                  </div>
+                </div>
+              </div>
 
               <h2 className="text-3xl font-bold tracking-tight text-[#12313a]">
                 Xác thực OTP

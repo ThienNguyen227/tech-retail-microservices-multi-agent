@@ -300,29 +300,31 @@ export default function OtpPage() {
                 Xác thực OTP
               </h2>
               {/* Progress */}
-              <div className="mx-auto mb-4 flex max-w-md items-center">
-                {/* Bước 1 - Đã hoàn thành */}
-                <div className="flex items-center gap-2">
-                  <div className="grid h-8 w-8 place-items-center rounded-full bg-[#168b87] text-sm font-bold text-white">
-                    ✓
-                  </div>
-                  <span className="text-sm font-semibold text-[#168b87]">
-                    Tạo tài khoản
-                  </span>
-                </div>
+<div className="mx-auto mb-4 flex max-w-sm items-start">
+  {/* Bước 1 - Đã hoàn thành */}
+  <div className="flex flex-col items-center">
+    <div className="grid h-8 w-8 place-items-center rounded-full bg-[#168b87] text-sm font-bold text-white">
+      ✓
+    </div>
 
-                <div className="mx-3 h-px flex-1 bg-[#168b87]" />
+    <span className="mt-2 text-center text-sm font-semibold text-[#168b87]">
+      Nhập thông tin
+    </span>
+  </div>
 
-                {/* Bước 2 - Đang focus */}
-                <div className="flex items-center gap-2">
-                  <div className="grid h-8 w-8 place-items-center rounded-full bg-[#168b87] text-sm font-bold text-white">
-                    2
-                  </div>
-                  <span className="text-sm font-semibold text-[#168b87]">
-                    Xác thực OTP
-                  </span>
-                </div>
-              </div>
+  <div className="mx-3 mt-4 h-px flex-1 bg-[#168b87]" />
+
+  {/* Bước 2 - Đang focus */}
+  <div className="flex flex-col items-center">
+    <div className="grid h-8 w-8 place-items-center rounded-full bg-[#168b87] text-sm font-bold text-white">
+      2
+    </div>
+
+    <span className="mt-2 text-center text-sm font-semibold text-[#168b87]">
+      Xác thực OTP
+    </span>
+  </div>
+</div>
               <p className="mt-3 text-sm leading-6 text-[#70858b]">
                 Mã xác thực đã được gửi tới{" "}
                 <span className="font-semibold text-[#12313a]">

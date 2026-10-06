@@ -156,23 +156,25 @@ export default function RegisterPage() {
             </div>
 
             {/* Progress */}
-<div className="mx-auto mb-8 flex max-w-md items-center">
-  <div className="flex items-center gap-2">
+<div className="mx-auto mb-8 flex max-w-sm items-start">
+  <div className="flex flex-col items-center">
     <div className="grid h-8 w-8 place-items-center rounded-full bg-[#168b87] text-sm font-bold text-white">
       1
     </div>
-    <span className="text-sm font-semibold text-[#168b87]">
-      Tạo tài khoản
+
+    <span className="mt-2 text-center text-sm font-semibold text-[#168b87]">
+      Nhập thông tin
     </span>
   </div>
 
-  <div className="mx-3 h-px flex-1 bg-[#d9e4e5]" />
+  <div className="mx-3 mt-4 h-px flex-1 bg-[#d9e4e5]" />
 
-  <div className="flex items-center gap-2">
+  <div className="flex flex-col items-center">
     <div className="grid h-8 w-8 place-items-center rounded-full border-2 border-[#d9e4e5] text-sm font-bold text-[#9aabad]">
       2
     </div>
-    <span className="text-sm text-[#9aabad]">
+
+    <span className="mt-2 text-center text-sm text-[#9aabad]">
       Xác thực OTP
     </span>
   </div>

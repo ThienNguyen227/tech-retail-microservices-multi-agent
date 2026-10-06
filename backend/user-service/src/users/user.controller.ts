@@ -26,19 +26,9 @@ const refreshCookieOptions = {
 export class UserController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Post('customer/forgot-password/send-otp')
-  sendForgotPasswordOtp(@Body() dto: SendOtpDto) {
-    return this.usersService.sendForgotPasswordOtp(dto);
-  }
-
   @Post('customer/forgot-password/verify-otp')
   verifyForgotPasswordOtp(@Body() dto: VerifyForgotPasswordOtpDto) {
     return this.usersService.verifyForgotPasswordOtp(dto);
-  }
-
-  @Post('customer/forgot-password/resend-otp')
-  resendForgotPasswordOtp(@Body() dto: SendOtpDto) {
-    return this.usersService.sendForgotPasswordOtp(dto);
   }
 
   @Post("customer/forgot-password/change-password")
