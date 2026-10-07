@@ -69,7 +69,7 @@ export default function ForgotPasswordOtpPage() {
     setLoading(true);
 
     try {
-      await axios.post(
+      const response = await axios.post(
         "http://localhost:3001/api/v1/user-service/forgot-password/otp-verifying",
         {
           user_email: email,
@@ -80,6 +80,10 @@ export default function ForgotPasswordOtpPage() {
           withCredentials: true,
         },
       );
+
+      const data = response.data;
+
+      sessionStorage.setItem("forgotPasswordResetExpiresAt", data.reset_expires_at);
 
       router.push("/customer/forgot-password-change");
     } catch (error) {
@@ -107,9 +111,6 @@ export default function ForgotPasswordOtpPage() {
       setLoading(false);
     }
   };
-
-
-
 
   const handleResend = async () => {
     if (!email || resending) return;

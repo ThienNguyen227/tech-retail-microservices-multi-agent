@@ -15,10 +15,10 @@ import { EmailService } from '../../email/email.service';
 import { RedisService } from '../../redis/redis.service';
 
 import { SendOtpForgotPasswordDto } from '../dto/forgot_password/send_otp.dto';
-import { ReSendOtpDto } from '../dto/register/resend_otp.dto';
-import { VerifyOtpDto } from '../dto/register/verify_otp.dto';
 import { ReSendOtpForgotPasswordDto } from '../dto/forgot_password/resend_otp.dto';
 import { VerifyOtpForgotPasswordDto } from '../dto/forgot_password/verify_otp.dto';
+import { ChangePasswordForgotPasswordDto } from '../dto/forgot_password/change_password.dto';
+
 
 @Injectable()
 export class ForgotPasswordService {
@@ -118,8 +118,6 @@ export class ForgotPasswordService {
     // 2. Hash OTP
     const otpCodeHash = await bcrypt.hash(otp, 10);
 
-    await new Promise((resolve) => setTimeout(resolve, 5_000));
-
     // 3. Lưu OTP mới vào Redis
     const saved = await this.redisService.setIfNotExists(
       redisKey,
@@ -158,7 +156,7 @@ export class ForgotPasswordService {
   }
 
   // 3. Verify OTP
-  async verifyOtpForgotPassword(dto: VerifyOtpForgotPasswordDto): Promise<string> {
+  async verifyOtpForgotPassword(dto: VerifyOtpForgotPasswordDto): Promise<{resetToken: string; reset_expires_at: Date;}> {
 
     // 1. Kiểm tra email tồn tại
     const existedUser = await this.findByEmail(dto.user_email);
@@ -249,8 +247,70 @@ export class ForgotPasswordService {
       120,
     );
 
+    // Thời điểm hết hạn
+    const resetExpiresAt = new Date(
+      Date.now() + 120 * 1000,
+    );
+
     // 9. Chỉ trả token về Controller để Controller
     // đặt vào HttpOnly Cookie
-    return resetToken;
+    return {
+      resetToken,
+      reset_expires_at: resetExpiresAt,
+    };
+  }
+
+  // 4. Change Password
+  async changePassword(resetToken: string, dto: ChangePasswordForgotPasswordDto): Promise<{ message: string }> {
+
+    // 1. Kiểm tra reset token
+    const resetTokenKey = `forgot-password:reset-token:${resetToken}`;
+
+    const userId = await this.redisService.get(resetTokenKey);
+
+    if (!userId) {
+      throw new UnauthorizedException(
+        'Phiên đổi mật khẩu không hợp lệ hoặc đã hết hạn!',
+      );
+    }
+
+    // 2. Hash password
+    const hashedPassword = await bcrypt.hash(dto.new_password, 10);
+
+    
+
+    // 3. Update password trong transaction
+    await this.prisma.$transaction(async (tx) => {
+      const user = await tx.users.findUnique({
+        where: {
+          user_id: BigInt(userId),
+        },
+        select: {
+          user_id: true,
+        },
+      });
+
+      if (!user) {
+        throw new BadRequestException(
+          'Tài khoản không tồn tại!',
+        );
+      }
+
+      await tx.users.update({
+        where: {
+          user_id: user.user_id,
+        },
+        data: {
+          user_password_hash: hashedPassword,
+        },
+      });
+    });
+
+    // 4. DB đã commit thành công → mới xóa reset token
+    await this.redisService.delete(resetTokenKey);
+
+    return {
+      message: 'Đổi mật khẩu thành công',
+    };
   }
 }

@@ -2,73 +2,151 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import axios from "axios";
+
+const getRemainingSeconds = (expiresAt: string | null): number => {
+  if (!expiresAt) return 0;
+
+  const remainingMs = new Date(expiresAt).getTime() - Date.now();
+
+  return Math.max(0, Math.ceil(remainingMs / 1000));
+};
 
 export default function ResetPasswordPage() {
   const router = useRouter();
-
   const [email, setEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
+  const [resetExpiresAt, setResetExpiresAt] = useState<string | null>(null);
+  const [countdown, setCountdown] = useState(0);
 
+  // =========================
+  // Kiểm tra session
+  // =========================
   useEffect(() => {
     const forgotPasswordEmail = sessionStorage.getItem("forgotPasswordEmail");
 
-    if (!forgotPasswordEmail) {
+    const resetExpiresAt = sessionStorage.getItem("forgotPasswordResetExpiresAt");
+
+    if (!forgotPasswordEmail || !resetExpiresAt) {
       router.replace("/customer/forgot-password");
       return;
     }
 
     setEmail(forgotPasswordEmail);
+    setResetExpiresAt(resetExpiresAt);
   }, [router]);
 
-  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
+  // =========================
+  // Countdown
+  // =========================
+  useEffect(() => {
+    const updateCountdown = () => {
+      setCountdown(
+        getRemainingSeconds(resetExpiresAt),
+      );
+    };
+
+    updateCountdown();
+
+    if (!resetExpiresAt) return;
+
+    const timer = window.setInterval(updateCountdown, 1000);
+
+    return () => {
+      window.clearInterval(timer);
+    };
+  }, [resetExpiresAt]);
+
+  // =========================
+  // Đổi mật khẩu
+  // =========================
+  const handleSubmit = async (
+    event: FormEvent<HTMLFormElement>,
+  ) => {
     event.preventDefault();
+
     setError("");
     setSuccess("");
 
+    if (countdown <= 0) {
+      setError(
+        "Phiên đổi mật khẩu đã hết hạn. Vui lòng thực hiện lại!",
+      );
+      return;
+    }
+
     if (newPassword !== confirmPassword) {
-      setError("Mật khẩu xác nhận không khớp.");
+      setError(
+        "Mật khẩu xác nhận không khớp.",
+      );
       return;
     }
 
     setLoading(true);
 
     try {
-      const response = await fetch(
-        "http://localhost:3001/auth/customer/forgot-password/change-password",
+      await axios.post(
+        "http://localhost:3001/api/v1/user-service/forgot-password/password-change",
         {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            user_email: email,
-            new_password: newPassword,
-          }),
+          new_password: newPassword,
+        },
+        {
+          timeout: 10_000,
+          withCredentials: true,
         },
       );
 
-      const data = await response.json();
+      setSuccess(
+        "Đổi mật khẩu thành công. Đang chuyển đến trang đăng nhập...",
+      );
 
-      if (!response.ok) {
-        setError(data.message || "Đổi mật khẩu thất bại.");
-        return;
-      }
+      // Xóa thông tin session của quá trình quên mật khẩu
+      sessionStorage.removeItem(
+        "forgotPasswordEmail",
+      );
 
-      setSuccess("Đổi mật khẩu thành công. Đang chuyển đến trang đăng nhập...");
+      sessionStorage.removeItem(
+        "forgotPasswordOtpExpiresAt",
+      );
 
-      sessionStorage.removeItem("forgotPasswordEmail");
-      sessionStorage.removeItem("forgotPasswordOtpExpiresAt");
-      sessionStorage.removeItem("forgotPasswordUserId");
+      sessionStorage.removeItem(
+        "forgotPasswordResetExpiresAt",
+      );
 
       window.setTimeout(() => {
         router.push("/customer/login");
       }, 1200);
-    } catch {
-      setError("Không thể kết nối đến server. Vui lòng thử lại.");
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        // Server không phản hồi
+        if (!error.response) {
+          if (error.code === "ECONNABORTED") {
+            setError(
+              "Server phản hồi quá lâu. Vui lòng thử lại sau!",
+            );
+          } else {
+            setError(
+              "Không thể kết nối đến server. Vui lòng thử lại.",
+            );
+          }
+
+          return;
+        }
+
+        // Server trả về lỗi 4xx / 5xx
+        setError(
+          error.response.data?.message ||
+            "Đổi mật khẩu thất bại.",
+        );
+      } else {
+        setError(
+          "Đã xảy ra lỗi. Vui lòng thử lại.",
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -77,9 +155,14 @@ export default function ResetPasswordPage() {
   return (
     <main className="min-h-screen bg-[#eef6f7] p-4 sm:p-6 lg:p-8">
       <div className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-7xl overflow-hidden rounded-[28px] bg-white shadow-2xl shadow-[#0c56631a] lg:grid-cols-[1.1fr_0.9fr]">
-        {/* LEFT - BRAND / INFORMATION */}
+
+        {/* =========================
+            LEFT - BRAND / INFORMATION
+        ========================= */}
         <section className="relative hidden overflow-hidden bg-[#073b4c] p-10 text-white lg:flex lg:flex-col lg:justify-between xl:p-14">
+
           <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full border-[28px] border-[#2ec4b6]/20" />
+
           <div className="absolute -bottom-32 -left-28 h-80 w-80 rounded-full border-[38px] border-[#ffd166]/15" />
 
           <div className="relative z-10">
@@ -88,7 +171,9 @@ export default function ResetPasswordPage() {
                 S
               </div>
 
-              <span className="text-xl font-bold">SmartHub</span>
+              <span className="text-xl font-bold">
+                SmartHub
+              </span>
             </div>
 
             <p className="mb-5 text-sm font-semibold uppercase tracking-[0.25em] text-[#2ec4b6]">
@@ -100,8 +185,9 @@ export default function ResetPasswordPage() {
             </h1>
 
             <p className="mt-6 max-w-md text-base leading-7 text-[#c6e4e5]">
-              Thiết lập mật khẩu mới để bảo vệ tài khoản và tiếp tục sử dụng
-              hệ thống SmartHub.
+              Thiết lập mật khẩu mới để bảo vệ
+              tài khoản và tiếp tục sử dụng hệ
+              thống SmartHub.
             </p>
           </div>
 
@@ -112,7 +198,9 @@ export default function ResetPasswordPage() {
               </div>
 
               <div>
-                <p className="font-semibold">Mật khẩu mới</p>
+                <p className="font-semibold">
+                  Mật khẩu mới
+                </p>
 
                 <p className="mt-1 text-sm text-[#a9d4d6]">
                   Bảo vệ tài khoản của bạn
@@ -124,9 +212,12 @@ export default function ResetPasswordPage() {
           </div>
         </section>
 
-        {/* RIGHT - FORM */}
+        {/* =========================
+            RIGHT - FORM
+        ========================= */}
         <section className="flex items-center justify-center px-5 py-10 sm:px-12 lg:px-16 xl:px-24">
           <div className="w-full max-w-md">
+
             {/* Mobile logo */}
             <div className="mb-6 flex items-center gap-3 lg:hidden">
               <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#073b4c] font-black text-white">
@@ -138,10 +229,55 @@ export default function ResetPasswordPage() {
               </span>
             </div>
 
+            {/* =========================
+                HEADER
+            ========================= */}
             <div className="mb-9">
-              <p className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-[#168b87]">
-                Bước cuối
-              </p>
+
+              {/* Progress */}
+              <div className="mb-8">
+                <div className="flex items-center justify-between">
+
+                  {/* Bước 1 */}
+                  <div className="flex flex-col items-center">
+                    <div className="grid h-9 w-9 place-items-center rounded-full bg-[#168b87] text-sm font-bold text-white">
+                      ✓
+                    </div>
+
+                    <span className="mt-2 text-xs font-semibold text-[#168b87]">
+                      Kiểm tra email
+                    </span>
+                  </div>
+
+                  {/* Line 1 */}
+                  <div className="mx-3 h-[2px] flex-1 bg-[#168b87]" />
+
+                  {/* Bước 2 */}
+                  <div className="flex flex-col items-center">
+                    <div className="grid h-9 w-9 place-items-center rounded-full bg-[#168b87] text-sm font-bold text-white">
+                      ✓
+                    </div>
+
+                    <span className="mt-2 text-xs font-semibold text-[#168b87]">
+                      Xác thực OTP
+                    </span>
+                  </div>
+
+                  {/* Line 2 */}
+                  <div className="mx-3 h-[2px] flex-1 bg-[#168b87]" />
+
+                  {/* Bước 3 */}
+                  <div className="flex flex-col items-center">
+                    <div className="grid h-9 w-9 place-items-center rounded-full bg-[#168b87] text-sm font-bold text-white">
+                      3
+                    </div>
+
+                    <span className="mt-2 text-xs font-semibold text-[#168b87]">
+                      Thay đổi mật khẩu
+                    </span>
+                  </div>
+                </div>
+              </div>
 
               <h2 className="text-3xl font-bold tracking-tight text-[#12313a]">
                 Đổi mật khẩu
@@ -156,7 +292,14 @@ export default function ResetPasswordPage() {
               </p>
             </div>
 
-            <form className="space-y-5" onSubmit={handleSubmit}>
+            {/* =========================
+                FORM
+            ========================= */}
+            <form
+              className="space-y-5"
+              onSubmit={handleSubmit}
+            >
+
               {/* New password */}
               <div>
                 <label
@@ -170,11 +313,13 @@ export default function ResetPasswordPage() {
                   id="newPassword"
                   type="password"
                   value={newPassword}
-                  onChange={(event) => setNewPassword(event.target.value)}
+                  onChange={(event) =>
+                    setNewPassword(event.target.value)
+                  }
                   placeholder="Nhập mật khẩu mới"
                   minLength={6}
                   required
-                  disabled={loading}
+                  disabled={loading || countdown <= 0}
                   className="h-12 w-full rounded-xl border border-[#d9e4e5] bg-[#fbfdfd] px-4 text-sm text-[#12313a] outline-none transition placeholder:text-[#a4b4b7] focus:border-[#168b87] focus:ring-4 focus:ring-[#168b8718] disabled:cursor-not-allowed disabled:bg-gray-100"
                 />
               </div>
@@ -192,13 +337,28 @@ export default function ResetPasswordPage() {
                   id="confirmPassword"
                   type="password"
                   value={confirmPassword}
-                  onChange={(event) => setConfirmPassword(event.target.value)}
+                  onChange={(event) =>
+                    setConfirmPassword(event.target.value)
+                  }
                   placeholder="Nhập lại mật khẩu mới"
                   minLength={6}
                   required
-                  disabled={loading}
+                  disabled={loading || countdown <= 0}
                   className="h-12 w-full rounded-xl border border-[#d9e4e5] bg-[#fbfdfd] px-4 text-sm text-[#12313a] outline-none transition placeholder:text-[#a4b4b7] focus:border-[#168b87] focus:ring-4 focus:ring-[#168b8718] disabled:cursor-not-allowed disabled:bg-gray-100"
                 />
+              </div>
+
+              {/* Countdown */}
+              <div
+                className={`rounded-xl px-4 py-3 text-sm font-medium ${
+                  countdown > 0
+                    ? "bg-[#eef8f7] text-[#168b87]"
+                    : "bg-[#fff0ee] text-[#c0392b]"
+                }`}
+              >
+                {countdown > 0
+                  ? `Phiên đổi mật khẩu còn ${countdown}s`
+                  : "Phiên đổi mật khẩu đã hết hạn."}
               </div>
 
               {/* Error */}
@@ -218,10 +378,15 @@ export default function ResetPasswordPage() {
               {/* Submit */}
               <button
                 type="submit"
-                disabled={loading}
+                disabled={
+                  loading ||
+                  countdown <= 0
+                }
                 className="h-12 w-full rounded-xl bg-[#168b87] font-semibold text-white shadow-lg shadow-[#168b8730] transition hover:bg-[#10736f] hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-[#168b8730] disabled:cursor-not-allowed disabled:opacity-70"
               >
-                {loading ? "Đang đổi mật khẩu..." : "Đổi mật khẩu"}
+                {loading
+                  ? "Đang đổi mật khẩu..."
+                  : "Đổi mật khẩu"}
               </button>
             </form>
 
@@ -229,7 +394,9 @@ export default function ResetPasswordPage() {
               Nhớ mật khẩu rồi?{" "}
               <button
                 type="button"
-                onClick={() => router.push("/customer/login")}
+                onClick={() =>
+                  router.push("/customer/login")
+                }
                 className="font-bold text-[#168b87] hover:text-[#073b4c]"
               >
                 Đăng nhập
@@ -241,4 +408,3 @@ export default function ResetPasswordPage() {
     </main>
   );
 }
-

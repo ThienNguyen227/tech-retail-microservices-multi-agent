@@ -1,12 +1,8 @@
 import { BadRequestException, ConflictException, HttpException, Injectable, InternalServerErrorException, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../prisma/prisma.service';
-import { SendOtpDto } from './dto/send-otp.dto';
-import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { EmailService } from './email.service';
 import { Prisma } from '@prisma/client';
-import { ChangePasswordDto } from "./dto/change-password.dto";
-import { VerifyForgotPasswordOtpDto } from "./dto/verify-forgot-password-otp.dto";
 import { LoginDto } from './dto/login.dto';
 import { LogoutDto } from "./dto/logout.dto";
 import { sign, verify } from 'jsonwebtoken';
@@ -35,76 +31,6 @@ export class UsersService {
 
   private generateOtp(): string {
     return Math.floor(100000 + Math.random() * 900000).toString();
-  }
-  // Forget-password
-  async changePassword(dto: ChangePasswordDto,): Promise<{ message: string }> {
-    const hashedPassword = await bcrypt.hash(dto.new_password, 10);
-
-    await this.prisma.$transaction(async (tx) => {
-      const user = await tx.users.findUnique({
-        where: {
-          user_email: dto.user_email,
-        },
-      });
-
-      if (!user) {
-        throw new BadRequestException("Tài khoản không tồn tại");
-      }
-
-      // Chỉ cho phép đổi mật khẩu nếu OTP quên mật khẩu đã được xác thực.
-      const verifiedOtp = await tx.otps.findFirst({
-        where: {
-          otp_user_id: user.user_id,
-          otp_purpose: "FORGOT_PASSWORD",
-          otp_status: "VERIFIED",
-        },
-        orderBy: {
-          otp_verified_at: "desc",
-        },
-      });
-
-      if (!verifiedOtp) {
-        throw new UnauthorizedException(
-          "Bạn chưa xác thực OTP để đổi mật khẩu",
-        );
-      }
-
-      // if (new Date() > verifiedOtp.otp_expires_at) {
-      //   throw new BadRequestException(
-      //     "OTP đã hết hạn. Vui lòng yêu cầu mã OTP mới.",
-      //   );
-      // }
-
-      // Đánh dấu OTP đã dùng để không thể dùng lại đổi mật khẩu lần nữa.
-      const usedOtp = await tx.otps.updateMany({
-        where: {
-          otp_id: verifiedOtp.otp_id,
-          otp_status: "VERIFIED",
-        },
-        data: {
-          otp_status: "USED",
-        },
-      });
-
-      if (usedOtp.count === 0) {
-        throw new BadRequestException(
-          "OTP đã được sử dụng. Vui lòng yêu cầu mã OTP mới.",
-        );
-      }
-
-      await tx.users.update({
-        where: {
-          user_id: user.user_id,
-        },
-        data: {
-          user_password_hash: hashedPassword,
-        },
-      });
-    });
-
-    return {
-      message: "Đổi mật khẩu thành công",
-    };
   }
   //Login
   async login(dto: LoginDto, deviceInfo?: string, ipAddress?: string,): Promise<{
