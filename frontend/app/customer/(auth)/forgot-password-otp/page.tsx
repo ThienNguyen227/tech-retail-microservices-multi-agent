@@ -51,53 +51,65 @@ export default function ForgotPasswordOtpPage() {
     }
   }, [router]);
 
+
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
 
     if (!email) {
-      setError("Không tìm thấy email.");
+      setError("Không tìm thấy email1");
       return;
     }
 
     if (otp.length !== 6) {
-      setError("Vui lòng nhập đủ 6 số OTP.");
+      setError("Vui lòng nhập đủ 6 số OTP!");
       return;
     }
 
     setLoading(true);
 
     try {
-      const response = await fetch(
-        "http://localhost:3001/auth/customer/forgot-password/verify-otp",
+      await axios.post(
+        "http://localhost:3001/api/v1/user-service/forgot-password/otp-verifying",
         {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            user_email: email,
-            otp_code: otp,
-          }),
+          user_email: email,
+          otp_code: otp,
+        },
+        {
+          timeout: 10_000,
+          withCredentials: true,
         },
       );
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.message || "Xác thực OTP thất bại.");
-        return;
-      }
-
-      sessionStorage.setItem("forgotPasswordUserId", String(data.user_id));
-
       router.push("/customer/forgot-password-change");
-    } catch {
-      setError("Không thể kết nối đến server. Vui lòng thử lại.");
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        // Server không phản hồi
+        if (!error.response) {
+          if (error.code === "ECONNABORTED") {
+            setError("Server phản hồi quá lâu. Vui lòng thử lại sau!");
+          } else {
+            setError("Không thể kết nối đến server. Vui lòng thử lại.");
+          }
+
+          return;
+        }
+
+        // Server trả về lỗi 4xx / 5xx
+        setError(
+          error.response.data?.message ||
+            "Xác thực OTP thất bại.",
+        );
+      } else {
+        setError("Đã xảy ra lỗi. Vui lòng thử lại.");
+      }
     } finally {
       setLoading(false);
     }
   };
+
+
+
 
   const handleResend = async () => {
     if (!email || resending) return;
@@ -118,10 +130,7 @@ export default function ForgotPasswordOtpPage() {
 
       const data = response.data;
 
-      sessionStorage.setItem(
-        "forgotPasswordOtpExpiresAt",
-        data.otp_expires_at,
-      );
+      sessionStorage.setItem("forgotPasswordOtpExpiresAt", data.otp_expires_at);
 
       setExpiresAt(data.otp_expires_at);
       setOtp("");
