@@ -1,9 +1,5 @@
 import { Body, Controller, Post, Patch, Get, Req, Res, UseGuards } from '@nestjs/common';
 import { UsersService } from './user.service';
-import { SendOtpDto } from './dto/send-otp.dto';
-import { VerifyOtpDto } from './dto/verify-otp.dto';
-import { ChangePasswordDto } from "./dto/change-password.dto";
-import { VerifyForgotPasswordOtpDto } from "./dto/verify-forgot-password-otp.dto";
 import type { Request, Response } from 'express';
 import { LoginDto } from './dto/login.dto';
 import { LogoutDto } from "./dto/logout.dto";
@@ -25,11 +21,6 @@ const refreshCookieOptions = {
 @Controller('auth')
 export class UserController {
   constructor(private readonly usersService: UsersService) {}
-
-  @Post("customer/forgot-password/change-password")
-  changePassword(@Body() dto: ChangePasswordDto) {
-    return this.usersService.changePassword(dto);
-  }
 
   @Post('customer/login')
   async login(@Body() dto: LoginDto, @Req() request: Request, @Res({ passthrough: true }) response: Response,) {
