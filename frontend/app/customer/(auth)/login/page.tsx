@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import { setAccessToken } from "@/lib/access_token/access_token";
+import axios from "axios";
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
@@ -21,42 +23,38 @@ export default function LoginPage() {
     const remember = form.get("remember") === "on";
 
     try {
-      const response = await fetch(
-        "http://localhost:3001/auth/customer/login",
+      const response = await axios.post(
+        "http://localhost:3001/api/v1/user-service/login",
         {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            user_email,
-            user_password,
-          }),
+          user_email,
+          user_password,
+        },
+        {
+          withCredentials: true,
         },
       );
 
-      const data = await response.json();
+      const data = response.data;
 
-      if (!response.ok) {
-        const message = Array.isArray(data.message)
-          ? data.message[0]
-          : data.message;
-
-        setError(message || "Đăng nhập thất bại.");
-        return;
-      }
+      setAccessToken(data.access_token);
 
       const storage = remember ? localStorage : sessionStorage;
 
-      storage.setItem("accessToken", data.access_token);
       storage.setItem("userType", "CUSTOMER");
       storage.setItem("userName", data.user_name);
       storage.setItem("userId", data.user_id);
 
       router.push("/customer/home");
-    } catch {
-      setError("Không thể kết nối đến server. Vui lòng thử lại.");
+    } catch (error) {
+      if (axios.isAxiosError(error)) {
+        const message = Array.isArray(error.response?.data?.message)
+          ? error.response.data.message[0]
+          : error.response?.data?.message;
+
+        setError(message || "Đăng nhập thất bại.");
+      } else {
+        setError("Không thể kết nối đến server. Vui lòng thử lại.");
+      }
     } finally {
       setLoading(false);
     }
