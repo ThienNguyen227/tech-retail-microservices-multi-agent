@@ -22,25 +22,6 @@ const refreshCookieOptions = {
 export class UserController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Post('customer/login')
-  async login(@Body() dto: LoginDto, @Req() request: Request, @Res({ passthrough: true }) response: Response,) {
-    const ipAddress = request.ip ?? request.socket.remoteAddress ?? undefined;
-
-    const deviceInfo = dto.device_info ?? request.get('user-agent') ?? undefined;
-
-    const result = await this.usersService.login(dto, deviceInfo, ipAddress);
-
-    response.cookie(
-      REFRESH_COOKIE_NAME,
-      result.refresh_token,
-      refreshCookieOptions,
-    );
-
-    // Không cho refresh token xuất hiện trong JSON response
-    const { refresh_token, ...loginResponse } = result;
-    return loginResponse;
-  }
-
   @Post('customer/refresh')
   async refresh(@Req() request: Request) {
     const refreshToken = request.cookies?.[REFRESH_COOKIE_NAME];
