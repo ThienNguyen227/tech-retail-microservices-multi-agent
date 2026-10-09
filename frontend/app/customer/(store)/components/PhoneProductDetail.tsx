@@ -819,7 +819,7 @@ export default function PhoneProductDetail({product, selectedSlug}: PhoneProduct
 
               <DetailSection title="Camera & Màn hình">
                 <InfoRow
-                  label="Camera sau"
+                  label="Độ phân giải Camera sau"
                   value={
                     product.cameraAndScreen
                       ?.rearCameraResolution
@@ -827,7 +827,7 @@ export default function PhoneProductDetail({product, selectedSlug}: PhoneProduct
                 />
 
                 <InfoRow
-                  label="Camera trước"
+                  label="Độ phân giải Camera trước"
                   value={
                     product.cameraAndScreen
                       ?.frontCameraResolution
@@ -843,7 +843,7 @@ export default function PhoneProductDetail({product, selectedSlug}: PhoneProduct
                 />
 
                 <InfoRow
-                  label="Độ phân giải"
+                  label="Độ phân giải màn hình"
                   value={
                     product.cameraAndScreen
                       ?.screenResolution
@@ -851,7 +851,7 @@ export default function PhoneProductDetail({product, selectedSlug}: PhoneProduct
                 />
 
                 <InfoRow
-                  label="Kích thước"
+                  label="Màn hình rộng"
                   value={
                     product.cameraAndScreen
                       ?.screenSize
@@ -873,7 +873,7 @@ export default function PhoneProductDetail({product, selectedSlug}: PhoneProduct
                 />
 
                 <InfoRow
-                  label="Kính màn hình"
+                  label="Mặt kính cảm ứng"
                   value={
                     product.cameraAndScreen
                       ?.touchScreenGlass
@@ -889,7 +889,7 @@ export default function PhoneProductDetail({product, selectedSlug}: PhoneProduct
                 />
 
                 <InfoList
-                  label="Quay video"
+                  label="Quay phim Camera sau"
                   items={
                     product.cameraAndScreen
                       ?.rearVideoRecording
@@ -909,7 +909,7 @@ export default function PhoneProductDetail({product, selectedSlug}: PhoneProduct
 
               <DetailSection title="Pin & Sạc">
                 <InfoRow
-                  label="Thời lượng pin"
+                  label="Dung lượng pin"
                   value={
                     product.batteryAndCharge?.batteryLife
                   }
@@ -923,7 +923,7 @@ export default function PhoneProductDetail({product, selectedSlug}: PhoneProduct
                 />
 
                 <InfoRow
-                  label="Công suất sạc"
+                  label="Hỗ trợ sạc tối đa"
                   value={
                     product.batteryAndCharge
                       ?.maxChargingPower
@@ -931,7 +931,7 @@ export default function PhoneProductDetail({product, selectedSlug}: PhoneProduct
                 />
 
                 <InfoList
-                  label="Tính năng pin"
+                  label="Công nghệ pin"
                   items={
                     product.batteryAndCharge
                       ?.batteryFeatures
@@ -943,7 +943,7 @@ export default function PhoneProductDetail({product, selectedSlug}: PhoneProduct
 
               <DetailSection title="Tiện ích">
                 <InfoRow
-                  label="Bảo mật"
+                  label="Bảo mật nâng cao"
                   value={
                     product.utilities?.advancedSecurity
                   }
