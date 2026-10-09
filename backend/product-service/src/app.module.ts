@@ -3,6 +3,11 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ProductModule } from './products/product.module';
 
+
+
+// AI_SESSION
+import { SearchProductModule } from './ai_session/search_product/search_product.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -19,6 +24,11 @@ import { ProductModule } from './products/product.module';
       inject: [ConfigService],
     }),
     ProductModule,
+
+    // AI_SESSION
+    SearchProductModule,
+
+
   ],
 })
 export class AppModule {}
