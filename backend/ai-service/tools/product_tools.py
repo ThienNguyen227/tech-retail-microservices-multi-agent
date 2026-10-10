@@ -1,13 +1,14 @@
 from langchain.tools import tool
 
-from services.product_service import search_products
-
+from services.product_service import (get_product_details)
 
 @tool
-async def search_product(keyword: str):
+async def get_product_detail(product_name: str):
     """
-    Tìm kiếm sản phẩm công nghệ theo từ khóa.
-    Sử dụng tool này khi người dùng muốn tìm sản phẩm.
-    Ví dụ: iPhone 17, Samsung, laptop gaming...
+    Lấy thông tin chi tiết và cấu hình của một sản phẩm.
+    Dùng khi người dùng hỏi cấu hình, thông số kỹ thuật,
+    camera, màn hình, chip, pin, kết nối hoặc thiết kế.
+    Ví dụ: iPhone 17 Pro Max có cấu hình như thế nào?
+    Tham số product_name là tên sản phẩm, ví dụ iPhone 17 Pro Max.
     """
-    return await search_products(keyword)
+    return await get_product_details(product_name)
