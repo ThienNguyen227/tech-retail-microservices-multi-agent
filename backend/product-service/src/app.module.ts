@@ -7,6 +7,7 @@ import { ProductModule } from './products/product.module';
 
 // AI_SESSION
 import { SearchProductModule } from './ai_session/search_product/search_product.module';
+import { GetProductDetailModule } from './ai_session/get_product_detail/get_product_detail.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { SearchProductModule } from './ai_session/search_product/search_product.
 
     // AI_SESSION
     SearchProductModule,
+    GetProductDetailModule,
 
 
   ],
