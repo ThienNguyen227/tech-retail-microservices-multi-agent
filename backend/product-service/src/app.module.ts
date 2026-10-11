@@ -28,6 +28,7 @@ import { GetProductDetailModule } from './ai_session/get_product_detail/get_prod
 
     // AI_SESSION
     SearchProductModule,
+    
     GetProductDetailModule,
 
 
