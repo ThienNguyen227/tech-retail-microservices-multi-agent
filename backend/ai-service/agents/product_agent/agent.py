@@ -27,7 +27,11 @@ from langchain.agents import create_agent
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from .prompt import PRODUCT_AGENT_PROMPT
-from tools.product_tools import get_product_detail
+
+from tools.product_tools import (
+    search_products,
+    get_product_detail,
+)
 
 load_dotenv()
 
@@ -42,6 +46,6 @@ llm = ChatGoogleGenerativeAI(
 
 product_agent = create_agent(
     model=llm,
-    tools=[get_product_detail],
+    tools=[get_product_detail, search_products],
     system_prompt=PRODUCT_AGENT_PROMPT,
 )
