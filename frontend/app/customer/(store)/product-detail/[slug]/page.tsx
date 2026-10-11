@@ -1,4 +1,5 @@
 import PhoneProductDetail from '../../components/PhoneProductDetail';
+import LaptopProductDetail from '../../components/LaptopProductDetail';
 
 async function getProductDetail(slug: string) {
   try {
@@ -50,11 +51,7 @@ export default async function ProductDetailPage({
       return <PhoneProductDetail product={product} selectedSlug={slug}/>;
 
     case 'may-tinh-xach-tay':
-      return (
-        <div className="mx-auto max-w-7xl px-4 py-16 text-center">
-          Trang chi tiết Laptop đang phát triển.
-        </div>
-      );
+      return <LaptopProductDetail product={product} selectedSlug={slug}/>;
 
     case 'may-tinh-bang':
       return (
