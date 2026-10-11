@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import PhoneProductCard, {Phone} from '../../components/PhoneProductCard';
+import LaptopProductCard, { Laptop } from '../../components/LaptopProductCard';
 import ProductFilter from '../../components/ProductFilter';
 
 type Brand = {
@@ -157,13 +158,13 @@ export default async function ProductCategoryPage({
             ))}
 
           {/* LAPTOP */}
-          {/* {categorySlug === 'laptop' &&
+          {categorySlug === 'may-tinh-xach-tay' &&
             (products as Laptop[]).map((laptop) => (
               <LaptopProductCard
                 key={laptop._id}
                 product={laptop}
               />
-            ))} */}
+            ))}
 
           {/* TABLET */}
           {/* {categorySlug === 'tablet' &&
