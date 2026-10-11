@@ -452,19 +452,19 @@ export default function PhoneProductDetail({product, selectedSlug}: PhoneProduct
     <main className="min-h-screen bg-slate-50">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
 
-        {/* =================================================
-            HEADER
-        ================================================= */}
+        {/* Breadcrumb */}
+        <nav className="mb-5 text-sm text-gray-500">
+          <span>Trang chủ</span>
+          <span className="mx-2">/</span>
+          <span>Điện thoại</span>
+          <span className="mx-2">/</span>
+          <span className="text-gray-800">{product.name}</span>
+        </nav>
 
-        <div className="mb-7">
-          <p className="text-sm text-slate-500">
-            Điện thoại / Sản phẩm
-          </p>
-
-          <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 md:text-3xl">
-            {product.name}
-          </h1>
-        </div>
+        {/* Product title */}
+        <h1 className="mb-6 text-xl font-bold text-gray-900 sm:text-2xl">
+          {product.name}
+        </h1>
 
         {/* =================================================
             PRODUCT TOP
@@ -536,7 +536,7 @@ export default function PhoneProductDetail({product, selectedSlug}: PhoneProduct
 
               <div className="border-b border-slate-100 pb-5">
                 <p className="text-sm text-slate-500">
-                  Sản phẩm
+                  Điện thoại
                 </p>
 
                 <h2 className="mt-1 text-2xl font-bold text-slate-900">
@@ -558,7 +558,7 @@ export default function PhoneProductDetail({product, selectedSlug}: PhoneProduct
                   Giá bán
                 </p>
 
-                <p className="mt-1 text-3xl font-extrabold text-red-600">
+                <p className="mt-1 text-xl font-extrabold text-red-600">
                   {selectedVariant
                     ? `${formatPrice(
                         selectedVariant.price,
