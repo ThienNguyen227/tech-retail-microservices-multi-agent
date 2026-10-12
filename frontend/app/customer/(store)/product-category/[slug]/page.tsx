@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import PhoneProductCard, {Phone} from '../../components/PhoneProductCard';
-import LaptopProductCard, { Laptop } from '../../components/LaptopProductCard';
+import LaptopProductCard, {Laptop} from '../../components/LaptopProductCard';
+import TabletProductCard, {Tablet} from '../../components/TabletProductCard';
 import ProductFilter from '../../components/ProductFilter';
 
 type Brand = {
@@ -87,7 +88,7 @@ export default async function ProductCategoryPage({
 
       {/* HEADER */}
       <div className="mb-6 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">
+        <h1 className="text-xl font-bold text-gray-900">
           Danh mục:{' '}
           <span className="text-red-600">{categoryName}</span>
         </h1>
@@ -167,13 +168,13 @@ export default async function ProductCategoryPage({
             ))}
 
           {/* TABLET */}
-          {/* {categorySlug === 'tablet' &&
+          {categorySlug === 'may-tinh-bang' &&
             (products as Tablet[]).map((tablet) => (
               <TabletProductCard
                 key={tablet._id}
                 product={tablet}
               />
-            ))} */}
+            ))}
 
         </div>
       ) : (
