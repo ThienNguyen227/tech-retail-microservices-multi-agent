@@ -31,14 +31,15 @@ from .prompt import PRODUCT_AGENT_PROMPT
 from tools.product_tools import (
     search_products,
     get_product_detail,
+    compare_phones,
 )
 
 load_dotenv()
 
 llm = ChatGoogleGenerativeAI(
-    model="gemini-3.1-flash-lite",
+    model="gemini-3.5-flash-lite",
     google_api_key=os.getenv("GOOGLE_API_KEY"),
-    temperature=0,
+    # temperature=0,
     max_tokens=1024,
     timeout=60,
     max_retries=1,
@@ -46,6 +47,6 @@ llm = ChatGoogleGenerativeAI(
 
 product_agent = create_agent(
     model=llm,
-    tools=[get_product_detail, search_products],
+    tools=[get_product_detail, search_products, compare_phones],
     system_prompt=PRODUCT_AGENT_PROMPT,
 )

@@ -1,8 +1,10 @@
 from langchain.tools import tool
+from typing import Literal
 
 from services.product_service import (
     get_product_details,
     search_products as search_products_api,
+    compare_phones as compare_phones_api,
 )
 
 @tool
@@ -55,4 +57,51 @@ async def search_products(
         min_price=min_price,
         max_price=max_price,
         limit=limit,
+    )
+
+
+CompareCriteria = Literal[
+    "basic",
+    "variant",
+    "price",
+    "performance",
+    "camera",
+    "screen",
+    "battery",
+    "connectivity",
+    "design",
+    "utilities",
+    "all",
+]
+
+
+@tool
+async def compare_phones(
+    products: list[str],
+    criteria: list[CompareCriteria] | None = None,
+):
+    """Lấy dữ liệu để so sánh từ 2 đến 5 điện thoại.
+
+    products: Danh sách tên sản phẩm chính xác.
+    criteria: Danh sách tiêu chí cần so sánh.
+
+    Tiêu chí hỗ trợ:
+    - basic: thông tin cơ bản
+    - variant: dung lượng, màu sắc, giá và mã phiên bản
+    - price: giá theo từng dung lượng
+    - performance: chip, CPU, GPU, RAM và bộ nhớ
+    - camera: camera và tính năng quay video
+    - screen: thông số màn hình
+    - battery: pin và sạc
+    - connectivity: kết nối
+    - design: thiết kế, chất liệu, kích thước và trọng lượng
+    - utilities: tiện ích
+    - all: toàn bộ dữ liệu
+
+    Nếu criteria không được cung cấp, Product-Service trả về toàn bộ dữ liệu.
+    Chỉ chọn các tiêu chí liên quan đến yêu cầu của người dùng.
+    """
+    return await compare_phones_api(
+        products=products,
+        criteria=criteria,
     )

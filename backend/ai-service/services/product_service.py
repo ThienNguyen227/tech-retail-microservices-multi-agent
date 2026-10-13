@@ -110,3 +110,64 @@ async def search_products(
                 "found": False,
                 "message": "Không thể kết nối đến Product Service.",
             }
+
+
+# 3. SO SÁNH ĐIỆN THOẠI
+async def compare_phones(products: list[str], criteria: list[str] | None = None):
+    """Lấy dữ liệu điện thoại theo các tiêu chí cần so sánh."""
+    url = f"{PRODUCT_SERVICE_URL}/api/v1/ai/product-service/compare/phones"
+
+    if not 2 <= len(products) <= 5:
+        return {
+            "found": False,
+            "message": "Chỉ được so sánh từ 2 đến 5 sản phẩm.",
+        }
+
+    params = [("products", name) for name in products]
+
+    if criteria:
+        params.extend(("criteria", item) for item in criteria)
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        try:
+            response = await client.get(url, params=params)
+            response.raise_for_status()
+
+            return {
+                "found": True,
+                "data": response.json(),
+            }
+
+        except httpx.TimeoutException:
+            return {
+                "found": False,
+                "message": "Product Service phản hồi quá thời gian.",
+            }
+
+        except httpx.HTTPStatusError as e:
+            
+            print("Compare phones HTTP error:", e.response.status_code)
+            print("Response body:", e.response.text)
+
+            if e.response.status_code == 400:
+                return {
+                    "found": False,
+                    "message": "Tên sản phẩm hoặc tiêu chí so sánh không hợp lệ.",
+                }
+
+            if e.response.status_code == 404:
+                return {
+                    "found": False,
+                    "message": "Không tìm thấy sản phẩm cần so sánh.",
+                }
+
+            return {
+                "found": False,
+                "message": "Đã xảy ra lỗi khi so sánh sản phẩm.",
+            }
+
+        except httpx.RequestError:
+            return {
+                "found": False,
+                "message": "Không thể kết nối đến Product Service.",
+            }
