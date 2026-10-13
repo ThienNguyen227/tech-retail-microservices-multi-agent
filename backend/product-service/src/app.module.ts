@@ -8,6 +8,7 @@ import { ProductModule } from './products/product.module';
 // AI_SESSION
 import { SearchProductModule } from './ai_session/search_product/search_product.module';
 import { GetProductDetailModule } from './ai_session/get_product_detail/get_product_detail.module';
+import { CompareProductlModule } from './ai_session/compare_product/compare_product.module';
 
 @Module({
   imports: [
@@ -30,6 +31,8 @@ import { GetProductDetailModule } from './ai_session/get_product_detail/get_prod
     SearchProductModule,
     
     GetProductDetailModule,
+
+    CompareProductlModule,
 
 
   ],
