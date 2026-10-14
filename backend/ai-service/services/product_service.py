@@ -187,3 +187,62 @@ async def get_phone_detail(
                 "found": False,
                 "message": "Không thể kết nối đến Product Service.",
             }
+
+# 5. LẤY CHI TIẾT LAPTOP THEO TIÊU CHÍ
+async def get_laptop_detail(
+    laptop_name: str,
+    criteria: list[str] | None = None,
+):
+    url = (
+        f"{PRODUCT_SERVICE_URL}"
+        "/api/v1/ai/product-service/detail/laptop"
+    )
+
+    params = [("laptopName", laptop_name)]
+
+    if criteria:
+        params.extend(
+            ("criteria", item) for item in criteria
+        )
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        try:
+            response = await client.get(url, params=params)
+
+            if response.status_code == 404:
+                return {
+                    "found": False,
+                    "message": f"Không tìm thấy laptop: {laptop_name}",
+                }
+
+            response.raise_for_status()
+
+            return {
+                "found": True,
+                "data": response.json(),
+            }
+
+        except httpx.TimeoutException:
+            return {
+                "found": False,
+                "message": "Product Service phản hồi quá thời gian.",
+            }
+
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 400:
+                return {
+                    "found": False,
+                    "message": "Tên sản phẩm hoặc tiêu chí truy xuất không hợp lệ.",
+                    "detail": e.response.json(),
+                }
+
+            return {
+                "found": False,
+                "message": "Đã xảy ra lỗi khi lấy chi tiết laptop.",
+            }
+
+        except httpx.RequestError:
+            return {
+                "found": False,
+                "message": "Không thể kết nối đến Product Service.",
+            }

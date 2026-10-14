@@ -8,7 +8,7 @@ from langgraph.prebuilt import ToolNode, tools_condition
 
 from prompt import PRODUCT_AGENT_PROMPT
 
-from tools.product_tools import (get_phone_detail, search_products, compare_phones)
+from tools.product_tools import (get_phone_detail, get_laptop_detail, search_products, compare_phones)
 
 load_dotenv()
 
@@ -21,7 +21,7 @@ llm = ChatGoogleGenerativeAI(
 )
 
 tools = [
-    get_phone_detail,
+    get_phone_detail, get_laptop_detail
 ]
 
 llm_with_tools = llm.bind_tools(tools)

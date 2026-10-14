@@ -4,6 +4,7 @@ from typing import Literal
 from services.product_service import (
   search_products as search_products_api,
   get_phone_detail as get_phone_detail_api,
+   get_laptop_detail as get_laptop_detail_api,
   compare_phones as compare_phones_api,
 )
 @tool
@@ -291,3 +292,168 @@ async def get_phone_detail(phone_name: str, criteria: list[PhoneDetailCriteria] 
     thông số hoặc đặc điểm sản phẩm.
   """
   return await get_phone_detail_api(phone_name=phone_name, criteria=criteria)
+
+
+LaptopDetailCriteria = Literal[
+    "all",
+    "ram",
+    "ssd",
+    "variants",
+    "processor",
+    "graphics",
+    "memoryAndStorage",
+    "display",
+    "connectivityAndExpansion",
+    "dimensionsAndBattery",
+]
+
+
+@tool
+async def get_laptop_detail(
+    laptop_name: str,
+    criteria: list[LaptopDetailCriteria] | None = None,
+):
+    """
+    TOOL: get_laptop_detail
+
+    1. MÔ TẢ
+    Truy xuất thông tin chi tiết của một laptop từ Product Service
+    theo tên sản phẩm và các nhóm thông tin được yêu cầu.
+
+    2. KHI NÀO SỬ DỤNG
+    - Người dùng hỏi thông tin về một laptop cụ thể.
+    - Người dùng hỏi giá, màu sắc, RAM, SSD hoặc phiên bản.
+    - Người dùng hỏi CPU, GPU, màn hình hoặc kết nối.
+    - Người dùng hỏi pin, hệ điều hành, kích thước hoặc trọng lượng.
+    - Người dùng yêu cầu xem toàn bộ thông tin laptop.
+
+    Không sử dụng Tool này để tìm kiếm danh sách nhiều laptop
+    theo điều kiện lọc hoặc so sánh nhiều laptop.
+
+    3. THAM SỐ ĐẦU VÀO
+
+    - laptop_name:
+      Tên laptop cần truy xuất.
+      Ví dụ: "Laptop HP 240R G10 - C3RU7AT".
+
+    - criteria:
+      Danh sách nhóm dữ liệu cần truy xuất.
+      Chỉ chọn các nhóm phù hợp với câu hỏi của người dùng.
+
+    4. CÁC CRITERIA HỢP LỆ
+
+    - all:
+      Toàn bộ dữ liệu của laptop.
+
+    - variants:
+      Danh sách phiên bản và thông tin bán hàng.
+      Trường dữ liệu:
+      - sku: Mã định danh phiên bản.
+      - slug: Đường dẫn định danh phiên bản.
+      - ram: Dung lượng RAM của phiên bản.
+      - ssd: Dung lượng SSD của phiên bản.
+      - color: Màu sắc.
+      - colorSlug: Slug màu sắc.
+      - price: Giá bán, đơn vị VNĐ.
+      - images: Danh sách hình ảnh của phiên bản.
+
+    - processor:
+      Thông tin bộ xử lý.
+      Trường dữ liệu:
+      - cpuTechnology: Công nghệ CPU.
+      - cpuCores: Số nhân CPU.
+      - cpuThreads: Số luồng CPU.
+      - cpuSpeed: Tốc độ CPU.
+
+    - graphics:
+      Thông tin card đồ họa.
+      Trường dữ liệu:
+      - graphicsCard: Card đồ họa tích hợp hoặc rời.
+
+    - memoryAndStorage:
+      Thông tin bộ nhớ và lưu trữ.
+      Trường dữ liệu:
+      - ram: Dung lượng RAM.
+      - ramType: Loại RAM và cấu hình khe RAM.
+      - ramBusSpeed: Tốc độ bus RAM.
+      - maxRamCapacity: Dung lượng RAM tối đa.
+      - storage: Thông tin SSD, chuẩn kết nối và khả năng nâng cấp.
+
+    - display:
+      Thông tin màn hình.
+      Trường dữ liệu:
+      - screenSize: Kích thước màn hình.
+      - resolution: Độ phân giải.
+      - panelType: Loại tấm nền.
+      - refreshRate: Tần số quét.
+      - colorCoverage: Độ phủ màu.
+      - screenTechnology: Công nghệ và đặc điểm màn hình.
+
+    - connectivityAndExpansion:
+      Thông tin kết nối và mở rộng.
+      Trường dữ liệu:
+      - ports: Các cổng kết nối.
+      - wirelessConnectivity: Wi-Fi và Bluetooth.
+      - memoryCardSlot: Khe đọc thẻ nhớ.
+      - webcam: Webcam.
+      - keyboardBacklight: Đèn bàn phím.
+      - security: Tính năng bảo mật.
+      - audioTechnology: Công nghệ âm thanh.
+      - cooling: Hệ thống tản nhiệt.
+
+    - dimensionsAndBattery:
+      Thông tin pin, hệ điều hành, thiết kế và kích thước.
+      Trường dữ liệu:
+      - battery: Dung lượng và thông tin pin.
+      - operatingSystem: Hệ điều hành.
+      - releaseYear: Năm ra mắt.
+      - dimensions: Kích thước vật lý.
+      - weight: Trọng lượng.
+      - material: Vật liệu cấu thành.
+
+    5. HƯỚNG DẪN CHỌN CRITERIA
+
+    - Hỏi giá, SKU, màu sắc hoặc phiên bản:
+      ["variants"]
+
+    - Hỏi CPU, số nhân, số luồng hoặc tốc độ CPU:
+      ["processor"]
+
+    - Hỏi card đồ họa:
+      ["graphics"]
+
+    - Hỏi loại RAM, bus RAM, RAM tối đa hoặc khả năng nâng cấp SSD:
+      ["memoryAndStorage"]
+
+    - Hỏi kích thước, độ phân giải, tấm nền hoặc tần số quét:
+      ["display"]
+
+    - Hỏi cổng kết nối, Wi-Fi, Bluetooth, webcam, âm thanh
+      hoặc tính năng bảo mật:
+      ["connectivityAndExpansion"]
+
+    - Hỏi pin, hệ điều hành, năm ra mắt, kích thước,
+      trọng lượng hoặc vật liệu:
+      ["dimensionsAndBattery"]
+
+    - Hỏi nhiều nhóm thông tin:
+      Chọn tất cả criteria có liên quan.
+
+    - Hỏi toàn bộ thông tin laptop:
+      ["all"]
+
+    6. QUY TẮC XỬ LÝ KẾT QUẢ
+
+    - Chỉ yêu cầu những nhóm dữ liệu cần thiết để trả lời.
+    - Khi hỏi giá theo RAM, SSD hoặc màu sắc, đối chiếu
+      variants[].ram, variants[].ssd và variants[].color.
+    - Giá bán phải lấy từ variants[].price của phiên bản phù hợp.
+    - Nếu người dùng chưa xác định phiên bản, trình bày các
+      lựa chọn phù hợp hoặc hỏi lại khi cần thiết.
+    - Chỉ sử dụng dữ liệu Tool trả về; không tự suy đoán giá,
+      thông số hoặc đặc điểm laptop.
+    """
+    return await get_laptop_detail_api(
+        laptop_name=laptop_name,
+        criteria=criteria,
+    )

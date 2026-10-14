@@ -10,6 +10,7 @@ import { SearchProductModule } from './ai_session/search_product/search_product.
 import { CompareProductlModule } from './ai_session/compare_product/compare_product.module';
 
 import { GetPhoneDetailModule } from './ai_session/get_product_detail/get_phone_detail/get_phone_detail.module';
+import { GetLaptopDetailModule } from './ai_session/get_product_detail/get_laptop_detail/get_laptop_detail.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { GetPhoneDetailModule } from './ai_session/get_product_detail/get_phone_
     CompareProductlModule,
 
     GetPhoneDetailModule,
+    GetLaptopDetailModule,
 
 
   ],
