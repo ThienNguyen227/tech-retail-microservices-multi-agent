@@ -4,7 +4,8 @@ from typing import Literal
 from services.product_service import (
   search_products as search_products_api,
   get_phone_detail as get_phone_detail_api,
-   get_laptop_detail as get_laptop_detail_api,
+  get_laptop_detail as get_laptop_detail_api,
+  get_tablet_detail as get_tablet_detail_api,
   compare_phones as compare_phones_api,
 )
 @tool
@@ -455,5 +456,201 @@ async def get_laptop_detail(
     """
     return await get_laptop_detail_api(
         laptop_name=laptop_name,
+        criteria=criteria,
+    )
+
+
+TabletDetailCriteria = Literal[
+    "all",
+    "screenTech",
+    "screenSize",
+    "variants",
+    "screen",
+    "operatingSystemAndCpu",
+    "memoryAndStorage",
+    "rearCamera",
+    "frontCamera",
+    "connectivity",
+    "utilities",
+    "batteryAndCharge",
+    "designAndMaterials",
+]
+
+@tool
+async def get_tablet_detail(
+    tablet_name: str,
+    criteria: list[TabletDetailCriteria] | None = None,
+):
+    """
+    TOOL: get_tablet_detail
+
+    1. MÔ TẢ
+    Truy xuất thông tin chi tiết của một tablet từ Product Service
+    theo tên sản phẩm và các nhóm thông tin được yêu cầu.
+
+    2. KHI NÀO SỬ DỤNG
+    - Người dùng hỏi thông tin về một tablet cụ thể.
+    - Người dùng hỏi giá, màu sắc, dung lượng RAM, bộ nhớ hoặc phiên bản.
+    - Người dùng hỏi màn hình, CPU, GPU hoặc hệ điều hành.
+    - Người dùng hỏi camera, kết nối hoặc tính năng tiện ích.
+    - Người dùng hỏi pin, công suất sạc, kích thước hoặc vật liệu.
+    - Người dùng yêu cầu xem toàn bộ thông tin tablet.
+
+    Không sử dụng Tool này để tìm kiếm danh sách nhiều tablet
+    theo điều kiện lọc hoặc so sánh nhiều tablet.
+
+    3. THAM SỐ ĐẦU VÀO
+
+    - tablet_name:
+      Tên tablet cần truy xuất.
+      Ví dụ: "Samsung Galaxy Tab A11+ 5G".
+
+    - criteria:
+      Danh sách nhóm dữ liệu cần truy xuất.
+      Chỉ chọn các nhóm phù hợp với câu hỏi của người dùng.
+
+    4. CÁC CRITERIA HỢP LỆ
+
+    - all:
+      Toàn bộ dữ liệu của tablet.
+
+    - screenTech:
+      Công nghệ màn hình ở cấp cao nhất.
+
+    - screenSize:
+      Kích thước màn hình ở cấp cao nhất.
+
+    - variants:
+      Danh sách phiên bản và thông tin bán hàng.
+      Trường dữ liệu:
+      - sku: Mã định danh phiên bản.
+      - slug: Đường dẫn định danh phiên bản.
+      - storage: Thông tin RAM và bộ nhớ của phiên bản.
+      - color: Màu sắc.
+      - colorSlug: Slug màu sắc.
+      - price: Giá bán, đơn vị VNĐ.
+      - images: Danh sách hình ảnh của phiên bản.
+
+    - screen:
+      Thông tin màn hình.
+      Trường dữ liệu:
+      - screenTechnology: Công nghệ màn hình.
+      - screenSize: Kích thước và tần số quét màn hình.
+
+    - operatingSystemAndCpu:
+      Thông tin hệ điều hành và bộ xử lý.
+      Trường dữ liệu:
+      - operatingSystem: Hệ điều hành.
+      - cpu: Tên bộ xử lý.
+      - cpuSpeed: Tốc độ và cấu hình nhân CPU.
+      - gpu: Bộ xử lý đồ họa.
+
+    - memoryAndStorage:
+      Thông tin bộ nhớ và lưu trữ.
+      Trường dữ liệu:
+      - randomAccessMemory: Dung lượng RAM.
+      - usableStorage: Bộ nhớ khả dụng.
+      - externalMemoryCard: Thẻ nhớ ngoài và dung lượng hỗ trợ tối đa.
+
+    - rearCamera:
+      Thông tin camera sau.
+      Trường dữ liệu:
+      - rearVideoRecording: Khả năng quay video.
+      - rearCameraFeatures: Các tính năng camera sau.
+
+    - frontCamera:
+      Thông tin camera trước.
+      Trường dữ liệu:
+      - frontCameraFeatures: Các tính năng camera trước.
+
+    - connectivity:
+      Thông tin kết nối.
+      Trường dữ liệu:
+      - mobileNetwork: Mạng di động.
+      - simType: Loại SIM.
+      - voiceCallSupport: Khả năng nghe gọi.
+      - wifi: Chuẩn Wi-Fi.
+      - gps: Các hệ thống định vị.
+      - bluetooth: Phiên bản Bluetooth.
+      - connectorPort: Cổng kết nối.
+      - headphoneJack: Jack tai nghe.
+      - otherConnectivity: Các kết nối khác.
+
+    - utilities:
+      Thông tin tiện ích và tính năng đặc biệt.
+      Trường dữ liệu:
+      - specialFeatures: Các tính năng đặc biệt.
+      - waterResistance: Chuẩn kháng nước.
+      - audioRecording: Khả năng ghi âm.
+      - radio: Khả năng sử dụng radio.
+
+    - batteryAndCharge:
+      Thông tin pin và sạc.
+      Trường dữ liệu:
+      - batteryCapacity: Dung lượng pin.
+      - batteryType: Loại pin.
+      - batteryTechnology: Công nghệ sạc.
+      - maxChargingPower: Công suất sạc tối đa.
+      - chargerIncluded: Thông tin bộ sạc đi kèm.
+
+    - designAndMaterials:
+      Thông tin thiết kế và vật liệu.
+      Trường dữ liệu:
+      - materials: Chất liệu.
+      - dimensions: Kích thước thiết bị.
+      - releaseDate: Thời điểm ra mắt.
+
+    5. HƯỚNG DẪN CHỌN CRITERIA
+
+    - Hỏi giá, SKU, màu sắc hoặc phiên bản:
+      ["variants"]
+
+    - Hỏi công nghệ, kích thước hoặc tần số quét màn hình:
+      ["screen", "screenTech", "screenSize"]
+
+    - Hỏi hệ điều hành, CPU hoặc GPU:
+      ["operatingSystemAndCpu"]
+
+    - Hỏi RAM, bộ nhớ khả dụng hoặc thẻ nhớ:
+      ["memoryAndStorage"]
+
+    - Hỏi camera sau hoặc khả năng quay video:
+      ["rearCamera"]
+
+    - Hỏi camera trước:
+      ["frontCamera"]
+
+    - Hỏi mạng di động, SIM, Wi-Fi, GPS, Bluetooth hoặc cổng kết nối:
+      ["connectivity"]
+
+    - Hỏi tính năng đặc biệt, kháng nước hoặc ghi âm:
+      ["utilities"]
+
+    - Hỏi dung lượng pin, công nghệ sạc hoặc bộ sạc:
+      ["batteryAndCharge"]
+
+    - Hỏi chất liệu, kích thước hoặc ngày ra mắt:
+      ["designAndMaterials"]
+
+    - Hỏi nhiều nhóm thông tin:
+      Chọn tất cả criteria có liên quan.
+
+    - Hỏi toàn bộ thông tin tablet:
+      ["all"]
+
+    6. QUY TẮC XỬ LÝ KẾT QUẢ
+
+    - Chỉ yêu cầu những nhóm dữ liệu cần thiết để trả lời.
+    - Khi hỏi giá theo dung lượng bộ nhớ hoặc màu sắc, đối chiếu
+      variants[].storage và variants[].color.
+    - Giá bán phải lấy từ variants[].price của phiên bản phù hợp.
+    - Không tự suy ra RAM hoặc bộ nhớ của từng phiên bản nếu dữ liệu
+      phiên bản không cung cấp thông tin tương ứng.
+    - Nếu người dùng chưa xác định phiên bản, trình bày các lựa chọn
+      phù hợp hoặc hỏi lại khi cần thiết.
+    - Chỉ sử dụng dữ liệu Tool trả về; không tự suy đoán thông số.
+    """
+    return await get_tablet_detail_api(
+        tablet_name=tablet_name,
         criteria=criteria,
     )

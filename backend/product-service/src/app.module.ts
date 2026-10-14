@@ -11,6 +11,7 @@ import { CompareProductlModule } from './ai_session/compare_product/compare_prod
 
 import { GetPhoneDetailModule } from './ai_session/get_product_detail/get_phone_detail/get_phone_detail.module';
 import { GetLaptopDetailModule } from './ai_session/get_product_detail/get_laptop_detail/get_laptop_detail.module';
+import { GetTabletDetailModule } from './ai_session/get_product_detail/get_tablet_detail/get_tablet_detail.module';
 
 @Module({
   imports: [
@@ -33,9 +34,10 @@ import { GetLaptopDetailModule } from './ai_session/get_product_detail/get_lapto
     SearchProductModule,
 
     CompareProductlModule,
-
+    /// 2. GET PRODUCT DETAIL
     GetPhoneDetailModule,
     GetLaptopDetailModule,
+    GetTabletDetailModule,
 
 
   ],
