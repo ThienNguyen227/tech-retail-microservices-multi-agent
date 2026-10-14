@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from agents.product_agent.agent import product_agent
+from agent import product_agent
 
 app = FastAPI(title="AI Service")
 

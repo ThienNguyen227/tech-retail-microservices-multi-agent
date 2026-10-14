@@ -8,50 +8,6 @@ load_dotenv()
 
 PRODUCT_SERVICE_URL = os.getenv("PRODUCT_SERVICE_URL")
 
-async def get_product_details(product_name: str):
-    url = f"{PRODUCT_SERVICE_URL}/api/v1/ai/product-service/details"
-
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        try:
-            response = await client.get(
-                url,
-                params={"keyword": product_name},
-            )
-
-            if response.status_code == 404:
-                return {
-                    "found": False,
-                    "message": f"Không tìm thấy sản phẩm: {product_name}",
-                }
-
-            response.raise_for_status()
-
-            data = response.json()
-
-            return {
-                "found": True,
-                "data": data,
-            }
-
-        except httpx.TimeoutException:
-            return {
-                "found": False,
-                "message": "Product Service phản hồi quá thời gian.",
-            }
-
-        except httpx.HTTPStatusError:
-            return {
-                "found": False,
-                "message": "Đã xảy ra lỗi khi truy xuất thông tin sản phẩm.",
-            }
-
-        except httpx.RequestError:
-            return {
-                "found": False,
-                "message": "Không thể kết nối đến Product Service.",
-            }
-
-
 async def search_products(
     keyword: str | None = None,
     brand: str | None = None,
@@ -164,6 +120,66 @@ async def compare_phones(products: list[str], criteria: list[str] | None = None)
             return {
                 "found": False,
                 "message": "Đã xảy ra lỗi khi so sánh sản phẩm.",
+            }
+
+        except httpx.RequestError:
+            return {
+                "found": False,
+                "message": "Không thể kết nối đến Product Service.",
+            }
+
+
+# 4. LẤY CHI TIẾT ĐIỆN THOẠI THEO TIÊU CHÍ
+async def get_phone_detail(
+    phone_name: str,
+    criteria: list[str] | None = None,
+):
+    url = (
+        f"{PRODUCT_SERVICE_URL}"
+        "/api/v1/ai/product-service/detail/phone"
+    )
+
+    params = [("phoneName", phone_name)]
+
+    if criteria:
+        params.extend(
+            ("criteria", item) for item in criteria
+        )
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        try:
+            response = await client.get(url, params=params)
+
+            if response.status_code == 404:
+                return {
+                    "found": False,
+                    "message": f"Không tìm thấy điện thoại: {phone_name}",
+                }
+
+            response.raise_for_status()
+
+            return {
+                "found": True,
+                "data": response.json(),
+            }
+
+        except httpx.TimeoutException:
+            return {
+                "found": False,
+                "message": "Product Service phản hồi quá thời gian.",
+            }
+
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 400:
+                return {
+                    "found": False,
+                    "message": "Tên sản phẩm hoặc tiêu chí truy xuất không hợp lệ.",
+                    "detail": e.response.json(),
+                }
+
+            return {
+                "found": False,
+                "message": "Đã xảy ra lỗi khi lấy chi tiết điện thoại.",
             }
 
         except httpx.RequestError:
