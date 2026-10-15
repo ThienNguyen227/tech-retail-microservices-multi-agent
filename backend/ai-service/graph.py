@@ -8,7 +8,7 @@ from langgraph.prebuilt import ToolNode, tools_condition
 
 from prompt import PRODUCT_AGENT_PROMPT
 
-from tools.product_tools import (get_phone_detail, get_laptop_detail, get_tablet_detail, compare_phones, compare_laptops)
+from tools.product_tools import (get_phone_detail, get_laptop_detail, get_tablet_detail, compare_phones, compare_laptops, compare_tablets)
 
 load_dotenv()
 
@@ -26,6 +26,7 @@ tools = [
     get_tablet_detail,
     compare_phones,
     compare_laptops,
+    compare_tablets,
 ]
 
 llm_with_tools = llm.bind_tools(tools)
