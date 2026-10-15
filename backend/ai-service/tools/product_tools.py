@@ -48,54 +48,8 @@ async def search_products(
         limit=limit,
     )
 
-
-CompareCriteria = Literal[
-    "basic",
-    "variant",
-    "price",
-    "performance",
-    "camera",
-    "screen",
-    "battery",
-    "connectivity",
-    "design",
-    "utilities",
-    "all",
-]
-
-
-@tool
-async def compare_phones(
-    products: list[str],
-    criteria: list[CompareCriteria] | None = None,
-):
-    """Lấy dữ liệu để so sánh từ 2 đến 5 điện thoại.
-
-    products: Danh sách tên sản phẩm chính xác.
-    criteria: Danh sách tiêu chí cần so sánh.
-
-    Tiêu chí hỗ trợ:
-    - basic: thông tin cơ bản
-    - variant: dung lượng, màu sắc, giá và mã phiên bản
-    - price: giá theo từng dung lượng
-    - performance: chip, CPU, GPU, RAM và bộ nhớ
-    - camera: camera và tính năng quay video
-    - screen: thông số màn hình
-    - battery: pin và sạc
-    - connectivity: kết nối
-    - design: thiết kế, chất liệu, kích thước và trọng lượng
-    - utilities: tiện ích
-    - all: toàn bộ dữ liệu
-
-    Nếu criteria không được cung cấp, Product-Service trả về toàn bộ dữ liệu.
-    Chỉ chọn các tiêu chí liên quan đến yêu cầu của người dùng.
-    """
-    return await compare_phones_api(
-        products=products,
-        criteria=criteria,
-    )
-
-
+## GET PRODUCT DETAIL
+# 1. GET PHONE DETIAL
 PhoneDetailCriteria = Literal[
   "all",
   "screenTech",
@@ -294,7 +248,7 @@ async def get_phone_detail(phone_name: str, criteria: list[PhoneDetailCriteria] 
   """
   return await get_phone_detail_api(phone_name=phone_name, criteria=criteria)
 
-
+# 2. GET LAPTOP DETIAL
 LaptopDetailCriteria = Literal[
     "all",
     "ram",
@@ -459,7 +413,7 @@ async def get_laptop_detail(
         criteria=criteria,
     )
 
-
+# 3. GET TABLET DETIAL
 TabletDetailCriteria = Literal[
     "all",
     "screenTech",
@@ -652,5 +606,119 @@ async def get_tablet_detail(
     """
     return await get_tablet_detail_api(
         tablet_name=tablet_name,
+        criteria=criteria,
+    )
+
+## COMPARE PRODUCT
+# 1. COMPARE PHONE
+PhoneCompareCriteria = Literal[
+    "all",
+    "screenTech",
+    "screenSize",
+    "variants",
+    "specifications",
+    "performanceAndStorage",
+    "cameraAndScreen",
+    "batteryAndCharge",
+    "utilities",
+    "connectivity",
+    "designAndMaterials",
+]
+
+
+@tool
+async def compare_phones(
+    products: list[str],
+    criteria: list[PhoneCompareCriteria] | None = None,
+):
+    """
+    TOOL: compare_phones
+
+    1. MÔ TẢ
+    Lấy dữ liệu của nhiều điện thoại từ Product Service
+    theo danh sách tên sản phẩm và các tiêu chí so sánh.
+
+    2. KHI NÀO SỬ DỤNG
+    - Người dùng yêu cầu so sánh từ 2 đến 5 điện thoại.
+    - Người dùng muốn so sánh giá, màu sắc hoặc phiên bản.
+    - Người dùng muốn so sánh thông số kỹ thuật giữa các điện thoại.
+    - Người dùng muốn so sánh một tiêu chí cụ thể hoặc nhiều tiêu chí.
+
+    Không sử dụng Tool này để lấy chi tiết một điện thoại duy nhất
+    hoặc tìm kiếm danh sách sản phẩm theo điều kiện lọc.
+
+    3. THAM SỐ ĐẦU VÀO
+
+    - products:
+      Danh sách tên từ 2 đến 5 điện thoại cần so sánh.
+      Ví dụ:
+      [
+          "iPhone 17 Pro Max",
+          "Samsung Galaxy S25 Ultra"
+      ]
+
+    - criteria:
+      Danh sách nhóm dữ liệu cần lấy để so sánh.
+      Chỉ chọn các nhóm phù hợp với yêu cầu của người dùng.
+
+      Các giá trị hợp lệ:
+      - all: Toàn bộ dữ liệu.
+      - screenTech: Công nghệ màn hình.
+      - screenSize: Kích thước màn hình.
+      - variants: Phiên bản, dung lượng, màu sắc và giá bán.
+      - specifications: Thông số kỹ thuật tổng quát.
+      - performanceAndStorage: Hiệu năng và bộ nhớ.
+      - cameraAndScreen: Camera và màn hình chi tiết.
+      - batteryAndCharge: Pin và sạc.
+      - utilities: Tiện ích và tính năng bổ sung.
+      - connectivity: Kết nối.
+      - designAndMaterials: Thiết kế và vật liệu.
+
+    4. HƯỚNG DẪN CHỌN CRITERIA
+
+    - Chỉ so sánh giá, màu sắc hoặc dung lượng:
+      ["variants"]
+
+    - So sánh công nghệ màn hình:
+      ["screenTech"]
+
+    - So sánh kích thước màn hình:
+      ["screenSize"]
+
+    - So sánh hiệu năng, chip, RAM hoặc bộ nhớ:
+      ["performanceAndStorage"]
+
+    - So sánh camera hoặc màn hình chi tiết:
+      ["cameraAndScreen"]
+
+    - So sánh pin và sạc:
+      ["batteryAndCharge"]
+
+    - So sánh nhiều nhóm thông số:
+      Chọn tất cả criteria có liên quan.
+
+    - Người dùng yêu cầu so sánh toàn diện:
+      ["all"]
+
+    - Người dùng chỉ nói "so sánh hai điện thoại" mà không nêu tiêu chí:
+      Chọn các nhóm tiêu chí quan trọng, phù hợp với dữ liệu
+      hiện có của các điện thoại.
+
+    5. QUY TẮC XỬ LÝ KẾT QUẢ
+
+    - Truyền đúng tên các điện thoại cần so sánh.
+    - Chỉ sử dụng dữ liệu do Tool trả về.
+    - Không tự tạo hoặc suy đoán giá bán, thông số hay tính năng.
+    - Khi so sánh giá, phải đối chiếu đúng phiên bản trong variants.
+    - Nếu một sản phẩm có nhiều phiên bản, cần phân biệt rõ
+      dung lượng, màu sắc và giá tương ứng.
+    - Nếu dữ liệu của một tiêu chí bị thiếu, nêu rõ chưa có dữ liệu.
+    - Nếu Tool trả về found = false, thông báo lỗi phù hợp;
+      không trình bày kết quả như thể đã so sánh thành công.
+    - Sau khi nhận dữ liệu, trình bày điểm giống nhau,
+      khác nhau và nhận xét dựa trên tiêu chí người dùng yêu cầu.
+    """
+    return await compare_phones_api(
+        products=products,
         criteria=criteria,
     )
