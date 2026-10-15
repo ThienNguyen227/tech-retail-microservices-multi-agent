@@ -8,6 +8,7 @@ from services.product_service import (
   get_tablet_detail as get_tablet_detail_api,
   compare_phones as compare_phones_api,
   compare_laptops as compare_laptops_api,
+  compare_tablets as compare_tablets_api,
 )
 @tool
 async def search_products(
@@ -829,6 +830,141 @@ async def compare_laptops(
       khác nhau và nhận xét dựa trên tiêu chí người dùng yêu cầu.
     """
     return await compare_laptops_api(
+        products=products,
+        criteria=criteria,
+    )
+
+# 3. COMPARE TABLET
+
+TabletCompareCriteria = Literal[
+    "all",
+    "screenTech",
+    "screenSize",
+    "variants",
+    "screen",
+    "operatingSystemAndCpu",
+    "memoryAndStorage",
+    "rearCamera",
+    "frontCamera",
+    "connectivity",
+    "utilities",
+    "batteryAndCharge",
+    "designAndMaterials",
+]
+
+
+@tool
+async def compare_tablets(
+    products: list[str],
+    criteria: list[TabletCompareCriteria] | None = None,
+):
+    """
+    TOOL: compare_tablets
+
+    1. MÔ TẢ
+    Lấy dữ liệu của nhiều máy tính bảng từ Product Service
+    theo danh sách tên sản phẩm và các tiêu chí so sánh.
+
+    2. KHI NÀO SỬ DỤNG
+    - Người dùng yêu cầu so sánh từ 2 đến 5 máy tính bảng.
+    - Người dùng muốn so sánh giá, màu sắc hoặc phiên bản tablet.
+    - Người dùng muốn so sánh màn hình, hệ điều hành hoặc CPU.
+    - Người dùng muốn so sánh RAM, bộ nhớ lưu trữ hoặc camera.
+    - Người dùng muốn so sánh kết nối, tiện ích hoặc pin.
+    - Người dùng muốn so sánh thiết kế và vật liệu.
+    - Người dùng muốn so sánh một hoặc nhiều nhóm thông số.
+
+    Không sử dụng Tool này để lấy chi tiết một tablet duy nhất
+    hoặc tìm kiếm danh sách tablet theo điều kiện lọc.
+
+    3. THAM SỐ ĐẦU VÀO
+
+    - products:
+      Danh sách tên từ 2 đến 5 máy tính bảng cần so sánh.
+
+      Ví dụ:
+      [
+          "Apple iPad Air",
+          "Samsung Galaxy Tab S10"
+      ]
+
+    - criteria:
+      Danh sách nhóm dữ liệu cần lấy để so sánh.
+
+      Các giá trị hợp lệ:
+      - all: Toàn bộ dữ liệu.
+      - screenTech: Công nghệ màn hình.
+      - screenSize: Kích thước màn hình.
+      - variants: Phiên bản, màu sắc và giá bán.
+      - screen: Thông tin màn hình.
+      - operatingSystemAndCpu: Hệ điều hành và CPU.
+      - memoryAndStorage: RAM và bộ nhớ lưu trữ.
+      - rearCamera: Camera sau.
+      - frontCamera: Camera trước.
+      - connectivity: Khả năng kết nối.
+      - utilities: Các tiện ích.
+      - batteryAndCharge: Pin và sạc.
+      - designAndMaterials: Thiết kế và vật liệu.
+
+    4. HƯỚNG DẪN CHỌN CRITERIA
+
+    - Chỉ so sánh giá, màu sắc hoặc phiên bản:
+      ["variants"]
+
+    - So sánh công nghệ màn hình:
+      ["screenTech"]
+
+    - So sánh kích thước màn hình:
+      ["screenSize"]
+
+    - So sánh hệ điều hành và CPU:
+      ["operatingSystemAndCpu"]
+
+    - So sánh RAM hoặc bộ nhớ lưu trữ:
+      ["memoryAndStorage"]
+
+    - So sánh camera sau:
+      ["rearCamera"]
+
+    - So sánh camera trước:
+      ["frontCamera"]
+
+    - So sánh kết nối:
+      ["connectivity"]
+
+    - So sánh pin và sạc:
+      ["batteryAndCharge"]
+
+    - So sánh tiện ích:
+      ["utilities"]
+
+    - So sánh thiết kế và vật liệu:
+      ["designAndMaterials"]
+
+    - So sánh nhiều nhóm thông số:
+      Chọn tất cả criteria có liên quan.
+
+    - Người dùng yêu cầu so sánh toàn diện:
+      ["all"]
+
+    - Người dùng chỉ nói "so sánh hai tablet" mà không nêu tiêu chí:
+      Chọn các nhóm tiêu chí quan trọng, phù hợp với dữ liệu
+      hiện có của các tablet.
+
+    5. QUY TẮC XỬ LÝ KẾT QUẢ
+
+    - Truyền đúng tên các tablet cần so sánh.
+    - Chỉ sử dụng dữ liệu do Tool trả về.
+    - Không tự tạo hoặc suy đoán giá bán, thông số hay tính năng.
+    - Khi so sánh giá, đối chiếu đúng phiên bản trong variants.
+    - Phân biệt rõ thông số của từng tablet.
+    - Nếu thiếu dữ liệu của một tiêu chí, nêu rõ chưa có dữ liệu.
+    - Nếu Tool trả về found = false, thông báo lỗi phù hợp;
+      không trình bày kết quả như thể đã so sánh thành công.
+    - Sau khi nhận dữ liệu, trình bày điểm giống nhau,
+      khác nhau và nhận xét dựa trên tiêu chí người dùng yêu cầu.
+    """
+    return await compare_tablets_api(
         products=products,
         criteria=criteria,
     )

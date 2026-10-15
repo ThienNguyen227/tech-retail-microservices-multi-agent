@@ -381,3 +381,71 @@ async def compare_laptops(
                 "found": False,
                 "message": "Không thể kết nối đến Product Service.",
             }
+
+## 3. COMPARE TABLET
+async def compare_tablets(
+    products: list[str],
+    criteria: list[str] | None = None,
+):
+    url = (
+        f"{PRODUCT_SERVICE_URL}"
+        "/api/v1/ai/product-service/compare/tablets"
+    )
+
+    params = [
+        ("products", product)
+        for product in products
+    ]
+
+    if criteria:
+        params.extend(
+            ("criteria", item) for item in criteria
+        )
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        try:
+            response = await client.get(url, params=params)
+
+            if response.status_code == 404:
+                return {
+                    "found": False,
+                    "message": "Không tìm thấy một hoặc nhiều tablet cần so sánh.",
+                    "detail": response.json(),
+                }
+
+            response.raise_for_status()
+
+            return {
+                "found": True,
+                "data": response.json(),
+            }
+
+        except httpx.TimeoutException:
+            return {
+                "found": False,
+                "message": "Product Service phản hồi quá thời gian.",
+            }
+
+        except httpx.HTTPStatusError as e:
+            print("COMPARE TABLET API STATUS:", e.response.status_code)
+            print("COMPARE TABLET API BODY:", e.response.text)
+
+            if e.response.status_code == 400:
+                return {
+                    "found": False,
+                    "message": "Danh sách tablet hoặc tiêu chí so sánh không hợp lệ.",
+                    "detail": e.response.text,
+                }
+
+            return {
+                "found": False,
+                "message": "Đã xảy ra lỗi khi so sánh tablet.",
+                "status_code": e.response.status_code,
+                "detail": e.response.text,
+            }
+
+        except httpx.RequestError:
+            return {
+                "found": False,
+                "message": "Không thể kết nối đến Product Service.",
+            }
