@@ -7,11 +7,12 @@ import { ProductModule } from './products/product.module';
 
 // AI_SESSION
 import { SearchProductModule } from './ai_session/search_product/search_product.module';
-import { CompareProductlModule } from './ai_session/compare_product/compare_product.module';
 
 import { GetPhoneDetailModule } from './ai_session/get_product_detail/get_phone_detail/get_phone_detail.module';
 import { GetLaptopDetailModule } from './ai_session/get_product_detail/get_laptop_detail/get_laptop_detail.module';
 import { GetTabletDetailModule } from './ai_session/get_product_detail/get_tablet_detail/get_tablet_detail.module';
+
+import { ComparePhoneModule } from './ai_session/compare_product/compare_phone/compare_phone.module';
 
 @Module({
   imports: [
@@ -33,11 +34,13 @@ import { GetTabletDetailModule } from './ai_session/get_product_detail/get_table
     // AI_SESSION
     SearchProductModule,
 
-    CompareProductlModule,
     /// 2. GET PRODUCT DETAIL
     GetPhoneDetailModule,
     GetLaptopDetailModule,
     GetTabletDetailModule,
+
+    /// 3. COMPARE PRODUCT
+    ComparePhoneModule,
 
 
   ],
