@@ -43,6 +43,7 @@ type Tablet = {
 
   operatingSystemAndCpu?: {
     operatingSystem?: string;
+    cpu?: string;
     cpuSpeed?: string;
     gpu?: string;
   };
@@ -669,6 +670,10 @@ export default function TabletProductDetail({
                 <InfoRow
                   label="Hệ điều hành"
                   value={product.operatingSystemAndCpu?.operatingSystem}
+                />
+                <InfoRow
+                  label="CPU"
+                  value={product.operatingSystemAndCpu?.cpu}
                 />
                 <InfoRow
                   label="Tốc độ CPU"
