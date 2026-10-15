@@ -13,6 +13,7 @@ import { GetLaptopDetailModule } from './ai_session/get_product_detail/get_lapto
 import { GetTabletDetailModule } from './ai_session/get_product_detail/get_tablet_detail/get_tablet_detail.module';
 
 import { ComparePhoneModule } from './ai_session/compare_product/compare_phone/compare_phone.module';
+import { CompareLaptopModule } from './ai_session/compare_product/compare_laptop/compare_laptop.module';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { ComparePhoneModule } from './ai_session/compare_product/compare_phone/c
 
     /// 3. COMPARE PRODUCT
     ComparePhoneModule,
+    CompareLaptopModule,
 
 
   ],
