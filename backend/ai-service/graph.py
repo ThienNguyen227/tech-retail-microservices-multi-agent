@@ -6,6 +6,9 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import StateGraph, MessagesState, START, END
 from langgraph.prebuilt import ToolNode, tools_condition
 
+from pymongo import MongoClient
+from langgraph.checkpoint.mongodb import MongoDBSaver
+
 from prompt import PRODUCT_AGENT_PROMPT
 
 from tools.product_tools import (get_phone_detail, get_laptop_detail, get_tablet_detail, compare_phones, compare_laptops, compare_tablets)
@@ -60,4 +63,13 @@ builder.add_conditional_edges(
 
 builder.add_edge("tools", "llm")
 
-product_agent = builder.compile()
+# product_agent = builder.compile()
+
+# Kết nối MongoDB
+mongo_client = MongoClient(os.getenv("MONGODB_URI"))
+
+# Khởi tạo Checkpointer
+checkpointer = MongoDBSaver(mongo_client, db_name="ai_service")
+
+# Compile graph có lưu trạng thái
+product_agent = builder.compile(checkpointer=checkpointer)
