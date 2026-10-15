@@ -7,6 +7,7 @@ from services.product_service import (
   get_laptop_detail as get_laptop_detail_api,
   get_tablet_detail as get_tablet_detail_api,
   compare_phones as compare_phones_api,
+  compare_laptops as compare_laptops_api,
 )
 @tool
 async def search_products(
@@ -625,7 +626,6 @@ PhoneCompareCriteria = Literal[
     "designAndMaterials",
 ]
 
-
 @tool
 async def compare_phones(
     products: list[str],
@@ -719,6 +719,116 @@ async def compare_phones(
       khác nhau và nhận xét dựa trên tiêu chí người dùng yêu cầu.
     """
     return await compare_phones_api(
+        products=products,
+        criteria=criteria,
+    )
+
+# 2. COMPARE LAPTOP
+
+LaptopCompareCriteria = Literal[
+    "all",
+    "variants",
+    "processor",
+    "graphics",
+    "memoryAndStorage",
+    "display",
+    "connectivityAndExpansion",
+    "dimensionsAndBattery",
+]
+
+@tool
+async def compare_laptops(
+    products: list[str],
+    criteria: list[LaptopCompareCriteria] | None = None,
+):
+    """
+    TOOL: compare_laptops
+
+    1. MÔ TẢ
+    Lấy dữ liệu của nhiều laptop từ Product Service
+    theo danh sách tên sản phẩm và các tiêu chí so sánh.
+
+    2. KHI NÀO SỬ DỤNG
+    - Người dùng yêu cầu so sánh từ 2 đến 5 laptop.
+    - Người dùng muốn so sánh giá, màu sắc hoặc phiên bản laptop.
+    - Người dùng muốn so sánh CPU, GPU, RAM, SSD hoặc màn hình.
+    - Người dùng muốn so sánh pin, kích thước hoặc khả năng kết nối.
+    - Người dùng muốn so sánh một hoặc nhiều nhóm thông số.
+
+    Không sử dụng Tool này để lấy chi tiết một laptop duy nhất
+    hoặc tìm kiếm danh sách laptop theo điều kiện lọc.
+
+    3. THAM SỐ ĐẦU VÀO
+
+    - products:
+      Danh sách tên từ 2 đến 5 laptop cần so sánh.
+
+      Ví dụ:
+      [
+          "HP 240R G10 - C3RU7AT",
+          "Laptop Lenovo IdeaPad Slim 5"
+      ]
+
+    - criteria:
+      Danh sách nhóm dữ liệu cần lấy để so sánh.
+
+      Các giá trị hợp lệ:
+      - all: Toàn bộ dữ liệu.
+      - variants: Phiên bản, màu sắc và giá bán.
+      - processor: Bộ xử lý (CPU).
+      - graphics: Card đồ họa (GPU).
+      - memoryAndStorage: RAM và bộ nhớ lưu trữ.
+      - display: Màn hình.
+      - connectivityAndExpansion: Kết nối và cổng mở rộng.
+      - dimensionsAndBattery: Kích thước, trọng lượng và pin.
+
+    4. HƯỚNG DẪN CHỌN CRITERIA
+
+    - Chỉ so sánh giá, màu sắc hoặc phiên bản:
+      ["variants"]
+
+    - So sánh CPU:
+      ["processor"]
+
+    - So sánh GPU:
+      ["graphics"]
+
+    - So sánh RAM hoặc SSD:
+      ["memoryAndStorage"]
+
+    - So sánh màn hình:
+      ["display"]
+
+    - So sánh cổng kết nối:
+      ["connectivityAndExpansion"]
+
+    - So sánh pin, kích thước hoặc trọng lượng:
+      ["dimensionsAndBattery"]
+
+    - So sánh nhiều nhóm thông số:
+      Chọn tất cả criteria có liên quan.
+
+    - Người dùng yêu cầu so sánh toàn diện:
+      ["all"]
+
+    - Người dùng chỉ nói "so sánh hai laptop" mà không nêu tiêu chí:
+      Chọn các nhóm tiêu chí quan trọng, phù hợp với dữ liệu
+      hiện có của các laptop.
+
+    5. QUY TẮC XỬ LÝ KẾT QUẢ
+
+    - Truyền đúng tên các laptop cần so sánh.
+    - Chỉ sử dụng dữ liệu do Tool trả về.
+    - Không tự tạo hoặc suy đoán giá bán, thông số hay tính năng.
+    - Khi so sánh giá, đối chiếu đúng phiên bản trong variants.
+    - Phân biệt rõ CPU, GPU, RAM và SSD của từng laptop.
+    - Nếu thiếu dữ liệu của một tiêu chí, nêu rõ chưa có dữ liệu.
+    - Nếu Tool trả về found = false, thông báo lỗi phù hợp;
+      không trình bày kết quả như thể đã so sánh thành công.
+    - Sau khi nhận dữ liệu, trình bày điểm giống nhau,
+      khác nhau và nhận xét dựa trên tiêu chí người dùng yêu cầu.
+    """
+    return await compare_laptops_api(
         products=products,
         criteria=criteria,
     )
