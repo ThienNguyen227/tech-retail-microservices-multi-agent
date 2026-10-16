@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import CustomerHeader from "./components/CustomerHeader";
+import AIChatbox from "./components/AIChatbox";
 
 export default function CustomerLayout({
   children,
@@ -11,6 +12,8 @@ export default function CustomerLayout({
       <CustomerHeader />
 
       <main className="flex-1">{children}</main>
+
+      <AIChatbox />
     </div>
   );
 }
