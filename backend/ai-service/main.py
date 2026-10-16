@@ -76,10 +76,8 @@ class ChatRequest(BaseModel):
     message: str
     conversation_id: str | None = None
 
-
 @app.post("/api/v1/agent/product")
 async def product_chat(request: ChatRequest):
-    # Tạo cuộc trò chuyện mới nếu chưa có ID
     conversation_id = request.conversation_id or str(uuid4())
 
     config = {
@@ -87,6 +85,10 @@ async def product_chat(request: ChatRequest):
             "thread_id": conversation_id,
         }
     }
+
+    snapshot = await product_agent.aget_state(config)
+
+    old_count = len(snapshot.values.get("messages", [])) if snapshot.values else 0
 
     result = await product_agent.ainvoke(
         {
@@ -100,12 +102,33 @@ async def product_chat(request: ChatRequest):
         config=config,
     )
 
+    # Chỉ kiểm tra các message mới của lượt hiện tại
+    new_messages = result["messages"][old_count:]
+
+    total_input = 0
+    total_output = 0
+
+    for msg in new_messages:
+        usage = getattr(msg, "usage_metadata", None)
+
+        if usage:
+            input_tokens = usage.get("input_tokens", 0)
+            output_tokens = usage.get("output_tokens", 0)
+
+            total_input += input_tokens
+            total_output += output_tokens
+
+    print("\n========== TOKEN USAGE ==========")
+    print(f"Total input tokens:  {total_input}")
+    print(f"Total output tokens: {total_output}")
+    print(f"Total tokens:        {total_input + total_output}")
+
     # DEBUG: Kiểm tra Agent có gọi Tool không
-    for msg in result["messages"]:
+    for msg in new_messages:
         print("\nTYPE:", type(msg).__name__)
         print("CONTENT:", msg.content)
 
-        if hasattr(msg, "tool_calls"):
+        if hasattr(msg, "tool_calls") and msg.tool_calls:
             print("TOOL CALLS:", msg.tool_calls)
 
     # Lấy câu trả lời cuối cùng
