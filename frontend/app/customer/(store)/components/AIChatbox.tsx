@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
@@ -19,16 +20,14 @@ import {
   Trash2,
   PanelLeftClose,
   LoaderCircle,
+  MoreHorizontal,
+  Pencil,
 } from "lucide-react";
 
 // ==================== API ====================
 
 const API_ROOT_URL = "http://127.0.0.1:8000/api/v1/ai-service";
-
-// Endpoint Product Agent: danh sách, tin nhắn, gửi câu hỏi
 const PRODUCT_API_URL = `${API_ROOT_URL}/product`;
-
-// Endpoint quản lý conversation: tạo conversation mới
 const CONVERSATION_API_URL = `${API_ROOT_URL}/conversations`;
 
 // ==================== TYPES ====================
@@ -83,6 +82,13 @@ type ChatResponse = {
   detail?: string;
 };
 
+type DeleteConversationResponse = {
+  conversation_id?: string;
+  deleted_messages?: number;
+  message?: string;
+  detail?: string;
+};
+
 const INITIAL_MESSAGE: Message = {
   id: "welcome",
   role: "assistant",
@@ -92,7 +98,7 @@ const INITIAL_MESSAGE: Message = {
 
 // ==================== COMPONENT ====================
 
-export default function AIChatbox() {
+export default function AIChatBot() {
   const [isOpen, setIsOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [input, setInput] = useState("");
@@ -108,6 +114,12 @@ export default function AIChatbox() {
   const [isCreatingConversation, setIsCreatingConversation] =
     useState(false);
   const [isSending, setIsSending] = useState(false);
+
+  // Trạng thái menu 3 chấm và xóa hội thoại
+  const [openMenuConversationId, setOpenMenuConversationId] =
+    useState<string | null>(null);
+  const [deletingConversationId, setDeletingConversationId] =
+    useState<string | null>(null);
 
   const [conversationError, setConversationError] = useState("");
   const [messageError, setMessageError] = useState("");
@@ -125,7 +137,6 @@ export default function AIChatbox() {
       userId: string,
       signal?: AbortSignal
     ): Promise<Conversation[]> => {
-      // Giữ nguyên endpoint GET từ code ban đầu.
       const response = await fetch(
         `${PRODUCT_API_URL}/conversations?user_id=${encodeURIComponent(
           userId
@@ -318,10 +329,15 @@ export default function AIChatbox() {
       return;
     }
 
-    if (isCreatingConversation || isSending) return;
+    if (
+      isCreatingConversation ||
+      isSending ||
+      deletingConversationId
+    ) {
+      return;
+    }
 
-    // Nếu conversation hiện tại chưa có tin nhắn,
-    // dùng lại nó thay vì tạo thêm một conversation rỗng.
+    // Nếu hội thoại hiện tại chưa có tin nhắn thì sử dụng lại.
     if (
       activeConversation &&
       activeConversation.messages.length === 0
@@ -329,20 +345,20 @@ export default function AIChatbox() {
       setInput("");
       setMessageError("");
       setConversationError("");
+      setOpenMenuConversationId(null);
       return;
     }
 
     setIsCreatingConversation(true);
     setConversationError("");
     setMessageError("");
+    setOpenMenuConversationId(null);
 
     try {
       const params = new URLSearchParams({
         user_id: userId,
       });
 
-      // Chỉ truyền conversation_id khi conversation hiện tại
-      // đã có tin nhắn, phù hợp với điều kiện của backend.
       if (
         activeConversationId &&
         activeConversation &&
@@ -353,9 +369,7 @@ export default function AIChatbox() {
 
       const response = await fetch(
         `${CONVERSATION_API_URL}?${params.toString()}`,
-        {
-          method: "POST",
-        }
+        { method: "POST" }
       );
 
       const data: CreateConversationResponse =
@@ -383,7 +397,6 @@ export default function AIChatbox() {
         updated_at: new Date().toISOString(),
       };
 
-      // Thêm hội thoại mới lên đầu danh sách.
       setConversations((previous) => [
         newConversation,
         ...previous.filter(
@@ -391,9 +404,7 @@ export default function AIChatbox() {
         ),
       ]);
 
-      // Chuyển sang hội thoại mới.
       setActiveConversationId(data.conversation_id);
-
       setInput("");
       setMessageError("");
       setConversationError("");
@@ -415,31 +426,135 @@ export default function AIChatbox() {
   // ==================== SELECT CONVERSATION ====================
 
   const handleSelectConversation = (id: string) => {
-    if (isSending || isCreatingConversation) return;
+    if (
+      isSending ||
+      isCreatingConversation ||
+      deletingConversationId
+    ) {
+      return;
+    }
 
     setActiveConversationId(id);
     setInput("");
     setMessageError("");
+    setOpenMenuConversationId(null);
   };
 
-  // ==================== DELETE FROM UI ====================
+  // ==================== OPEN 3-DOT MENU ====================
 
-  const handleDeleteConversation = (
+  const handleToggleMenu = (
     event: MouseEvent<HTMLButtonElement>,
     id: string
   ) => {
     event.stopPropagation();
 
-    if (isSending || isCreatingConversation) return;
+    setOpenMenuConversationId((currentId) =>
+      currentId === id ? null : id
+    );
+  };
 
-    const remaining = conversations.filter(
-      (item) => item.id !== id
+  // ==================== RENAME CONVERSATION ====================
+
+  const handleRenameConversation = (
+    event: MouseEvent<HTMLButtonElement>,
+    id: string
+  ) => {
+    event.stopPropagation();
+    setOpenMenuConversationId(null);
+
+    // Chưa triển khai chức năng đổi tên.
+    alert("Chức năng đổi tên cuộc trò chuyện sẽ được bổ sung sau.");
+  };
+
+  // ==================== DELETE CONVERSATION ====================
+
+  const handleDeleteConversation = async (
+    event: MouseEvent<HTMLButtonElement>,
+    id: string
+  ) => {
+    event.stopPropagation();
+
+    if (
+      isSending ||
+      isCreatingConversation ||
+      deletingConversationId
+    ) {
+      return;
+    }
+
+    const userId = sessionStorage.getItem("userId");
+
+    if (!userId) {
+      setIsLoggedIn(false);
+      setConversationError(
+        "Vui lòng đăng nhập để xóa cuộc trò chuyện."
+      );
+      setOpenMenuConversationId(null);
+      return;
+    }
+
+    const conversation = conversations.find(
+      (item) => item.id === id
     );
 
-    setConversations(remaining);
+    if (!conversation) return;
 
-    if (activeConversationId === id) {
-      setActiveConversationId(remaining[0]?.id ?? null);
+    const confirmed = window.confirm(
+      `Bạn có chắc muốn xóa cuộc trò chuyện "${conversation.title}" không? Toàn bộ tin nhắn cũng sẽ bị xóa.`
+    );
+
+    if (!confirmed) {
+      setOpenMenuConversationId(null);
+      return;
+    }
+
+    setDeletingConversationId(id);
+    setOpenMenuConversationId(null);
+    setConversationError("");
+
+    try {
+      const response = await fetch(
+        `${CONVERSATION_API_URL}/${encodeURIComponent(
+          id
+        )}?user_id=${encodeURIComponent(userId)}`,
+        {
+          method: "DELETE",
+        }
+      );
+
+      const data: DeleteConversationResponse =
+        await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.detail ||
+            data.message ||
+            `Không thể xóa hội thoại (HTTP ${response.status}).`
+        );
+      }
+
+      // Chỉ cập nhật giao diện sau khi backend xóa thành công.
+      const remaining = conversations.filter(
+        (item) => item.id !== id
+      );
+
+      setConversations(remaining);
+
+      if (activeConversationId === id) {
+        setActiveConversationId(remaining[0]?.id ?? null);
+        setInput("");
+        setMessageError("");
+      }
+    } catch (error) {
+      console.error("Delete conversation error:", error);
+
+      setConversationError(
+        error instanceof Error
+          ? error.message
+          : "Không thể xóa cuộc trò chuyện."
+      );
+    } finally {
+      setDeletingConversationId(null);
     }
   };
 
@@ -452,7 +567,8 @@ export default function AIChatbox() {
       !content ||
       !activeConversationId ||
       isSending ||
-      isCreatingConversation
+      isCreatingConversation ||
+      deletingConversationId
     ) {
       return;
     }
@@ -485,7 +601,6 @@ export default function AIChatbox() {
       created_at: new Date().toISOString(),
     };
 
-    // Hiển thị câu hỏi ngay lập tức.
     setConversations((previous) =>
       previous.map((conversation) =>
         conversation.id === currentId
@@ -518,9 +633,7 @@ export default function AIChatbox() {
 
       const response = await fetch(
         `${PRODUCT_API_URL}?${params.toString()}`,
-        {
-          method: "POST",
-        }
+        { method: "POST" }
       );
 
       const data: ChatResponse = await response.json();
@@ -568,8 +681,7 @@ export default function AIChatbox() {
         setActiveConversationId(serverId);
       }
 
-      // Cập nhật lại danh sách để đồng bộ title và updated_at
-      // theo dữ liệu thực tế từ backend.
+      // Đồng bộ lại danh sách theo dữ liệu từ backend.
       try {
         const latest = await loadConversations(userId);
 
@@ -587,8 +699,6 @@ export default function AIChatbox() {
               : item;
           });
 
-          // Giữ lại tin nhắn đang hiển thị ngay cả khi API
-          // danh sách chưa trả về conversation vừa gửi.
           for (const local of previous) {
             if (
               local.id === serverId &&
@@ -690,7 +800,8 @@ export default function AIChatbox() {
                   disabled={
                     !isLoggedIn ||
                     isSending ||
-                    isCreatingConversation
+                    isCreatingConversation ||
+                    Boolean(deletingConversationId)
                   }
                   className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-medium text-gray-700 transition hover:border-[#087f8c] hover:text-[#087f8c] disabled:cursor-not-allowed disabled:opacity-50"
                 >
@@ -751,7 +862,7 @@ export default function AIChatbox() {
                     onClick={() =>
                       handleSelectConversation(conversation.id)
                     }
-                    className={`group flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-3 transition ${
+                    className={`group relative flex cursor-pointer items-center gap-2 rounded-xl px-2.5 py-3 transition ${
                       activeConversationId === conversation.id
                         ? "bg-[#dff1f2] text-[#087f8c]"
                         : "text-gray-600 hover:bg-gray-200/70"
@@ -766,22 +877,71 @@ export default function AIChatbox() {
                       {conversation.title}
                     </span>
 
+                    {/* NÚT 3 CHẤM */}
+
                     <button
                       type="button"
                       onClick={(event) =>
-                        handleDeleteConversation(
-                          event,
-                          conversation.id
-                        )
+                        handleToggleMenu(event, conversation.id)
                       }
                       disabled={
-                        isSending || isCreatingConversation
+                        isSending ||
+                        isCreatingConversation ||
+                        Boolean(deletingConversationId)
                       }
-                      aria-label="Xóa hội thoại khỏi giao diện"
-                      className="shrink-0 rounded-md p-1 text-gray-400 opacity-0 transition hover:bg-red-100 hover:text-red-500 group-hover:opacity-100 disabled:cursor-not-allowed"
+                      aria-label="Tùy chọn hội thoại"
+                      aria-expanded={
+                        openMenuConversationId === conversation.id
+                      }
+                      className="shrink-0 rounded-md p-1 text-gray-500 opacity-0 transition hover:bg-gray-300/70 group-hover:opacity-100 focus:opacity-100 disabled:cursor-not-allowed"
                     >
-                      <Trash2 size={14} />
+                      {deletingConversationId === conversation.id ? (
+                        <LoaderCircle
+                          size={17}
+                          className="animate-spin"
+                        />
+                      ) : (
+                        <MoreHorizontal size={18} />
+                      )}
                     </button>
+
+                    {/* MENU OPTIONS */}
+
+                    {openMenuConversationId === conversation.id && (
+                      <div
+                        onClick={(event) => event.stopPropagation()}
+                        className="absolute right-2 top-10 z-50 w-44 overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg"
+                      >
+                        <button
+                          type="button"
+                          onClick={(event) =>
+                            handleRenameConversation(
+                              event,
+                              conversation.id
+                            )
+                          }
+                          className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs text-gray-700 transition hover:bg-gray-100"
+                        >
+                          <Pencil size={15} />
+                          Đổi tên cuộc trò chuyện
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={(event) =>
+                            void handleDeleteConversation(
+                              event,
+                              conversation.id
+                            )
+                          }
+                          disabled={Boolean(deletingConversationId)}
+                          className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <Trash2 size={15} />
+                          Xóa cuộc trò chuyện
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -821,7 +981,15 @@ export default function AIChatbox() {
                   </h3>
 
                   <p className="flex items-center gap-1.5 truncate text-xs text-white/80">
-                    {isCreatingConversation ? (
+                    {deletingConversationId ? (
+                      <>
+                        <LoaderCircle
+                          size={12}
+                          className="animate-spin"
+                        />
+                        Đang xóa hội thoại...
+                      </>
+                    ) : isCreatingConversation ? (
                       <>
                         <LoaderCircle
                           size={12}
@@ -986,7 +1154,8 @@ export default function AIChatbox() {
                     !isLoggedIn ||
                     !activeConversation ||
                     isSending ||
-                    isCreatingConversation
+                    isCreatingConversation ||
+                    Boolean(deletingConversationId)
                   }
                   className="max-h-24 min-w-0 flex-1 resize-none bg-transparent px-2 py-2 text-sm text-gray-800 outline-none placeholder:text-gray-400 disabled:cursor-not-allowed"
                 />
@@ -998,7 +1167,8 @@ export default function AIChatbox() {
                     !input.trim() ||
                     !activeConversation ||
                     isSending ||
-                    isCreatingConversation
+                    isCreatingConversation ||
+                    Boolean(deletingConversationId)
                   }
                   aria-label="Gửi tin nhắn"
                   className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#087f8c] text-white transition hover:bg-[#066873] disabled:cursor-not-allowed disabled:opacity-40"
@@ -1027,9 +1197,7 @@ export default function AIChatbox() {
       <div className="flex justify-end">
         <button
           type="button"
-          onClick={() =>
-            setIsOpen((previous) => !previous)
-          }
+          onClick={() => setIsOpen((previous) => !previous)}
           aria-label={
             isOpen ? "Đóng trợ lý AI" : "Mở trợ lý AI"
           }

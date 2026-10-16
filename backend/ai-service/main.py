@@ -389,3 +389,44 @@ async def create_conversation(
         "title": "Cuộc trò chuyện mới",
         "message": "Tạo cuộc trò chuyện mới thành công.",
     }
+
+# DELETE CONVERSATION AND ITS MESSAGES
+@app.delete("/api/v1/ai-service/conversations/{conversation_id}")
+async def delete_conversation(
+    conversation_id: str,
+    user_id: str = Query(...),
+):
+    # 1. Kiểm tra conversation tồn tại và thuộc về user
+    conversation = conversations_collection.find_one({
+        "_id": conversation_id,
+        "user_id": user_id,
+    })
+
+    if not conversation:
+        raise HTTPException(
+            status_code=404,
+            detail="Không tìm thấy conversation.",
+        )
+
+    # 2. Xóa toàn bộ message thuộc conversation
+    deleted_messages = messages_collection.delete_many({
+        "conversation_id": conversation_id,
+    })
+
+    # 3. Xóa conversation
+    deleted_conversation = conversations_collection.delete_one({
+        "_id": conversation_id,
+        "user_id": user_id,
+    })
+
+    if deleted_conversation.deleted_count == 0:
+        raise HTTPException(
+            status_code=500,
+            detail="Không thể xóa conversation.",
+        )
+
+    return {
+        "conversation_id": conversation_id,
+        "deleted_messages": deleted_messages.deleted_count,
+        "message": "Xóa conversation và toàn bộ message thành công.",
+    }
