@@ -136,7 +136,7 @@ load_dotenv()
 
 # Model xử lý câu hỏi và gọi tool
 llm = ChatGoogleGenerativeAI(
-    model="gemini-3.5-flash-lite",
+    model="gemini-3.1-flash-lite",
     google_api_key=os.getenv("GOOGLE_API_KEY"),
     max_tokens=1024,
     timeout=60,
@@ -145,7 +145,7 @@ llm = ChatGoogleGenerativeAI(
 
 # Model tóm tắt lịch sử hội thoại
 summarizer_llm = ChatGoogleGenerativeAI(
-    model="gemini-3.1-flash-lite",
+    model="gemini-3.5-flash-lite",
     google_api_key=os.getenv("GOOGLE_SUMMARIZE_API_KEY"),
     max_tokens=500,
     timeout=60,
