@@ -127,6 +127,7 @@ from tools.product_tools import (
     compare_phones,
     compare_laptops,
     compare_tablets,
+    search_products,
 )
 
 load_dotenv()
@@ -174,6 +175,7 @@ tools = [
     compare_phones,
     compare_laptops,
     compare_tablets,
+    search_products,
 ]
 
 llm_with_tools = llm.bind_tools(tools)

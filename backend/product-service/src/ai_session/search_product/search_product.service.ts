@@ -44,25 +44,25 @@ export class SearchProductService {
     private readonly brandModel: Model<BrandDocument>,
   ) {}
 
-  async searchProducts(params: SearchProductParams) {
-    const {
-      keyword,
-      brand,
-      category,
-      storage,
-      color,
-      min_price,
-      max_price,
-      limit,
-    } = params;
+    async searchProducts(params: SearchProductParams) {
+    const { keyword, brand, category, storage, color, min_price, max_price, limit} = params;
 
-    // 1. Kiểm tra và chuẩn hóa khoảng giá
-    const minPrice = min_price !== undefined ? Number(min_price) : undefined;
+    const escapeRegex = (value: string) =>
+      value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-    const maxPrice = max_price !== undefined ? Number(max_price) : undefined;
+    const createRegex = (value: string) =>
+      new RegExp(escapeRegex(value.trim()), 'i');
+
+    // 1. Kiểm tra khoảng giá
+    const minPrice =
+      min_price !== undefined ? Number(min_price) : undefined;
+
+    const maxPrice =
+      max_price !== undefined ? Number(max_price) : undefined;
 
     if (
-      (minPrice !== undefined && (!Number.isFinite(minPrice) || minPrice < 0)) ||
+      (minPrice !== undefined &&
+        (!Number.isFinite(minPrice) || minPrice < 0)) ||
       (maxPrice !== undefined &&
         (!Number.isFinite(maxPrice) || maxPrice < 0))
     ) {
@@ -79,6 +79,7 @@ export class SearchProductService {
       );
     }
 
+    // 2. Kiểm tra số lượng kết quả
     const resultLimit = limit !== undefined ? Number(limit) : 10;
 
     if (
@@ -91,16 +92,11 @@ export class SearchProductService {
       );
     }
 
-    // 2. Tạo điều kiện tìm kiếm
+    // 3. Tìm kiếm từ khóa gần đúng
     const filter: Record<string, any> = {};
 
-    const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
     if (keyword?.trim()) {
-      const regex = new RegExp(
-        escapeRegex(keyword.trim()),
-        'i',
-      );
+      const regex = createRegex(keyword);
 
       filter.$or = [
         { name: regex },
@@ -109,15 +105,10 @@ export class SearchProductService {
       ];
     }
 
-    // 3. Lọc theo thương hiệu
+    // 4. Tìm thương hiệu gần đúng
     if (brand?.trim()) {
-      const brandRegex = new RegExp(
-        `^${escapeRegex(brand.trim())}$`,
-        'i',
-      );
-
       const brandDocument = await this.brandModel
-        .findOne({ name: brandRegex })
+        .findOne({ name: createRegex(brand) })
         .lean()
         .exec();
 
@@ -125,18 +116,15 @@ export class SearchProductService {
         return { total: 0, products: [] };
       }
 
-      filter.brandId = String(brandDocument._id);
+      filter.brandId = String(
+        (brandDocument as any).id ?? brandDocument._id,
+      );
     }
 
-    // 4. Lọc theo danh mục
+    // 5. Tìm danh mục gần đúng
     if (category?.trim()) {
-      const categoryRegex = new RegExp(
-        `^${escapeRegex(category.trim())}$`,
-        'i',
-      );
-
       const categoryDocument = await this.categoryModel
-        .findOne({ name: categoryRegex })
+        .findOne({ name: createRegex(category) })
         .lean()
         .exec();
 
@@ -144,24 +132,22 @@ export class SearchProductService {
         return { total: 0, products: [] };
       }
 
-      filter.categoryId = String(categoryDocument._id);
+      // Dùng id nếu sản phẩm lưu categoryId dạng "1".
+      filter.categoryId = String(
+        (categoryDocument as any).id ??
+        categoryDocument._id,
+      );
     }
 
-    // 5. Lọc các thuộc tính của cùng một variant
+    // 6. Lọc các thuộc tính của cùng một phiên bản sản phẩm
     const variantFilter: Record<string, any> = {};
 
     if (storage?.trim()) {
-      variantFilter.storage = new RegExp(
-        `^${escapeRegex(storage.trim())}$`,
-        'i',
-      );
+      variantFilter.storage = createRegex(storage);
     }
 
     if (color?.trim()) {
-      variantFilter.color = new RegExp(
-        `^${escapeRegex(color.trim())}$`,
-        'i',
-      );
+      variantFilter.color = createRegex(color);
     }
 
     if (minPrice !== undefined || maxPrice !== undefined) {
@@ -180,63 +166,65 @@ export class SearchProductService {
       filter.variants = { $elemMatch: variantFilter };
     }
 
-    // 6. Truy vấn MongoDB
+    // 7. Truy vấn sản phẩm
     const products = await this.productModel
       .find(filter)
       .limit(resultLimit)
       .lean()
       .exec();
 
-    // 7. Trả về thông tin cần thiết cho Product Agent
-    const result = products.map((product: any) => ({
-      name: product.name,
-      slug: product.slug,
-      brandId: product.brandId,
-      categoryId: product.categoryId,
-      screenTech: product.screenTech,
-      screenSize: product.screenSize,
+    // 8. Lọc và trả về các phiên bản phù hợp
+    const result = products
+      .map((product: any) => {
+        const variants = (product.variants ?? [])
+          .filter((variant: any) => {
+            if (
+              storage?.trim() &&
+              !createRegex(storage).test(variant.storage ?? '')
+            ) {
+              return false;
+            }
 
-      variants: (product.variants ?? [])
-        .filter((variant: any) => {
-          if (
-            storage &&
-            variant.storage?.toLowerCase() !==
-              storage.trim().toLowerCase()
-          ) {
-            return false;
-          }
+            if (
+              color?.trim() &&
+              !createRegex(color).test(variant.color ?? '')
+            ) {
+              return false;
+            }
 
-          if (
-            color &&
-            variant.color?.toLowerCase() !==
-              color.trim().toLowerCase()
-          ) {
-            return false;
-          }
+            if (
+              minPrice !== undefined &&
+              variant.price < minPrice
+            ) {
+              return false;
+            }
 
-          if (
-            minPrice !== undefined &&
-            variant.price < minPrice
-          ) {
-            return false;
-          }
+            if (
+              maxPrice !== undefined &&
+              variant.price > maxPrice
+            ) {
+              return false;
+            }
 
-          if (
-            maxPrice !== undefined &&
-            variant.price > maxPrice
-          ) {
-            return false;
-          }
+            return true;
+          })
+          .map((variant: any) => ({
+            sku: variant.sku,
+            storage: variant.storage,
+            color: variant.color,
+            price: variant.price,
+          }));
 
-          return true;
-        })
-        .map((variant: any) => ({
-          sku: variant.sku,
-          storage: variant.storage,
-          color: variant.color,
-          price: variant.price,
-        })),
-    }));
+        return {
+          name: product.name,
+          slug: product.slug,
+          brandId: product.brandId,
+          categoryId: product.categoryId,
+          screenTech: product.screenTech,
+          screenSize: product.screenSize,
+          variants,
+        };
+      });
 
     return {
       total: result.length,
