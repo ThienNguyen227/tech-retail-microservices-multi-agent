@@ -10,6 +10,7 @@ from services.product_service import (
   compare_laptops as compare_laptops_api,
   compare_tablets as compare_tablets_api,
 )
+
 @tool
 async def search_products(
     keyword: str | None = None,
