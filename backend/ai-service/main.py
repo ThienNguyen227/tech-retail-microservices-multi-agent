@@ -430,3 +430,60 @@ async def delete_conversation(
         "deleted_messages": deleted_messages.deleted_count,
         "message": "Xóa conversation và toàn bộ message thành công.",
     }
+
+# RENAME CONVERSATION
+@app.patch("/api/v1/ai-service/conversations/{conversation_id}/rename")
+async def rename_conversation(
+    conversation_id: str,
+    user_id: str = Query(...),
+    title: str = Query(...),
+):
+    # 1. Kiểm tra title
+    title = title.strip()
+
+    if not title:
+        raise HTTPException(
+            status_code=400,
+            detail="Tên conversation không được để trống.",
+        )
+
+    # 2. Kiểm tra conversation tồn tại và thuộc về user
+    conversation = conversations_collection.find_one({
+        "_id": conversation_id,
+        "user_id": user_id,
+    })
+
+    if not conversation:
+        raise HTTPException(
+            status_code=404,
+            detail="Không tìm thấy conversation.",
+        )
+
+    # 3. Cập nhật tên conversation
+    now = datetime.now(timezone.utc)
+
+    result = conversations_collection.update_one(
+        {
+            "_id": conversation_id,
+            "user_id": user_id,
+        },
+        {
+            "$set": {
+                "title": title,
+                "updated_at": now,
+            }
+        },
+    )
+
+    if result.modified_count == 0 and conversation.get("title") != title:
+        raise HTTPException(
+            status_code=500,
+            detail="Không thể đổi tên conversation.",
+        )
+
+    return {
+        "conversation_id": conversation_id,
+        "title": title,
+        "updated_at": now,
+        "message": "Đổi tên conversation thành công.",
+    }
