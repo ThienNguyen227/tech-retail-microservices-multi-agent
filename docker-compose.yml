@@ -71,6 +71,25 @@ services:
         condition: service_healthy
       redisdb:
         condition: service_started
+
+
+  customer-service:
+    image: customer-service:v1
+    build:
+      context: ./backend/customer-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: customer-service
+    restart: unless-stopped
+    ports:
+      - "3002:3002"
+    env_file:
+      - ./backend/customer-service/.env
+    environment:
+      DATABASE_URL: "postgresql://postgres:password@postgresdb:5432/customer_service"
+    depends_on:
+      postgresdb:
+        condition: service_healthy
     
 volumes:
   mongodb_data:
