@@ -49,6 +49,28 @@ services:
       - "6379:6379"
     volumes:
       - redisdb_data:/data
+
+  user-service:
+    image: user-service:v1
+    build:
+      context: ./backend/user-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: user-service
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    env_file:
+      - ./backend/user-service/.env
+    environment:
+      DATABASE_URL: "postgresql://postgres:password@postgresdb:5432/user_service"
+      REDIS_HOST: "redisdb"
+      REDIS_PORT: "6379"
+    depends_on:
+      postgresdb:
+        condition: service_healthy
+      redisdb:
+        condition: service_started
     
 volumes:
   mongodb_data:
