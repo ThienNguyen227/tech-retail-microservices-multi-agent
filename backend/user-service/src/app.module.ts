@@ -8,7 +8,22 @@ import { RegisterModule } from './customer_session/register/register.module';
 import { ForgotPasswordModule } from './customer_session/forgot_password/forgot_password.module';
 import { LoginModule } from './customer_session/login/login.module';
 
+// ADMIN - SESSION
+import { LoginAdminModule } from './admin_session/login_admin/login_admin.module';
+
 @Module({
-  imports: [PrismaModule, RedisModule, UsersModule, RegisterModule, ForgotPasswordModule, LoginModule],
+  imports: [
+    PrismaModule, 
+    RedisModule, 
+    UsersModule, 
+    
+    // CUSTOMER SESSION
+    RegisterModule, 
+    ForgotPasswordModule, 
+    LoginModule,
+
+    // ADMIN SESSION
+    LoginAdminModule,
+  ],
 })
 export class AppModule {}
