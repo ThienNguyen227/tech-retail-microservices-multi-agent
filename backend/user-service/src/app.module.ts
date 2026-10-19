@@ -10,6 +10,7 @@ import { LoginModule } from './customer_session/login/login.module';
 
 // ADMIN - SESSION
 import { LoginAdminModule } from './admin_session/login_admin/login_admin.module';
+import { LogoutAdminModule } from './admin_session/logout_admin/logout_admin.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { LoginAdminModule } from './admin_session/login_admin/login_admin.module
 
     // ADMIN SESSION
     LoginAdminModule,
+    LogoutAdminModule,
   ],
 })
 export class AppModule {}
