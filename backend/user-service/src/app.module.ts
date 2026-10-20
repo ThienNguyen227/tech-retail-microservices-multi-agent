@@ -13,6 +13,7 @@ import { LoginAdminModule } from './admin_session/login_admin/login_admin.module
 import { LogoutAdminModule } from './admin_session/logout_admin/logout_admin.module';
 import { RefreshAccessTokenModule } from './admin_session/refresh_access_token/refresh_access_token.module';
 import { ForgotPasswordAdminModule } from './admin_session/forgot_password/forgot_password.module';
+import { AdminProfileModule } from './admin_session/profile/profile.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { ForgotPasswordAdminModule } from './admin_session/forgot_password/forgo
     LogoutAdminModule,
     RefreshAccessTokenModule,
     ForgotPasswordAdminModule,
+    AdminProfileModule,
   ],
 })
 export class AppModule {}
