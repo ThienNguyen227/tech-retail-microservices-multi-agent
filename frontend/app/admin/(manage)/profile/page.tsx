@@ -1,8 +1,7 @@
-
 "use client";
-
+import { adminUserService } from "@/lib/axios/services/admin-services/user_service";
 import { useEffect, useState } from "react";
-import axios from "axios";
+
 import {
   UserRound,
   Mail,
@@ -16,7 +15,6 @@ import {
   RefreshCw,
   Fingerprint,
 } from "lucide-react";
-import { getAccessToken } from "@/lib/access_token/access_token";
 
 interface AdminProfile {
   user_id: string;
@@ -28,8 +26,6 @@ interface AdminProfile {
   user_created_at: string;
   user_updated_at: string;
 }
-
-const API_URL ="http://localhost:3001/api/v1/admin-session/user-service/profile";
 
 function formatDate(value?: string) {
   if (!value) return "Chưa cập nhật";
@@ -70,45 +66,25 @@ export default function AdminProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // GET PROFILE
   async function fetchProfile() {
     setLoading(true);
     setError("");
 
     try {
-      const accessToken = getAccessToken();
-
-      if (!accessToken) {
-        setError("Không tìm thấy Access Token. Vui lòng đăng nhập lại.");
-        return;
-      }
-
-      const response = await axios.get<AdminProfile>(API_URL, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-        timeout: 10000,
-      });
-
-      // Hỗ trợ cả response trả về trực tiếp object
-      // hoặc object có cấu trúc { user: {...} }.
-      const data = response.data as AdminProfile & {
-        user?: AdminProfile;
-      };
+      const data = await adminUserService.getProfile();
 
       setProfile(data.user ?? data);
     } catch (err) {
       console.error("Lỗi lấy thông tin Admin:", err);
 
-      if (axios.isAxiosError(err) && err.response?.status === 401) {
-        setError("Phiên đăng nhập hết hạn hoặc không hợp lệ.");
-      } else {
-        setError("Không thể tải thông tin cá nhân. Vui lòng thử lại.");
-      }
+      setError("Không thể tải thông tin cá nhân. Vui lòng thử lại!");
     } finally {
       setLoading(false);
     }
   }
-
+  
+  // RETRY
   useEffect(() => {
     void fetchProfile();
   }, []);
