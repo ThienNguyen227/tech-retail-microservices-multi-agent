@@ -11,6 +11,7 @@ import { LoginModule } from './customer_session/login/login.module';
 // ADMIN - SESSION
 import { LoginAdminModule } from './admin_session/login_admin/login_admin.module';
 import { LogoutAdminModule } from './admin_session/logout_admin/logout_admin.module';
+import { RefreshAccessTokenModule } from './admin_session/refresh_access_token/refresh_access_token.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { LogoutAdminModule } from './admin_session/logout_admin/logout_admin.mod
     // ADMIN SESSION
     LoginAdminModule,
     LogoutAdminModule,
+    RefreshAccessTokenModule,
   ],
 })
 export class AppModule {}
