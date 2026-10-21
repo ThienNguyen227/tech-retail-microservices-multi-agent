@@ -14,6 +14,7 @@ import { LogoutAdminModule } from './admin_session/logout_admin/logout_admin.mod
 import { RefreshAccessTokenModule } from './admin_session/refresh_access_token/refresh_access_token.module';
 import { ForgotPasswordAdminModule } from './admin_session/forgot_password/forgot_password.module';
 import { AdminProfileModule } from './admin_session/profile/profile.module';
+import { UpdateAdminProfileModule } from './admin_session/update_profile/update_profile.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { AdminProfileModule } from './admin_session/profile/profile.module';
     RefreshAccessTokenModule,
     ForgotPasswordAdminModule,
     AdminProfileModule,
+    UpdateAdminProfileModule,
   ],
 })
 export class AppModule {}
