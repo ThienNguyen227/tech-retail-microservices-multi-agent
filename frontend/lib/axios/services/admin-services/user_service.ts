@@ -7,5 +7,11 @@ export const adminUserService = {
     async getProfile() {
         const response = await adminAxios.get(`${USER_SERVICE_URL}/profile`);
         return response.data;
-    }
+    },
+
+    // 2. UPDATE PROFILE
+    async updateProfile(data: {user_name?: string; user_phone?: string;}) {
+        const response = await adminAxios.patch(`${USER_SERVICE_URL}/profile`, data);
+        return response.data;
+    },
 };
