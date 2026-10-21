@@ -14,6 +14,8 @@ import {
   AlertCircle,
   RefreshCw,
   Fingerprint,
+  Pencil,
+  X,
 } from "lucide-react";
 
 interface AdminProfile {
@@ -66,7 +68,14 @@ export default function AdminProfilePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // GET PROFILE
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editName, setEditName] = useState("");
+  const [editPhone, setEditPhone] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [success, setSuccess] = useState("");
+  const [editError, setEditError] = useState("");
+
+  // 1. GET PROFILE
   async function fetchProfile() {
     setLoading(true);
     setError("");
@@ -83,6 +92,48 @@ export default function AdminProfilePage() {
       setLoading(false);
     }
   }
+
+  // 2. UPDATE PROFILE
+  async function handleUpdateProfile() {
+    setSaving(true);
+    setEditError("");
+    setSuccess("");
+
+    try {
+      const user_name = editName.trim();
+      const user_phone = editPhone.trim();
+
+      if (!user_name || user_name.length > 50) {
+        setEditError("Tên phải có từ 1 đến 50 ký tự.");
+        return;
+      }
+
+      if (!/^[0-9]{10,11}$/.test(user_phone)) {
+        setEditError("Số điện thoại phải có từ 10 đến 11 chữ số.");
+        return;
+      }
+
+      await adminUserService.updateProfile({
+        user_name,
+        user_phone,
+      });
+
+      await fetchProfile();
+
+      setIsEditModalOpen(false);
+      setSuccess("Cập nhật thông tin thành công!");
+    } catch (err) {
+      console.error("Lỗi cập nhật hồ sơ:", err);
+
+      setEditError(
+        "Không thể cập nhật thông tin. Vui lòng kiểm tra dữ liệu và thử lại.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+
   
   // RETRY
   useEffect(() => {
@@ -100,6 +151,13 @@ export default function AdminProfilePage() {
           <span className="font-medium text-blue-700">Hồ sơ cá nhân</span>
         </div>
 
+        {success && (
+          <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-700">
+            <CheckCircle2 size={18} />
+            {success}
+          </div>
+        )}
+
         {/* Heading */}
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
           <div>
@@ -111,19 +169,37 @@ export default function AdminProfilePage() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => void fetchProfile()}
-            disabled={loading}
-            className="inline-flex items-center justify-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60 sm:self-auto"
-          >
-            {loading ? (
-              <LoaderCircle size={17} className="animate-spin" />
-            ) : (
-              <RefreshCw size={17} />
-            )}
-            Làm mới
-          </button>
+          <div className="flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setEditName(profile?.user_name ?? "");
+                setEditPhone(profile?.user_phone ?? "");
+                setEditError("");
+                setSuccess("");
+                setIsEditModalOpen(true);
+              }}
+              disabled={!profile || loading}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-60"
+            >
+              <Pencil size={17} />
+              Chỉnh sửa thông tin
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void fetchProfile()}
+              disabled={loading}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading ? (
+                <LoaderCircle size={17} className="animate-spin" />
+              ) : (
+                <RefreshCw size={17} />
+              )}
+              Làm mới
+            </button>
+          </div>
         </div>
 
         {/* Loading */}
@@ -369,6 +445,117 @@ export default function AdminProfilePage() {
           </>
         )}
       </div>
+
+
+      {isEditModalOpen && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="edit-profile-title"
+      className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl sm:p-8"
+    >
+      <div className="flex items-center justify-between">
+        <div>
+          <h2
+            id="edit-profile-title"
+            className="text-xl font-bold text-slate-900"
+          >
+            Chỉnh sửa thông tin
+          </h2>
+          <p className="mt-1 text-sm text-slate-500">
+            Chỉ có thể thay đổi họ tên và số điện thoại.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setIsEditModalOpen(false)}
+          disabled={saving}
+          aria-label="Đóng"
+          className="rounded-lg p-2 text-slate-500 hover:bg-slate-100"
+        >
+          <X size={20} />
+        </button>
+      </div>
+
+      <div className="mt-6 space-y-5">
+        <div>
+          <label
+            htmlFor="edit-user-name"
+            className="mb-2 block text-sm font-semibold text-slate-700"
+          >
+            Họ và tên
+          </label>
+
+          <input
+            id="edit-user-name"
+            type="text"
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            maxLength={50}
+            disabled={saving}
+            className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
+            placeholder="Nhập họ và tên"
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="edit-user-phone"
+            className="mb-2 block text-sm font-semibold text-slate-700"
+          >
+            Số điện thoại
+          </label>
+
+          <input
+            id="edit-user-phone"
+            type="tel"
+            inputMode="numeric"
+            value={editPhone}
+            onChange={(e) =>
+              setEditPhone(e.target.value.replace(/[^0-9]/g, ""))
+            }
+            maxLength={11}
+            disabled={saving}
+            className="w-full rounded-xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100"
+            placeholder="Nhập số điện thoại"
+          />
+        </div>
+
+        {editError && (
+          <div className="flex items-start gap-2 rounded-xl bg-red-50 p-3 text-sm text-red-700">
+            <AlertCircle size={18} className="mt-0.5 shrink-0" />
+            <p>{editError}</p>
+          </div>
+        )}
+
+        <div className="flex justify-end gap-3 pt-2">
+          <button
+            type="button"
+            onClick={() => setIsEditModalOpen(false)}
+            disabled={saving}
+            className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+          >
+            Hủy
+          </button>
+
+          <button
+            type="button"
+            onClick={() => void handleUpdateProfile()}
+            disabled={saving}
+            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {saving && (
+              <LoaderCircle size={17} className="animate-spin" />
+            )}
+            {saving ? "Đang lưu..." : "Lưu thay đổi"}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+)}
     </main>
   );
 }
