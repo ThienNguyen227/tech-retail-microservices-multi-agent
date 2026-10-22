@@ -14,4 +14,10 @@ export const adminUserService = {
         const response = await adminAxios.patch(`${USER_SERVICE_URL}/profile`, data);
         return response.data;
     },
+
+    // 3. GET USER LIST - SEARCH & FILTER
+    async getUserList(params?: {search?: string; role?: string; status?: string;}) {
+        const response = await adminAxios.get(`${USER_SERVICE_URL}/user-list`, {params});
+        return response.data;
+    },
 };

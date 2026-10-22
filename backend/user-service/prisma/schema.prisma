@@ -55,6 +55,7 @@ model Roles {
 }
 
 // MASTER DATA
+/// 1, user-list:read, user-service, read
 model Permissions {
   permission_id          BigInt          @id @default(autoincrement())
   permission_name        String          @unique @db.VarChar(100)

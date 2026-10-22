@@ -13,7 +13,7 @@ export default function AdminHeader() {
   const [userName, setUserName] = useState("");
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  // Đồng bộ thông tin Admin
+  //================================== SYNC USERNAME (ADMIN INFORMATION) =======================================//
   useEffect(() => {
     function syncUserName() {
       setUserName(sessionStorage.getItem("userName") ?? "");
@@ -27,44 +27,6 @@ export default function AdminHeader() {
       window.removeEventListener("admin-profile-updated", syncUserName);
     };
   }, []);
-
-  // Refresh access token
-  // useEffect(() => {
-  //   let active = true;
-
-  //   async function refreshAccessToken() {
-  //     try {
-  //       const response = await fetch(
-  //         "http://localhost:3001/auth/admin/refresh",
-  //         {
-  //           method: "POST",
-  //           credentials: "include",
-  //         },
-  //       );
-
-  //       if (!response.ok || !active) return;
-
-  //       const data = await response.json();
-
-  //       // Lưu access token trong localStorage theo code hiện tại
-  //       localStorage.setItem("accessToken", data.access_token);
-  //     } catch (error) {
-  //       console.error("ADMIN REFRESH TOKEN ERROR:", error);
-  //     }
-  //   }
-
-  //   refreshAccessToken();
-
-  //   const intervalId = window.setInterval(
-  //     refreshAccessToken,
-  //     50 * 1000,
-  //   );
-
-  //   return () => {
-  //     active = false;
-  //     window.clearInterval(intervalId);
-  //   };
-  // }, []);
 
   //================================== LOGOUT =======================================//
   async function handleLogout() {
