@@ -20,6 +20,24 @@ model Users {
 
   Sessions                Sessions[]
   User_Roles              User_Roles[]
+  Employee                Employees?
+}
+
+model Employees {
+  employee_id             BigInt          @id @default(autoincrement())
+  employee_code           String          @unique @db.VarChar(20)
+  employee_full_name      String          @db.VarChar(100)
+  employee_gender         String          @db.VarChar(10)
+  employee_date_of_birth  DateTime        @db.Date
+  employee_address        String          @db.VarChar(255)
+  employee_status         String          @default("ACTIVE") @db.VarChar(20)
+  employee_created_at     DateTime        @default(now())
+  employee_updated_at     DateTime        @updatedAt
+
+  employee_user_id                 BigInt          @unique
+  user                    Users           @relation(fields: [employee_user_id], references: [user_id], onDelete: Cascade)
+  
+  @@index([employee_status], name: "idx_employees_status")
 }
 
 model Sessions {
@@ -56,6 +74,7 @@ model Roles {
 
 // MASTER DATA
 /// 1, user-list:read, user-service, read
+/// 2, user-status:update, user-service, update
 model Permissions {
   permission_id          BigInt          @id @default(autoincrement())
   permission_name        String          @unique @db.VarChar(100)
