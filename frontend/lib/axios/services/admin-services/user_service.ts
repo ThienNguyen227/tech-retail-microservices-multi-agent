@@ -26,4 +26,22 @@ export const adminUserService = {
         const response = await adminAxios.patch(`${USER_SERVICE_URL}/status`, data);
         return response.data;
     },
+
+    // 5. CREATE EMPLOYEE
+    async createEmployee(data: {
+        user_name: string;
+        user_email: string;
+        user_phone: string;
+        user_password: string;
+        user_status: string;
+        role_name: string;
+        employee_full_name: string;
+        employee_gender: string;
+        employee_date_of_birth: string;
+        employee_address: string;
+        employee_status: string;
+    }) {
+        const response = await adminAxios.post(`${USER_SERVICE_URL}/employee`, data);
+        return response.data;
+    },
 };
