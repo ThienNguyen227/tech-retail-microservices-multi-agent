@@ -36,28 +36,33 @@ let refreshPromise: Promise<string> | null = null;
 
 async function refreshAdminToken(): Promise<string> {
   if (!refreshPromise) {
-    refreshPromise = axios
-      .post<RefreshResponse>(
-        `${AUTH_URL}/refresh-access-token`, 
-        {},
+    refreshPromise = (async () => {
+      const sessionId = sessionStorage.getItem("adminSessionId");
+
+      if (!sessionId) {
+        throw new Error("Không tìm thấy session_id!");
+      }
+
+      const response = await axios.post<RefreshResponse>(
+        `${AUTH_URL}/refresh-access-token`,
+        { session_id: sessionId },
         {
           withCredentials: true,
           timeout: 10000,
         },
-      )
-      .then((response) => {
-        const token = response.data.access_token;
+      );
 
-        if (!token) {
-          throw new Error("Không nhận được Access Token mới");
-        }
+      const token = response.data.access_token;
 
-        setAccessToken(token);
-        return token;
-      })
-      .finally(() => {
-        refreshPromise = null;
-      });
+      if (!token) {
+        throw new Error("Không nhận được Access Token mới");
+      }
+
+      setAccessToken(token);
+      return token;
+    })().finally(() => {
+      refreshPromise = null;
+    });
   }
 
   return refreshPromise;
