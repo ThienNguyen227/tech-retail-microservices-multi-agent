@@ -20,4 +20,10 @@ export const adminUserService = {
         const response = await adminAxios.get(`${USER_SERVICE_URL}/user-list`, {params});
         return response.data;
     },
+
+    // 4. UPDATE USER STATUS - KHÓA / MỞ KHÓA TÀI KHOẢN
+    async updateUserStatus(data: {targetUserId: string; status: "ACTIVE" | "INACTIVE" | "BLOCKED";}) {
+        const response = await adminAxios.patch(`${USER_SERVICE_URL}/status`, data);
+        return response.data;
+    },
 };

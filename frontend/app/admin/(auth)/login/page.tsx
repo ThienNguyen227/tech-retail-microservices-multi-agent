@@ -42,6 +42,7 @@ export default function AdminLoginPage() {
 
       storage.setItem("userId", String(data.user_id));
       storage.setItem("userName", data.user_name);
+      sessionStorage.setItem("adminSessionId", data.session_id);
   
       router.push("/admin/dashboard");
     } catch (error) {

@@ -18,6 +18,9 @@ import {
   CalendarDays,
   Clock,
   UserRound,
+  LockKeyhole,
+  UnlockKeyhole,
+  Power,
 } from "lucide-react";
 import { adminUserService } from "@/lib/axios/services/admin-services/user_service";
 import axios from "axios";
@@ -205,6 +208,46 @@ export default function ManageAccountPage() {
 
   function retryLoad() {
     setRefreshKey((key) => key + 1);
+  }
+
+  // UPDATE USER STATUS
+  const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
+  const [confirmUser, setConfirmUser] = useState<UserAccount | null>(null);
+
+  async function handleToggleStatus(user: UserAccount) {
+    const nextStatus = user.user_status === "ACTIVE" ? "BLOCKED" : "ACTIVE";
+
+    setUpdatingUserId(user.user_id);
+
+    try {
+      await adminUserService.updateUserStatus({
+        targetUserId: user.user_id,
+        status: nextStatus,
+      });
+
+      if (selectedUser?.user_id === user.user_id) {
+        setSelectedUser({ ...user, user_status: nextStatus });
+      }
+
+      setConfirmUser(null);
+      setRefreshKey((key) => key + 1);
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        const message = err.response?.data?.message;
+
+        window.alert(
+          Array.isArray(message)
+            ? message.join(", ")
+            : message || "Không thể cập nhật trạng thái tài khoản.",
+        );
+      } else {
+        window.alert("Đã xảy ra lỗi không xác định.");
+      }
+
+      console.error("Update user status error:", err);
+    } finally {
+      setUpdatingUserId(null);
+    }
   }
 
   return (
@@ -446,7 +489,7 @@ export default function ManageAccountPage() {
                         </span>
                       </td>
 
-                      <td className="px-5 py-4 text-center">
+                      {/* <td className="px-5 py-4 text-center">
                         <button
                           type="button"
                           title="Xem chi tiết"
@@ -456,6 +499,50 @@ export default function ManageAccountPage() {
                         >
                           <Eye size={18} />
                         </button>
+                      </td> */}
+                      <td className="px-5 py-4 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          {/* Xem chi tiết */}
+                          <button
+                            type="button"
+                            title="Xem chi tiết"
+                            aria-label={`Xem chi tiết ${user.user_name}`}
+                            onClick={() => setSelectedUser(user)}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-blue-50 hover:text-blue-600"
+                          >
+                            <Eye size={18} />
+                          </button>
+
+                          {/* Khóa / mở khóa / kích hoạt */}
+                          <button
+                            type="button"
+                            title={
+                              user.user_status === "ACTIVE"
+                                ? "Khóa tài khoản"
+                                : user.user_status === "BLOCKED"
+                                  ? "Mở khóa tài khoản"
+                                  : "Kích hoạt tài khoản"
+                            }
+                            aria-label={`Cập nhật trạng thái ${user.user_name}`}
+                            disabled={updatingUserId !== null}
+                            onClick={() => setConfirmUser(user)}
+                            className={`inline-flex h-9 w-9 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                              user.user_status === "ACTIVE"
+                                ? "text-rose-500 hover:bg-rose-50"
+                                : "text-emerald-600 hover:bg-emerald-50"
+                            }`}
+                          >
+                            {updatingUserId === user.user_id ? (
+                              <LoaderCircle size={18} className="animate-spin" />
+                            ) : user.user_status === "ACTIVE" ? (
+                              <LockKeyhole size={18} />
+                            ) : user.user_status === "BLOCKED" ? (
+                              <UnlockKeyhole size={18} />
+                            ) : (
+                              <Power size={18} />
+                            )}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -633,6 +720,99 @@ export default function ManageAccountPage() {
                 className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
               >
                 Đóng
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {/* MODAL xác nhận khóa tài khoản */}
+      {confirmUser && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (
+              event.target === event.currentTarget &&
+              updatingUserId === null
+            ) {
+              setConfirmUser(null);
+            }
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="confirm-status-title"
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+          >
+            <div
+              className={`mx-auto grid h-14 w-14 place-items-center rounded-full ${
+                confirmUser.user_status === "ACTIVE"
+                  ? "bg-rose-50 text-rose-600"
+                  : "bg-emerald-50 text-emerald-600"
+              }`}
+            >
+              {confirmUser.user_status === "ACTIVE" ? (
+                <LockKeyhole size={26} />
+              ) : (
+                <UnlockKeyhole size={26} />
+              )}
+            </div>
+
+            <h2
+              id="confirm-status-title"
+              className="mt-4 text-center text-lg font-bold text-slate-800"
+            >
+              {confirmUser.user_status === "ACTIVE"
+                ? "Xác nhận khóa tài khoản"
+                : "Xác nhận mở khóa tài khoản"}
+            </h2>
+
+            <p className="mt-2 text-center text-sm leading-6 text-slate-500">
+              Bạn có chắc chắn muốn{" "}
+              <span className="font-semibold text-slate-800">
+                {confirmUser.user_status === "ACTIVE" ? "khóa" : "mở khóa"}
+              </span>{" "}
+              tài khoản <span className="font-semibold text-slate-800">
+                {confirmUser.user_name}
+              </span>
+              ?
+            </p>
+
+            {confirmUser.user_status === "ACTIVE" && (
+              <p className="mt-3 rounded-xl bg-rose-50 p-3 text-xs leading-5 text-rose-700">
+                Tài khoản sẽ chuyển sang trạng thái BLOCKED.
+              </p>
+            )}
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                type="button"
+                disabled={updatingUserId !== null}
+                onClick={() => setConfirmUser(null)}
+                className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+              >
+                Hủy
+              </button>
+
+              <button
+                type="button"
+                disabled={updatingUserId !== null}
+                onClick={() => handleToggleStatus(confirmUser)}
+                className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition disabled:opacity-50 ${
+                  confirmUser.user_status === "ACTIVE"
+                    ? "bg-rose-600 hover:bg-rose-700"
+                    : "bg-emerald-600 hover:bg-emerald-700"
+                }`}
+              >
+                {updatingUserId !== null && (
+                  <LoaderCircle size={16} className="animate-spin" />
+                )}
+                {updatingUserId !== null
+                  ? "Đang xử lý..."
+                  : confirmUser.user_status === "ACTIVE"
+                    ? "Xác nhận khóa"
+                    : "Xác nhận mở khóa"}
               </button>
             </div>
           </section>

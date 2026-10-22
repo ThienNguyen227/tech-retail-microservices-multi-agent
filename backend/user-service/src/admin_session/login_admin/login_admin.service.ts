@@ -23,6 +23,7 @@ export class LoginAdminService {
     refresh_token: string;
     user_name: string;
     user_id: string;
+    session_id: string; // Bổ sung
     token_type: 'Bearer';
     expires_in: number;}> 
   {
@@ -61,7 +62,8 @@ export class LoginAdminService {
     }
 
     const isAdmin = user.User_Roles.some(
-      (userRole) => userRole.role.role_name === 'ADMIN',
+      (userRole) =>
+        ['ADMIN', 'MANAGER', 'EMPLOYEE'].includes(userRole.role.role_name),
     );
 
     if (!isAdmin) {
@@ -124,6 +126,7 @@ export class LoginAdminService {
       refresh_token: refreshToken,
       user_name: user.user_name,
       user_id: userId,
+      session_id: sessionId, // Bổ sung
       token_type: 'Bearer',
       expires_in: 2 * 60,
     };

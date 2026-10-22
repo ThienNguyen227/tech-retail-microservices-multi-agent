@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 
 import { LogoutAdminService } from './logout_admin.service';
 
-const REFRESH_COOKIE_NAME = 'refresh_token';
+const REFRESH_COOKIE_NAME = 'admin_refresh_token';
 
 const refreshCookieOptions = {
   httpOnly: true,

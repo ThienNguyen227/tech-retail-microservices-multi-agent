@@ -6,7 +6,7 @@ import { LoginAdminService } from './login_admin.service';
 
 import { LoginAdminDto } from '../dto/login/loginAdmin.dto';
 
-const REFRESH_COOKIE_NAME = 'refresh_token';
+const REFRESH_COOKIE_NAME = 'admin_refresh_token';
 
 const refreshCookieOptions = {
   httpOnly: true,
@@ -29,7 +29,9 @@ export class LoginAdminController {
 
         const result = await this.loginAdminService.login(dto, deviceInfo, ipAddress);
 
-        response.cookie(REFRESH_COOKIE_NAME, result.refresh_token, refreshCookieOptions);
+        const cookieName = `admin_refresh_${result.session_id}`;
+
+        response.cookie(cookieName, result.refresh_token, refreshCookieOptions);
 
         const { refresh_token, ...loginResponse } = result;
         return loginResponse;

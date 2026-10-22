@@ -42,7 +42,7 @@ export default function AdminHeader() {
     } catch (error) {
       console.error("ADMIN LOGOUT ERROR:", error);
     } finally {
-      const keys = ["userName", "userId"];
+      const keys = ["userName", "userId", "adminSessionId"];
       clearAccessToken();
 
       keys.forEach((key) => {
