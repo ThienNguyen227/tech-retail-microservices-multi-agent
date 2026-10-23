@@ -1,9 +1,7 @@
-import { Body, Controller, Post, Patch, Get, Req, Res, UseGuards } from '@nestjs/common';
+import { Controller, Post, Req, Res, UnauthorizedException } from '@nestjs/common';
 import type { Request, Response } from 'express';
 
 import { LogoutAdminService } from './logout_admin.service';
-
-const REFRESH_COOKIE_NAME = 'admin_refresh_token';
 
 const refreshCookieOptions = {
   httpOnly: true,
@@ -18,20 +16,23 @@ export class LogoutAdminController {
 
   @Post('/logout')
   async logout(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
-    const refreshToken = request.cookies?.[REFRESH_COOKIE_NAME];
+    const sessionId = request.body?.session_id;
+
+    if (!sessionId || typeof sessionId !== 'string') {
+      throw new UnauthorizedException('Thiếu session_id!');
+    }
+
+    const cookieName = `admin_refresh_${sessionId}`;
+    const refreshToken = request.cookies?.[cookieName];
 
     try {
       if (refreshToken) {
-        await this.logoutAdminService.logout({ refresh_token: refreshToken });
+        await this.logoutAdminService.logout({
+          refresh_token: refreshToken,
+        });
       }
     } finally {
-      // response.clearCookie(REFRESH_COOKIE_NAME, {
-      //   httpOnly: true,
-      //   secure: process.env.NODE_ENV === 'production',
-      //   sameSite: 'lax',
-      //   path: '/',
-      // });
-      response.clearCookie(REFRESH_COOKIE_NAME, refreshCookieOptions);
+      response.clearCookie(cookieName, refreshCookieOptions);
     }
 
     return { message: 'Đăng xuất thành công' };
