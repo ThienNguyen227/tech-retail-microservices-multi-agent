@@ -18,6 +18,7 @@ import { UpdateAdminProfileModule } from './admin_session/update_profile/update_
 import { GetUserListModule } from './admin_session/get_user_list/get_user_list.module';
 import { UpdateUserStatusModule } from './admin_session/update_user_status/update_user_status.module';
 import { CreateEmloyeeModule } from './admin_session/create_employee/create_employee.module';
+import { UpdateUserModule } from './admin_session/update_user/update_user.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { CreateEmloyeeModule } from './admin_session/create_employee/create_empl
     GetUserListModule,
     UpdateUserStatusModule,
     CreateEmloyeeModule,
+    UpdateUserModule,
   ],
 })
 export class AppModule {}
