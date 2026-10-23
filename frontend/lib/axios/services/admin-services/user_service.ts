@@ -51,4 +51,16 @@ export const adminUserService = {
         const response = await adminAxios.post(`${USER_SERVICE_URL}/logout`, { session_id: sessionId });
         return response.data;
     },
+
+    // 7. UPDATE USER - CẬP NHẬT THÔNG TIN VÀ VAI TRÒ TÀI KHOẢN
+    async updateUser(data: {
+        targetUserId: string;
+        user_name: string;
+        user_email: string;
+        user_phone: string;
+        roles: string[];
+    }) {
+        const response = await adminAxios.patch(`${USER_SERVICE_URL}/user`, data);
+        return response.data;
+    },
 };

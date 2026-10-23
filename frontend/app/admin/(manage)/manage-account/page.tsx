@@ -21,6 +21,7 @@ import {
   LockKeyhole,
   UnlockKeyhole,
   Power,
+  Pencil,
 } from "lucide-react";
 import { adminUserService } from "@/lib/axios/services/admin-services/user_service";
 import axios from "axios";
@@ -247,6 +248,67 @@ export default function ManageAccountPage() {
       console.error("Update user status error:", err);
     } finally {
       setUpdatingUserId(null);
+    }
+  }
+
+  // UPDATE USER STATUS
+  type EditAccountForm = {
+    user_name: string;
+    user_email: string;
+    user_phone: string;
+    roles: string[];
+  };
+
+  const [editingUser, setEditingUser] = useState<UserAccount | null>(null);
+  const [editForm, setEditForm] = useState<EditAccountForm | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState("");
+
+  async function handleUpdateAccount() {
+    if (!editingUser || !editForm) return;
+
+    setSaving(true);
+    setEditError("");
+
+    try {
+      await adminUserService.updateUser({
+        targetUserId: editingUser.user_id,
+        user_name: editForm.user_name.trim(),
+        user_email: editForm.user_email.trim(),
+        user_phone: editForm.user_phone.trim(),
+        roles: editForm.roles,
+      });
+
+      // Cập nhật danh sách trên giao diện
+      setUsers((prev) =>
+        prev.map((user) =>
+          user.user_id === editingUser.user_id
+            ? {
+                ...user,
+                ...editForm,
+                user_name: editForm.user_name.trim(),
+                user_email: editForm.user_email.trim(),
+                user_phone: editForm.user_phone.trim(),
+              }
+            : user,
+        ),
+      );
+
+      setEditingUser(null);
+      setEditForm(null);
+    } catch (err: unknown) {
+      if (axios.isAxiosError(err)) {
+        const message = err.response?.data?.message;
+        setEditError(
+          Array.isArray(message)
+            ? message.join(", ")
+            : message || "Không thể cập nhật tài khoản.",
+        );
+      } else {
+        setEditError("Đã xảy ra lỗi không xác định.");
+      }
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -489,17 +551,6 @@ export default function ManageAccountPage() {
                         </span>
                       </td>
 
-                      {/* <td className="px-5 py-4 text-center">
-                        <button
-                          type="button"
-                          title="Xem chi tiết"
-                          aria-label={`Xem chi tiết ${user.user_name}`}
-                          onClick={() => setSelectedUser(user)}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-blue-50 hover:text-blue-600"
-                        >
-                          <Eye size={18} />
-                        </button>
-                      </td> */}
                       <td className="px-5 py-4 text-center">
                         <div className="flex items-center justify-center gap-1">
                           {/* Xem chi tiết */}
@@ -541,6 +592,26 @@ export default function ManageAccountPage() {
                             ) : (
                               <Power size={18} />
                             )}
+                          </button>
+
+                          {/* Chỉnh sửa tài khoản */}
+                          <button
+                            type="button"
+                            title="Chỉnh sửa tài khoản"
+                            aria-label={`Chỉnh sửa tài khoản ${user.user_name}`}
+                            onClick={() => {
+                              setEditingUser(user);
+                              setEditForm({
+                                user_name: user.user_name,
+                                user_email: user.user_email,
+                                user_phone: user.user_phone,
+                                roles: [...user.roles],
+                              });
+                              setEditError("");
+                            }}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-amber-50 hover:text-amber-600"
+                          >
+                            <Pencil size={18} />
                           </button>
                         </div>
                       </td>
@@ -815,6 +886,204 @@ export default function ManageAccountPage() {
                     : "Xác nhận mở khóa"}
               </button>
             </div>
+          </section>
+        </div>
+      )}
+      
+      {/* MODAL CHỈNH SỬA TÀI KHOẢN */}
+      {editingUser && editForm && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !saving) {
+              setEditingUser(null);
+              setEditForm(null);
+            }
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-account-title"
+            className="w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
+              <div>
+                <h2
+                  id="edit-account-title"
+                  className="text-lg font-bold text-slate-800"
+                >
+                  Chỉnh sửa tài khoản
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Mã tài khoản: {editingUser.user_id}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => {
+                  setEditingUser(null);
+                  setEditForm(null);
+                }}
+                className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 disabled:opacity-50"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleUpdateAccount();
+              }}
+            >
+              <div className="max-h-[65vh] space-y-5 overflow-y-auto p-6">
+                {/* Tên tài khoản */}
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Tên tài khoản
+                  </label>
+                  <input
+                    required
+                    maxLength={50}
+                    value={editForm.user_name}
+                    onChange={(event) =>
+                      setEditForm({
+                        ...editForm,
+                        user_name: event.target.value,
+                      })
+                    }
+                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    required
+                    maxLength={255}
+                    value={editForm.user_email}
+                    onChange={(event) =>
+                      setEditForm({
+                        ...editForm,
+                        user_email: event.target.value,
+                      })
+                    }
+                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+
+                {/* Số điện thoại */}
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-slate-700">
+                    Số điện thoại
+                  </label>
+                  <input
+                    required
+                    maxLength={20}
+                    value={editForm.user_phone}
+                    onChange={(event) =>
+                      setEditForm({
+                        ...editForm,
+                        user_phone: event.target.value,
+                      })
+                    }
+                    className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+
+                {/* Vai trò */}
+                <div>
+                  <h3 className="mb-3 border-b border-slate-100 pb-2 text-sm font-bold text-slate-700">
+                    Phân quyền tài khoản
+                  </h3>
+
+                  <div className="space-y-3">
+                    {["ADMIN", "MANAGER", "EMPLOYEE", "CUSTOMER"].map((role) => (
+                      <label
+                        key={role}
+                        className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 transition ${
+                          editForm.roles.includes(role)
+                            ? "border-blue-300 bg-blue-50"
+                            : "border-slate-200 hover:bg-slate-50"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={editForm.roles.includes(role)}
+                          onChange={() => {
+                            setEditForm({
+                              ...editForm,
+                              roles: editForm.roles.includes(role)
+                                ? editForm.roles.filter((item) => item !== role)
+                                : [...editForm.roles, role],
+                            });
+                          }}
+                          className="h-4 w-4 accent-blue-600"
+                        />
+
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-slate-700">
+                            {role}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {{
+                              ADMIN: "Quản trị hệ thống",
+                              MANAGER: "Quản lý cửa hàng",
+                              EMPLOYEE: "Nhân viên cửa hàng",
+                              CUSTOMER: "Khách hàng",
+                            }[role]}
+                          </p>
+                        </div>
+
+                        {editForm.roles.includes(role) && (
+                          <ShieldCheck size={18} className="text-blue-600" />
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {editError && (
+                  <p className="rounded-xl bg-rose-50 p-3 text-sm text-rose-600">
+                    {editError}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => {
+                    setEditingUser(null);
+                    setEditForm(null);
+                  }}
+                  className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-white disabled:opacity-50"
+                >
+                  Hủy
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={saving || editForm.roles.length === 0}
+                  className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {saving ? (
+                    <LoaderCircle size={16} className="animate-spin" />
+                  ) : (
+                    <Pencil size={16} />
+                  )}
+                  {saving ? "Đang lưu..." : "Lưu thay đổi"}
+                </button>
+              </div>
+            </form>
           </section>
         </div>
       )}
