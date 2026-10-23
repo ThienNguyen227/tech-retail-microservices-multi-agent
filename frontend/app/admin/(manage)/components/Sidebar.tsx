@@ -32,13 +32,20 @@ const menuItems = [
         href: "/admin/manage-account/create-customer",
         icon: UserRoundPlus,
       },
+      
     ],
   },
   {
-    title: "Quản lý thông tin nhân viên",
+    title: "Quản lý nhân viên",
     href: "/admin/manage-employee",
     icon: Users,
   },
+  {
+    title: "Thông tin nhân viên",
+    href: "/admin/employee-information",
+    icon: Users,
+  },
+  
 ];
 
 export default function Sidebar() {
