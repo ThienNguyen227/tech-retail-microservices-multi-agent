@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import {Store, User, LogOut, ChevronDown, ShieldCheck} from "lucide-react";
 import axios from "axios";
 import { clearAccessToken } from "@/lib/access_token/access_token";
+import { adminUserService } from "@/lib/axios/services/admin-services/user_service";
 
 export default function AdminHeader() {
   const router = useRouter();
@@ -31,18 +32,12 @@ export default function AdminHeader() {
   //================================== LOGOUT =======================================//
   async function handleLogout() {
     try {
-      await axios.post(
-        "http://localhost:3001/api/v1/admin-session/user-service/logout",
-        {},
-        {
-          withCredentials: true,
-          timeout: 10000,
-        },
-      );
+      await adminUserService.logout();
     } catch (error) {
       console.error("ADMIN LOGOUT ERROR:", error);
     } finally {
       const keys = ["userName", "userId", "adminSessionId"];
+
       clearAccessToken();
 
       keys.forEach((key) => {

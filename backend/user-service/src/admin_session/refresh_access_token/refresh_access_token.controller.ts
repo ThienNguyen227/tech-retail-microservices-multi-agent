@@ -3,15 +3,6 @@ import type { Request, Response } from 'express';
 
 import { RefreshAccessTokenService } from './refresh_access_token.service';
 
-const REFRESH_COOKIE_NAME = 'admin_refresh_token';
-
-const refreshCookieOptions = {
-  httpOnly: true,
-  secure: process.env.NODE_ENV === 'production',
-  sameSite: 'lax' as const,
-  path: '/',
-};
-
 @Controller('api/v1/admin-session/user-service')
 export class RefreshAccessTokenController {
   constructor(private readonly refreshAccessTokenService: RefreshAccessTokenService) {}

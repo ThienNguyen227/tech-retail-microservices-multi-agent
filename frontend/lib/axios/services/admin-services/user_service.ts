@@ -44,4 +44,11 @@ export const adminUserService = {
         const response = await adminAxios.post(`${USER_SERVICE_URL}/employee`, data);
         return response.data;
     },
+
+    // 6. LOGOUT ADMIN
+    async logout() {
+        const sessionId = sessionStorage.getItem("adminSessionId");
+        const response = await adminAxios.post(`${USER_SERVICE_URL}/logout`, { session_id: sessionId });
+        return response.data;
+    },
 };
