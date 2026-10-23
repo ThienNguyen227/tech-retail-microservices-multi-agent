@@ -19,7 +19,7 @@ import { GetUserListModule } from './admin_session/get_user_list/get_user_list.m
 import { UpdateUserStatusModule } from './admin_session/update_user_status/update_user_status.module';
 import { CreateEmloyeeModule } from './admin_session/create_employee/create_employee.module';
 import { UpdateUserModule } from './admin_session/update_user/update_user.module';
-import { GetEmployeeModule } from './admin_session/get_employee/get_employeem.module';
+import { EmployeeModule } from './admin_session/employee/employee.module';
 
 @Module({
   imports: [
@@ -33,17 +33,22 @@ import { GetEmployeeModule } from './admin_session/get_employee/get_employeem.mo
     LoginModule,
 
     // ADMIN SESSION
+    /// 1. AUTH
     LoginAdminModule,
     LogoutAdminModule,
     RefreshAccessTokenModule,
     ForgotPasswordAdminModule,
+
+    /// 2. USER
     AdminProfileModule,
     UpdateAdminProfileModule,
     GetUserListModule,
     UpdateUserStatusModule,
     CreateEmloyeeModule,
     UpdateUserModule,
-    GetEmployeeModule,
+
+    /// 3. EMPLOYEE
+    EmployeeModule,
   ],
 })
 export class AppModule {}

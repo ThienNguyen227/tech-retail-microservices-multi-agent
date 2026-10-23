@@ -3,15 +3,18 @@ import {
   InternalServerErrorException,
   ForbiddenException,
   HttpException,
+  UnauthorizedException,
+  NotFoundException
 } from '@nestjs/common';
 
 import { PrismaService } from '../../prisma/prisma.service';
 import { GetEmployeeListDto } from '../dto/get_employee_list/get_employee_list.dto';
 
 @Injectable()
-export class GetEmployeeService {
+export class EmployeeService {
   constructor(private readonly prisma: PrismaService) {}
 
+  // 1. 
   async getEmployeeList(userId: string, filters: GetEmployeeListDto) {
     // Check permission
     const hasPermission = await this.prisma.role_Permissions.findFirst({
@@ -169,5 +172,74 @@ export class GetEmployeeService {
         'Không thể lấy danh sách nhân viên.',
       );
     }
+  }
+
+  // 2. 
+  async getEmployeeInformation(userId: string) {
+    // 1. Check permission
+    const hasPermission = await this.prisma.role_Permissions.findFirst({
+      where: {
+        role: {
+          User_Roles: {
+            some: {
+              user_id: BigInt(userId),
+            },
+          },
+        },
+        permission: {
+          permission_name: "employee-information:read",
+        },
+      },
+    });
+
+    if (!hasPermission) {
+      throw new ForbiddenException(
+        "Bạn không có quyền đọc thông tin nhân viên!",
+      );
+    }
+
+    // 2. Get employee information and roles
+    const employee = await this.prisma.employees.findUnique({
+      where: {
+        employee_user_id: BigInt(userId),
+      },
+      select: {
+        employee_code: true,
+        employee_full_name: true,
+        employee_gender: true,
+        employee_date_of_birth: true,
+        employee_address: true,
+        employee_status: true,
+        employee_created_at: true,
+        employee_updated_at: true,
+        user: {
+          select: {
+            User_Roles: {
+              select: {
+                role: {
+                  select: {
+                    role_name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!employee) {
+      throw new NotFoundException(
+        "Không tìm thấy thông tin nhân viên!",
+      );
+    }
+
+    // 3. Return employee information with role names
+    const { user, ...employeeInfo } = employee;
+
+    return {
+      ...employeeInfo,
+      roles: user.User_Roles.map((userRole) => userRole.role.role_name),
+    };
   }
 }
