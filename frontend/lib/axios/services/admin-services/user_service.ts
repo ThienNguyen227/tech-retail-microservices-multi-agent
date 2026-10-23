@@ -63,4 +63,10 @@ export const adminUserService = {
         const response = await adminAxios.patch(`${USER_SERVICE_URL}/user`, data);
         return response.data;
     },
+
+    // 8. GET EMPLOYEE LIST - SEARCH & FILTER
+    async getEmployeeList(params?: {search?: string; role?: string; gender?: string; status?: string;}) {
+        const response = await adminAxios.get(`${USER_SERVICE_URL}/employee-list`, { params });
+        return response.data;
+    },
 };

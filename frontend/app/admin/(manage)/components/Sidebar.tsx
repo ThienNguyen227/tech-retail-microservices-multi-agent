@@ -34,6 +34,11 @@ const menuItems = [
       },
     ],
   },
+  {
+    title: "Quản lý thông tin nhân viên",
+    href: "/admin/manage-employee",
+    icon: Users,
+  },
 ];
 
 export default function Sidebar() {
