@@ -69,4 +69,10 @@ export const adminUserService = {
         const response = await adminAxios.get(`${USER_SERVICE_URL}/employee-list`, { params });
         return response.data;
     },
+
+    // 9. GET EMPLOYEE INFORMATION
+    async getEmployeeInformation() {
+        const response = await adminAxios.get(`${USER_SERVICE_URL}/employee-information`);
+        return response.data;
+    },
 };
