@@ -90,6 +90,15 @@ services:
     depends_on:
       postgresdb:
         condition: service_healthy
+
+  nginx:
+    image: nginx:alpine
+    container_name: api-gateway
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     
 volumes:
   mongodb_data:
