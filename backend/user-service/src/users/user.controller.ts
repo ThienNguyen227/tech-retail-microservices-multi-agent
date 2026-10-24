@@ -22,34 +22,6 @@ const refreshCookieOptions = {
 export class UserController {
   constructor(private readonly usersService: UsersService) {}
 
-  @Post('customer/refresh')
-  async refresh(@Req() request: Request) {
-    const refreshToken = request.cookies?.[REFRESH_COOKIE_NAME];
-
-    return this.usersService.refresh(refreshToken);
-  }
-
-  @Post('customer/logout')
-  async logout(@Req() request: Request, @Res({ passthrough: true }) response: Response,
-  ) {
-    const refreshToken = request.cookies?.[REFRESH_COOKIE_NAME];
-
-    try {
-      if (refreshToken) {
-        await this.usersService.logout({ refresh_token: refreshToken });
-      }
-    } finally {
-      response.clearCookie(REFRESH_COOKIE_NAME, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        path: '/auth/customer',
-      });
-    }
-
-    return { message: 'Đăng xuất thành công' };
-  }
-
   @UseGuards(JwtAuthGuard)
   @Get("customer/me")
   getMyProfile(@Req() request: { user: JwtPayload }) {
