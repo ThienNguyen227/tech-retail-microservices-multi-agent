@@ -3,10 +3,11 @@ import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
 import { UsersModule } from './users/user.module';
 
-// Refactor
+// CUSTOMER - SESSION
 import { RegisterModule } from './customer_session/register/register.module';
 import { ForgotPasswordModule } from './customer_session/forgot_password/forgot_password.module';
 import { LoginModule } from './customer_session/login/login.module';
+import { LogoutCustomerModule } from './customer_session/logout/logout.module';
 
 // ADMIN - SESSION
 import { LoginAdminModule } from './admin_session/login_admin/login_admin.module';
@@ -31,6 +32,7 @@ import { EmployeeModule } from './admin_session/employee/employee.module';
     RegisterModule, 
     ForgotPasswordModule, 
     LoginModule,
+    LogoutCustomerModule,
 
     // ADMIN SESSION
     /// 1. AUTH

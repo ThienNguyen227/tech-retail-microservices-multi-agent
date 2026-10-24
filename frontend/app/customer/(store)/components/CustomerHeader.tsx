@@ -16,6 +16,8 @@ import {
   Tablet,
   Home,
 } from "lucide-react";
+import { clearAccessToken } from "@/lib/access_token/customer_access_token";
+import { customerUserService } from "@/lib/axios/services/customer-services/customer_service";
 
 export default function CustomerHeader() {
   const router = useRouter();
@@ -50,66 +52,24 @@ export default function CustomerHeader() {
     };
   }, []);
 
-  // =========================
-  // REFRESH ACCESS TOKEN
-  // =========================
-  useEffect(() => {
-    async function refreshAccessToken() {
-      try {
-        const response = await fetch(
-          "http://localhost:3001/auth/customer/refresh",
-          {
-            method: "POST",
-            credentials: "include",
-          },
-        );
-
-        if (!response.ok) return;
-
-        const data = await response.json();
-
-        localStorage.setItem("accessToken", data.access_token);
-      } catch (error) {
-        console.error("REFRESH TOKEN ERROR:", error);
-      }
-    }
-
-    refreshAccessToken();
-
-    const intervalId = window.setInterval(
-      refreshAccessToken,
-      50 * 1000,
-    );
-
-    return () => window.clearInterval(intervalId);
-  }, []);
-
-  // =========================
-  // LOGOUT
-  // =========================
+  //================================== LOGOUT =======================================//
   async function handleLogout() {
     try {
-      await fetch(
-        "http://localhost:3001/auth/customer/logout",
-        {
-          method: "POST",
-          credentials: "include",
-        },
-      );
+      await customerUserService.logout();
+    } catch (error) {
+      console.error("CUSTOMER LOGOUT ERROR:", error);
     } finally {
-      const keys = [
-        "accessToken",
-        "userType",
-        "userName",
-        "userId",
-      ];
+      const keys = ["userName", "userId", "adminSessionId"];
+
+      clearAccessToken();
 
       keys.forEach((key) => {
         localStorage.removeItem(key);
         sessionStorage.removeItem(key);
       });
 
-      router.push("/customer/login");
+      setUserName("");
+      router.replace("/customer/login");
     }
   }
 
