@@ -16,7 +16,7 @@ const refreshCookieOptions = {
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 
-@Controller('api/v1/user-service')
+@Controller('api/v1/customer-session/user-service')
 export class LoginController {
     constructor(private readonly loginService: LoginService) {}
 
@@ -29,7 +29,9 @@ export class LoginController {
 
         const result = await this.loginService.login(dto, deviceInfo, ipAddress);
 
-        response.cookie(REFRESH_COOKIE_NAME, result.refresh_token, refreshCookieOptions);
+        const cookieName = `customer_refresh_${result.session_id}`;
+
+        response.cookie(cookieName, result.refresh_token, refreshCookieOptions);
 
         const { refresh_token, ...loginResponse } = result;
         return loginResponse;
