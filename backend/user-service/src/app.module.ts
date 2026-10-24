@@ -8,6 +8,7 @@ import { RegisterModule } from './customer_session/register/register.module';
 import { ForgotPasswordModule } from './customer_session/forgot_password/forgot_password.module';
 import { LoginModule } from './customer_session/login/login.module';
 import { LogoutCustomerModule } from './customer_session/logout/logout.module';
+import { RefreshAccessTokenCustomerModule } from './customer_session/refresh_access_token/refresh_access_token.module';
 
 // ADMIN - SESSION
 import { LoginAdminModule } from './admin_session/login_admin/login_admin.module';
@@ -33,6 +34,7 @@ import { EmployeeModule } from './admin_session/employee/employee.module';
     ForgotPasswordModule, 
     LoginModule,
     LogoutCustomerModule,
+    RefreshAccessTokenCustomerModule,
 
     // ADMIN SESSION
     /// 1. AUTH
