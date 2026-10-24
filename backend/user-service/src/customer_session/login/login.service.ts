@@ -1,31 +1,27 @@
 import {
   Injectable,
-  BadRequestException,
-  ConflictException,
   InternalServerErrorException,
   UnauthorizedException,
-  HttpException,
 } from '@nestjs/common';
 
 import * as bcrypt from 'bcryptjs';
-import { sign, verify } from 'jsonwebtoken';
+import { sign } from 'jsonwebtoken';
 import { randomUUID } from 'crypto';
 
 import { PrismaService } from '../../prisma/prisma.service';
-import { EmailService } from '../../email/email.service';
-import { RedisService } from '../../redis/redis.service';
 
 import { LoginDto } from '../dto/login/login.dto';
 
 @Injectable()
 export class LoginService {
-  constructor(private readonly prisma: PrismaService, private readonly emailService: EmailService, private readonly redisService: RedisService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async login(dto: LoginDto, deviceInfo?: string, ipAddress?: string): Promise<{
     access_token: string;
     refresh_token: string;
     user_name: string;
     user_id: string;
+    session_id: string; 
     token_type: 'Bearer';
     expires_in: number;}> 
   {
@@ -39,7 +35,15 @@ export class LoginService {
         user_type: true,
         user_password_hash: true,
         user_status: true,
-
+        User_Roles: {
+          select: {
+            role: {
+              select: {
+                role_name: true,
+              },
+            },
+          },
+        },
       },
     });
 
@@ -55,6 +59,17 @@ export class LoginService {
 
     if (!isPasswordValid) {
       throw new UnauthorizedException('Email hoặc mật khẩu không đúng!');
+    }
+
+    const isAdmin = user.User_Roles.some(
+      (userRole) =>
+        ['ADMIN', 'MANAGER', 'EMPLOYEE'].includes(userRole.role.role_name),
+    );
+
+    if (isAdmin) {
+      throw new UnauthorizedException(
+        'Tài khoản này không phải là tài khoản Khách Hàng!',
+      );
     }
 
     const accessSecret = process.env.JWT_ACCESS_SECRET;
@@ -97,6 +112,9 @@ export class LoginService {
         sid: sessionId,
         user_name: user.user_name,
         user_id: userId,
+        roles: user.User_Roles.map(
+          (userRole) => userRole.role.role_name,
+        ),
         user_type: user.user_type,
         type: 'access',
       },
@@ -109,6 +127,7 @@ export class LoginService {
       refresh_token: refreshToken,
       user_name: user.user_name,
       user_id: userId,
+      session_id: sessionId,
       token_type: 'Bearer',
       expires_in: 15 * 60,
     };

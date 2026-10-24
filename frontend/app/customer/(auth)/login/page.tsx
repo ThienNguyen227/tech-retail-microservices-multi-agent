@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
-import { setAccessToken } from "@/lib/access_token/access_token";
+import { setAccessToken } from "@/lib/access_token/customer_access_token";
 import axios from "axios";
 
 export default function LoginPage() {
@@ -20,11 +20,10 @@ export default function LoginPage() {
     const form = new FormData(event.currentTarget);
     const user_email = String(form.get("email") ?? "");
     const user_password = String(form.get("password") ?? "");
-    const remember = form.get("remember") === "on";
 
     try {
       const response = await axios.post(
-        "http://localhost:3001/api/v1/user-service/login",
+        "http://localhost:3001/api/v1/customer-session/user-service/login",
         {
           user_email,
           user_password,
@@ -38,11 +37,12 @@ export default function LoginPage() {
 
       setAccessToken(data.access_token);
 
+      const remember = form.get("remember") === "on";
       const storage = remember ? localStorage : sessionStorage;
 
-      storage.setItem("userType", "CUSTOMER");
+      storage.setItem("userId", String(data.user_id));
       storage.setItem("userName", data.user_name);
-      storage.setItem("userId", data.user_id);
+      sessionStorage.setItem("customerSessionId", data.session_id);
 
       router.push("/customer/home");
     } catch (error) {
