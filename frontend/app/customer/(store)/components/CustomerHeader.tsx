@@ -59,7 +59,7 @@ export default function CustomerHeader() {
     } catch (error) {
       console.error("CUSTOMER LOGOUT ERROR:", error);
     } finally {
-      const keys = ["userName", "userId", "adminSessionId"];
+      const keys = ["userName", "userId", "customerSessionId"];
 
       clearAccessToken();
 
