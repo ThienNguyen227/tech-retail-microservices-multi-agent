@@ -34,7 +34,7 @@ export default function Otp() {
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
   const [verified, setVerified] = useState(false);
-  const inputRefs = useRef<(TextInput | null)[]>([]);
+  const inputRefs = useRef<({ focus: () => void } | null)[]>([]);
 
   useEffect(() => {
     let active = true;
