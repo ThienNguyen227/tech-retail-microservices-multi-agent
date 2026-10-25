@@ -39,7 +39,7 @@ export default function ForgotPasswordOtp() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
-  const inputRefs = useRef<(TextInput | null)[]>([]);
+  const inputRefs = useRef<({ focus: () => void } | null)[]>([]);
 
   useEffect(() => {
     getForgotPasswordState().then((state) => {
