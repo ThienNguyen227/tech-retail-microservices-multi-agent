@@ -17,7 +17,7 @@ import {
   Home,
 } from "lucide-react";
 import { clearAccessToken } from "@/lib/access_token/customer_access_token";
-import { customerUserService } from "@/lib/axios/services/customer-services/customer_service";
+import { customerUserService } from "@/lib/axios/services/customer-services/user_service";
 
 export default function CustomerHeader() {
   const router = useRouter();
