@@ -34,9 +34,7 @@ export default function CustomerHeader() {
   useEffect(() => {
     function syncUserName() {
       setUserName(
-        localStorage.getItem("userName") ??
-          sessionStorage.getItem("userName") ??
-          "",
+        localStorage.getItem("userName") ?? sessionStorage.getItem("userName") ?? "",
       );
     }
 
