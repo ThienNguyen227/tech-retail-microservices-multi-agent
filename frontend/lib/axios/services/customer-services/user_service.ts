@@ -15,4 +15,10 @@ export const customerUserService = {
         const response = await customerAxios.get(`${USER_SERVICE_URL}/account-information`);
         return response.data;
     },
+
+    // 3. (PATCH) UPDATE ACCOUNT-INFORMATION
+    async updateAccountInformation(data: {user_name?: string; user_phone?: string;}) {
+        const response = await customerAxios.patch(`${USER_SERVICE_URL}/account-information`, data);
+        return response.data;
+    },
 };
