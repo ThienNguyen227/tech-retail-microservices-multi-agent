@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
+import { customerUserService } from "@/lib/axios/services/customer-services/user_service";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -11,34 +12,22 @@ export default function ForgotPasswordPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // 1. (POST) SEND OTP FOR FORGOT PASSWORD
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
     setLoading(true);
 
     try {
-      const response = await axios.post(
-        "http://localhost:3001/api/v1/user-service/forgot-password/otp-sending",
-        {
-          user_email: email,
-        },
-        {
-          timeout: 10_000,
-        },
-      );
-
-      const data = response.data;
+      const data = await customerUserService.sendOtpForgotPassword({
+        user_email: email,
+      });
 
       // Lưu email và thời gian hết hạn OTP
       sessionStorage.setItem("forgotPasswordEmail", email);
-      sessionStorage.setItem(
-        "forgotPasswordOtpExpiresAt",
-        data.otp_expires_at,
-      );
+      sessionStorage.setItem("forgotPasswordOtpExpiresAt", data.otp_expires_at);
 
-      router.push(
-        `/customer/forgot-password-otp?email=${encodeURIComponent(email)}`,
-      );
+      router.push(`/customer/forgot-password-otp?email=${encodeURIComponent(email)}`);
 
     } catch (error) {
       if (axios.isAxiosError(error)) {

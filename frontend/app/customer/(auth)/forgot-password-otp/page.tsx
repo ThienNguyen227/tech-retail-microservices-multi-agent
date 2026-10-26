@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import axios from "axios";
+import { customerUserService } from "@/lib/axios/services/customer-services/user_service";
 
 const getRemainingSeconds = (expiresAt: string | null): number => {
   if (!expiresAt) return 0;
@@ -51,7 +52,7 @@ export default function ForgotPasswordOtpPage() {
     }
   }, [router]);
 
-
+  // 1. (POST) VERIFY OTP FOR FORGOT PASSWORD
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
@@ -69,21 +70,13 @@ export default function ForgotPasswordOtpPage() {
     setLoading(true);
 
     try {
-      const response = await axios.post(
-        "http://localhost:3001/api/v1/user-service/forgot-password/otp-verifying",
-        {
-          user_email: email,
-          otp_code: otp,
-        },
-        {
-          timeout: 10_000,
-          withCredentials: true,
-        },
-      );
-
-      const data = response.data;
+      const data = await customerUserService.verifyOtpForgotPassword({
+        user_email: email,
+        otp_code: otp,
+      });
 
       sessionStorage.setItem("forgotPasswordResetExpiresAt", data.reset_expires_at);
+      sessionStorage.setItem("PasswordResetUserId", data.user_id);
 
       router.push("/customer/forgot-password-change");
     } catch (error) {
@@ -112,6 +105,7 @@ export default function ForgotPasswordOtpPage() {
     }
   };
 
+  // 2. (POST) RESEND OTP FOR FORGOT PASSWORD
   const handleResend = async () => {
     if (!email || resending) return;
 
@@ -119,17 +113,9 @@ export default function ForgotPasswordOtpPage() {
     setResending(true);
 
     try {
-      const response = await axios.post(
-        "http://localhost:3001/api/v1/user-service/forgot-password/otp-resending",
-        {
-          user_email: email,
-        },
-        {
-          timeout: 10_000,
-        },
-      );
-
-      const data = response.data;
+      const data = await customerUserService.resendOtpForgotPassword({
+        user_email: email,
+      });
 
       sessionStorage.setItem("forgotPasswordOtpExpiresAt", data.otp_expires_at);
 

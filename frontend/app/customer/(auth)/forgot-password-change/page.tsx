@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
+import { customerUserService } from "@/lib/axios/services/customer-services/user_service";
 
 const getRemainingSeconds = (expiresAt: string | null): number => {
   if (!expiresAt) return 0;
@@ -61,91 +62,66 @@ export default function ResetPasswordPage() {
     };
   }, [resetExpiresAt]);
 
-  // =========================
-  // Đổi mật khẩu
-  // =========================
-  const handleSubmit = async (
-    event: FormEvent<HTMLFormElement>,
-  ) => {
+  // 1. (POST) CHANGE PASSWORD FOR FORGOT PASSWORD
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     setError("");
     setSuccess("");
 
     if (countdown <= 0) {
-      setError(
-        "Phiên đổi mật khẩu đã hết hạn. Vui lòng thực hiện lại!",
-      );
+      setError("Phiên đổi mật khẩu đã hết hạn. Vui lòng thực hiện lại!");
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setError(
-        "Mật khẩu xác nhận không khớp.",
-      );
+      setError("Mật khẩu xác nhận không khớp.");
+      return;
+    }
+
+    const userId = sessionStorage.getItem("PasswordResetUserId");
+
+    if (!userId) {
+      setError("Không tìm thấy thông tin phiên đổi mật khẩu!");
       return;
     }
 
     setLoading(true);
 
     try {
-      await axios.post(
-        "http://localhost:3001/api/v1/user-service/forgot-password/password-change",
-        {
-          new_password: newPassword,
-        },
-        {
-          timeout: 10_000,
-          withCredentials: true,
-        },
-      );
+      await customerUserService.changePasswordForgotPassword({
+        new_password: newPassword,
+        user_id: userId,
+      });
 
       setSuccess(
         "Đổi mật khẩu thành công. Đang chuyển đến trang đăng nhập...",
       );
 
-      // Xóa thông tin session của quá trình quên mật khẩu
-      sessionStorage.removeItem(
-        "forgotPasswordEmail",
-      );
-
-      sessionStorage.removeItem(
-        "forgotPasswordOtpExpiresAt",
-      );
-
-      sessionStorage.removeItem(
-        "forgotPasswordResetExpiresAt",
-      );
+      sessionStorage.removeItem("forgotPasswordEmail");
+      sessionStorage.removeItem("forgotPasswordOtpExpiresAt");
+      sessionStorage.removeItem("forgotPasswordResetExpiresAt");
+      sessionStorage.removeItem("PasswordResetUserId");
 
       window.setTimeout(() => {
         router.push("/customer/login");
       }, 1200);
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        // Server không phản hồi
         if (!error.response) {
           if (error.code === "ECONNABORTED") {
-            setError(
-              "Server phản hồi quá lâu. Vui lòng thử lại sau!",
-            );
+            setError("Server phản hồi quá lâu. Vui lòng thử lại sau!");
           } else {
-            setError(
-              "Không thể kết nối đến server. Vui lòng thử lại.",
-            );
+            setError("Không thể kết nối đến server. Vui lòng thử lại.");
           }
-
           return;
         }
 
-        // Server trả về lỗi 4xx / 5xx
         setError(
-          error.response.data?.message ||
-            "Đổi mật khẩu thất bại.",
+          error.response.data?.message || "Đổi mật khẩu thất bại.",
         );
       } else {
-        setError(
-          "Đã xảy ra lỗi. Vui lòng thử lại.",
-        );
+        setError("Đã xảy ra lỗi. Vui lòng thử lại.");
       }
     } finally {
       setLoading(false);
