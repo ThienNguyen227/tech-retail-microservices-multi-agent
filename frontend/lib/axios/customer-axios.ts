@@ -3,7 +3,11 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
 
 import {getAccessToken, setAccessToken} from "@/lib/access_token/customer_access_token";
 
-const AUTH_URL = "http://localhost:3001/api/v1/customer-session/user-service";
+// DIRECT CALL API
+// const AUTH_URL = "http://localhost:3001/api/v1/customer-session/user-service";
+
+// CALL API THROUGH API-GATEWAY (NGINX)
+const AUTH_URL = "http://localhost/api/v1/customer-session/user-service";
 
 // Axios instance dùng chung cho các API Customer
 export const customerAxios = axios.create({
