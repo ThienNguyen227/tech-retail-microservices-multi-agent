@@ -24,6 +24,9 @@ import { CreateEmloyeeModule } from './admin_session/create_employee/create_empl
 import { UpdateUserModule } from './admin_session/update_user/update_user.module';
 import { EmployeeModule } from './admin_session/employee/employee.module';
 
+// AI SESSION
+import { SearchUserModule } from './ai_session/search_user/search_user.module';
+
 @Module({
   imports: [
     PrismaModule, 
@@ -55,6 +58,10 @@ import { EmployeeModule } from './admin_session/employee/employee.module';
 
     /// 3. EMPLOYEE
     EmployeeModule,
+
+
+    // AI SESSION
+    SearchUserModule,
   ],
 })
 export class AppModule {}
