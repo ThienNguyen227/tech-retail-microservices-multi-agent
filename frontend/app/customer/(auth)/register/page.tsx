@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { customerUserService } from "@/lib/axios/services/customer-services/user_service";
 import axios from "axios";
 
 export default function RegisterPage() {
@@ -31,18 +32,10 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const response = await axios.post(
-        "http://localhost:3001/api/v1/user-service/register/otp-sending",
-        {
-          user_email: email,
-          user_phone: phone,
-        },
-        {
-          timeout: 10_000, // 10 giây
-        },
-      );
-
-      const sendOtpData = response.data;
+      const sendOtpData = await customerUserService.sendOtp({
+        user_email: email,
+        user_phone: phone,
+      });
 
       const registerDraft = {
         user_name: fullName,
