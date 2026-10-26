@@ -44,7 +44,7 @@ export class RegisterService {
     });
   }
 
-  // 1. Send OTP
+  // 1. (POST) SEND OTP FOR REGISTRATION
   async sendOtp(dto: SendOtpDto): Promise<{ message: string; otp_expires_at: Date }> {
 
     // 1. Kiểm tra email hoặc số điện thoại đã tồn tại
@@ -107,7 +107,7 @@ export class RegisterService {
     return {message: 'OTP đã được gửi đến email của người dùng!', otp_expires_at: expiresAt};
   }
 
-  // 2. Resend OTP
+  // 2. (POST) RESEND OTP FOR REGISTRATION
   async resendOtp(dto: ReSendOtpDto): Promise<{ message: string; otp_expires_at: Date }> {
 
     const redisKey = `register:otp:${dto.user_email}`;
@@ -145,7 +145,7 @@ export class RegisterService {
     return {message: 'OTP mới đã được gửi đến email của người dùng!', otp_expires_at: expiresAt};
   }
 
-  // 3. Verify OTP
+  // 3. (POST) VERIFY OTP FOR REGISTRATION
   async verifyOtp(dto: VerifyOtpDto): Promise<{ message: string }> {
 
     // 1. Kiểm tra email đã tồn tại chưa

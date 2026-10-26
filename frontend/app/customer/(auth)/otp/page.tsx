@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { customerUserService } from "@/lib/axios/services/customer-services/user_service";
 
 const OTP_LENGTH = 6;
 
@@ -143,19 +144,13 @@ export default function OtpPage() {
     setLoading(true);
 
     try {
-      await axios.post(
-        "http://localhost:3001/api/v1/user-service/register/otp-verifying",
-        {
-          user_email: email,
-          otp_code: otpCode,
-          user_name: userName,
-          user_phone: userPhone,
-          user_password_hash: passwordHash,
-        },
-        {
-          timeout: 10_000,
-        },
-      );
+      await customerUserService.verifyOtp({
+        user_email: email,
+        otp_code: otpCode,
+        user_name: userName,
+        user_phone: userPhone,
+        user_password_hash: passwordHash,
+      });
 
       setVerified(true);
       sessionStorage.removeItem("registerDraft");
@@ -195,17 +190,9 @@ export default function OtpPage() {
     setError("");
 
     try {
-      const response = await axios.post(
-        "http://localhost:3001/api/v1/user-service/register/otp-resending",
-        {
-          user_email: email,
-        },
-        {
-          timeout: 10_000,
-        }
-      );
-
-      const data = response.data;
+      const data = await customerUserService.resendOtp({
+        user_email: email,
+      });
 
       // Cập nhật thời gian hết hạn OTP mới
       sessionStorage.setItem("otpExpiresAt", data.otp_expires_at);
