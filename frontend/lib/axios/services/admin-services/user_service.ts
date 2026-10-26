@@ -1,6 +1,10 @@
 import { adminAxios } from "../../admin-axios";
 
+// CALL DIRECT API
 const USER_SERVICE_URL = "http://localhost:3001/api/v1/admin-session/user-service";
+
+// CALL THROUGH API GATEWAY (NGINX)
+// const USER_SERVICE_URL = "http://localhost/api/v1/admin-session/user-service";
 
 export const adminUserService = {
     // 1. GET PROFILE
@@ -64,15 +68,29 @@ export const adminUserService = {
         return response.data;
     },
 
-    // 8. GET EMPLOYEE LIST - SEARCH & FILTER
+    // ========================================= EMPLOYEE ========================================================//
+
+    // 8. (GET) EMPLOYEE-LIST FOR ROLE: ADMIN
     async getEmployeeList(params?: {search?: string; role?: string; gender?: string; status?: string;}) {
         const response = await adminAxios.get(`${USER_SERVICE_URL}/employee-list`, { params });
         return response.data;
     },
 
-    // 9. GET EMPLOYEE INFORMATION
+    // 9. (GET) EMPLOYEE-INFORMATION FOR ROLE: EMPLOYEE AND MANAGER
     async getEmployeeInformation() {
         const response = await adminAxios.get(`${USER_SERVICE_URL}/employee-information`);
         return response.data;
     },
+
+    // 10. (PATCH) EMPLOYEE-INFORMATION FOR ROLE: EMPLOYEE AND MANAGER
+    async updateEmployeeInformation(data: {
+        employee_full_name?: string;
+        employee_gender?: string;
+        employee_date_of_birth?: string;
+        employee_address?: string;
+    }) {
+        const response = await adminAxios.patch(`${USER_SERVICE_URL}/employee-information`, data);
+        return response.data;
+    },
+        
 };

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { adminUserService } from "@/lib/axios/services/admin-services/user_service";
@@ -17,6 +16,9 @@ import {
   RefreshCw,
   Fingerprint,
   BriefcaseBusiness,
+  Pencil,
+  X,
+  Save,
 } from "lucide-react";
 
 interface EmployeeInformation {
@@ -197,6 +199,153 @@ export default function EmployeeInformationPage() {
 
   const statusInfo = getStatusInfo(employee?.employee_status);
 
+  // 2. (PATCH) EMPLOYEE-INFORMATION FOR ROLE: EMPLOYEE, MANAGER
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editError, setEditError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+
+  const [formData, setFormData] = useState({
+    employee_full_name: "",
+    employee_gender: "",
+    employee_date_of_birth: "",
+    employee_address: "",
+  });
+
+  // MỞ MODAL VÀ ĐỔ DỮ LIỆU HIỆN TẠI VÀO FORM
+  const handleOpenEditModal = () => {
+  if (!employee) return;
+
+  setFormData({
+    employee_full_name: employee.employee_full_name ?? "",
+    employee_gender: employee.employee_gender ?? "",
+    employee_date_of_birth: employee.employee_date_of_birth
+      ? employee.employee_date_of_birth.slice(0, 10)
+      : "",
+    employee_address: employee.employee_address ?? "",
+  });
+
+  setEditError("");
+  setSuccessMessage("");
+  setIsEditModalOpen(true);
+};
+
+const handleUpdateEmployeeInformation = async (
+  event: React.FormEvent<HTMLFormElement>,
+) => {
+  event.preventDefault();
+  setEditError("");
+  setSuccessMessage("");
+
+  const fullName = formData.employee_full_name.trim();
+  const address = formData.employee_address.trim();
+  const gender = formData.employee_gender;
+  const dateOfBirth = formData.employee_date_of_birth;
+
+  // 1. Kiểm tra họ và tên
+  if (!fullName) {
+    setEditError("Họ và tên không được để trống.");
+    return;
+  }
+
+  if (fullName.length > 100) {
+    setEditError("Họ và tên không được vượt quá 100 ký tự.");
+    return;
+  }
+
+  // 2. Kiểm tra giới tính
+  if (!["MALE", "FEMALE", "OTHER"].includes(gender)) {
+    setEditError("Vui lòng chọn giới tính hợp lệ.");
+    return;
+  }
+
+  // 3. Kiểm tra ngày sinh
+  if (!dateOfBirth) {
+    setEditError("Vui lòng chọn ngày sinh.");
+    return;
+  }
+
+  // Ngày sinh phải đúng định dạng YYYY-MM-DD
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) {
+    setEditError("Ngày sinh phải có định dạng YYYY-MM-DD.");
+    return;
+  }
+
+  const [year, month, day] = dateOfBirth.split("-").map(Number);
+
+  // Tạo ngày theo giờ địa phương, tránh lỗi múi giờ
+  const selectedDate = new Date(year, month - 1, day);
+
+  // Kiểm tra ngày thực tế có hợp lệ hay không
+  if (
+    selectedDate.getFullYear() !== year ||
+    selectedDate.getMonth() !== month - 1 ||
+    selectedDate.getDate() !== day
+  ) {
+    setEditError("Ngày sinh không hợp lệ.");
+    return;
+  }
+
+  // Không cho phép ngày sinh trong tương lai
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (selectedDate > today) {
+    setEditError("Ngày sinh không được lớn hơn ngày hiện tại.");
+    return;
+  }
+
+  // 4. Kiểm tra địa chỉ
+  if (!address) {
+    setEditError("Địa chỉ không được để trống.");
+    return;
+  }
+
+  if (address.length > 255) {
+    setEditError("Địa chỉ không được vượt quá 255 ký tự.");
+    return;
+  }
+
+  // 5. Gọi API cập nhật
+  setIsSaving(true);
+
+  try {
+    await adminUserService.updateEmployeeInformation({
+      employee_full_name: fullName,
+      employee_gender: gender,
+      employee_date_of_birth: dateOfBirth,
+      employee_address: address,
+    });
+
+    // Lấy dữ liệu mới nhất từ backend
+    await fetchEmployeeInformation();
+
+    setIsEditModalOpen(false);
+    setSuccessMessage("Cập nhật thông tin nhân viên thành công.");
+  } catch (err: unknown) {
+    console.error("Lỗi cập nhật thông tin nhân viên:", err);
+
+    const errorResponse = err as {
+      response?: {
+        data?: {
+          message?: string | string[];
+        };
+      };
+      message?: string;
+    };
+
+    const message = errorResponse.response?.data?.message;
+
+    setEditError(
+      Array.isArray(message)
+        ? message.join(", ")
+        : message || errorResponse.message ||
+          "Không thể cập nhật thông tin. Vui lòng thử lại.",
+    );
+  } finally {
+    setIsSaving(false);
+  }
+};
   return (
     <main className="min-h-screen bg-slate-50/80 px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl space-y-6">
@@ -221,23 +370,39 @@ export default function EmployeeInformationPage() {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => void fetchEmployeeInformation()}
-            disabled={loading}
-            className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {loading ? (
-              <LoaderCircle
-                size={17}
-                className="animate-spin"
-              />
-            ) : (
-              <RefreshCw size={17} />
-            )}
-            Làm mới
-          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={handleOpenEditModal}
+              disabled={loading || !employee}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Pencil size={17} />
+              Chỉnh sửa
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void fetchEmployeeInformation()}
+              disabled={loading}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-blue-300 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading ? (
+                <LoaderCircle size={17} className="animate-spin" />
+              ) : (
+                <RefreshCw size={17} />
+              )}
+              Làm mới
+            </button>
+          </div>
         </div>
+
+        {successMessage && (
+          <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-700">
+            <CheckCircle2 size={18} />
+            {successMessage}
+          </div>
+        )}
 
         {/* Loading */}
         {loading && !employee && (
@@ -309,23 +474,23 @@ export default function EmployeeInformationPage() {
                   </div>
 
                   <div className="mt-3 flex flex-wrap items-center gap-2">
-  <BriefcaseBusiness size={17} className="text-blue-100" />
+                    <BriefcaseBusiness size={17} className="text-blue-100" />
 
-  {employee.roles?.length ? (
-    employee.roles.map((role) => (
-      <span
-        key={role}
-        className="rounded-full border border-white/30 bg-white/15 px-3 py-1 text-xs font-semibold text-white"
-      >
-        {getRoleLabel(role)}
-      </span>
-    ))
-  ) : (
-    <span className="text-sm text-blue-100">
-      Chưa có vai trò
-    </span>
-  )}
-</div>
+                    {employee.roles?.length ? (
+                      employee.roles.map((role) => (
+                        <span
+                          key={role}
+                          className="rounded-full border border-white/30 bg-white/15 px-3 py-1 text-xs font-semibold text-white"
+                        >
+                          {getRoleLabel(role)}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-sm text-blue-100">
+                        Chưa có vai trò
+                      </span>
+                    )}
+                  </div>
 
                   <div className="mt-4 flex flex-col gap-3 text-sm text-white/90 sm:flex-row sm:flex-wrap sm:gap-6">
                     <span className="flex items-center gap-2">
@@ -593,6 +758,215 @@ export default function EmployeeInformationPage() {
           </>
         )}
       </div>
+
+      
+      {/* EDIT EMPLOYEE INFORMATION MODAL */}
+      {isEditModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm"
+          onClick={() => {
+            if (!isSaving) setIsEditModalOpen(false);
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-employee-title"
+            className="my-auto w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {/* Modal header */}
+            <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
+              <div>
+                <h2
+                  id="edit-employee-title"
+                  className="text-xl font-bold text-slate-900"
+                >
+                  Chỉnh sửa thông tin nhân viên
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Cập nhật thông tin hồ sơ cá nhân của bạn.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsEditModalOpen(false)}
+                disabled={isSaving}
+                aria-label="Đóng modal"
+                className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+              >
+                <X size={21} />
+              </button>
+            </div>
+
+            {/* Modal form */}
+            <form onSubmit={handleUpdateEmployeeInformation}>
+              <div className="space-y-5 px-6 py-6">
+                {/* Employee code - readonly */}
+                <div>
+                  <label className="mb-2 block text-sm font-semibold text-slate-700">
+                    Mã nhân viên
+                  </label>
+                  <input
+                    type="text"
+                    value={employee?.employee_code ?? ""}
+                    disabled
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500 outline-none"
+                  />
+                  <p className="mt-1.5 text-xs text-slate-400">
+                    Mã nhân viên không thể chỉnh sửa.
+                  </p>
+                </div>
+
+                {/* Full name */}
+                <div>
+                  <label
+                    htmlFor="employee_full_name"
+                    className="mb-2 block text-sm font-semibold text-slate-700"
+                  >
+                    Họ và tên <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    id="employee_full_name"
+                    type="text"
+                    required
+                    maxLength={100}
+                    value={formData.employee_full_name}
+                    onChange={(event) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        employee_full_name: event.target.value,
+                      }))
+                    }
+                    placeholder="Nhập họ và tên"
+                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                  />
+                </div>
+
+                {/* Gender and date of birth */}
+                <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                  <div>
+                    <label
+                      htmlFor="employee_gender"
+                      className="mb-2 block text-sm font-semibold text-slate-700"
+                    >
+                      Giới tính <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      id="employee_gender"
+                      required
+                      value={formData.employee_gender}
+                      onChange={(event) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          employee_gender: event.target.value,
+                        }))
+                      }
+                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                    >
+                      <option value="">-- Chọn giới tính --</option>
+                      <option value="MALE">Nam</option>
+                      <option value="FEMALE">Nữ</option>
+                      <option value="OTHER">Khác</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label
+                      htmlFor="employee_date_of_birth"
+                      className="mb-2 block text-sm font-semibold text-slate-700"
+                    >
+                      Ngày sinh <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      id="employee_date_of_birth"
+                      type="date"
+                      required
+                      max={new Date().toLocaleDateString("en-CA")}
+                      value={formData.employee_date_of_birth}
+                      onChange={(event) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          employee_date_of_birth: event.target.value,
+                        }))
+                      }
+                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                    />
+                  </div>
+                </div>
+
+                {/* Address */}
+                <div>
+                  <label
+                    htmlFor="employee_address"
+                    className="mb-2 block text-sm font-semibold text-slate-700"
+                  >
+                    Địa chỉ <span className="text-red-500">*</span>
+                  </label>
+                  <textarea
+                    id="employee_address"
+                    required
+                    maxLength={255}
+                    rows={3}
+                    value={formData.employee_address}
+                    onChange={(event) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        employee_address: event.target.value,
+                      }))
+                    }
+                    placeholder="Nhập địa chỉ của bạn"
+                    className="w-full resize-y rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                  />
+                  <p className="mt-1 text-right text-xs text-slate-400">
+                    {formData.employee_address.length}/255 ký tự
+                  </p>
+                </div>
+
+                {/* Error message */}
+                {editError && (
+                  <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                    <AlertCircle size={18} className="mt-0.5 shrink-0" />
+                    <span>{editError}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal footer */}
+              <div className="flex flex-col-reverse gap-3 border-t border-slate-100 bg-slate-50/70 px-6 py-4 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsEditModalOpen(false)}
+                  disabled={isSaving}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Hủy
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isSaving ? (
+                    <>
+                      <LoaderCircle size={17} className="animate-spin" />
+                      Đang lưu...
+                    </>
+                  ) : (
+                    <>
+                      <Save size={17} />
+                      Lưu thay đổi
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </main>
   );
 }

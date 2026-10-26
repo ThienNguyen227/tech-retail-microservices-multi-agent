@@ -2,7 +2,11 @@ import axios, {AxiosError, InternalAxiosRequestConfig} from "axios";
 
 import {getAccessToken, setAccessToken} from "@/lib/access_token/access_token";
 
+// DIRECT CALL API
 const AUTH_URL = "http://localhost:3001/api/v1/admin-session/user-service";
+
+// CALL API THROUGH API-GATEWAY (NGINX)
+// const AUTH_URL = "http://localhost/api/v1/admin-session/user-service";
 
 // Axios instance dùng chung cho các API Admin
 export const adminAxios = axios.create({
