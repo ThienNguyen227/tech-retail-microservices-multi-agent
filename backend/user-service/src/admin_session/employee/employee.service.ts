@@ -4,17 +4,19 @@ import {
   ForbiddenException,
   HttpException,
   UnauthorizedException,
-  NotFoundException
+  NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 
 import { PrismaService } from '../../prisma/prisma.service';
 import { GetEmployeeListDto } from '../dto/get_employee_list/get_employee_list.dto';
+import { UpdateEmployeeInformationDto } from "../dto/employee/update_employee_information.dto"
 
 @Injectable()
 export class EmployeeService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // 1. 
+  // 1. (GET) EMPLOYEE-LIST FOR ROLE: ADMIN
   async getEmployeeList(userId: string, filters: GetEmployeeListDto) {
     // Check permission
     const hasPermission = await this.prisma.role_Permissions.findFirst({
@@ -174,7 +176,7 @@ export class EmployeeService {
     }
   }
 
-  // 2. 
+  // 2. (GET) EMPLOYEE-INFORMATION FOR ROLE: EMPLOYEE, MANAGER
   async getEmployeeInformation(userId: string) {
     // 1. Check permission
     const hasPermission = await this.prisma.role_Permissions.findFirst({
@@ -241,5 +243,129 @@ export class EmployeeService {
       ...employeeInfo,
       roles: user.User_Roles.map((userRole) => userRole.role.role_name),
     };
+  }
+
+  // 3. (PATCH) EMPLOYEE-INFORMATION FOR ROLE: EMPLOYEE, MANAGER
+  async updateEmployeeInformation(userId: string, dto: UpdateEmployeeInformationDto) {
+    // 1. Check permission
+    const hasPermission = await this.prisma.role_Permissions.findFirst({
+      where: {
+        role: {
+          User_Roles: {
+            some: {
+              user_id: BigInt(userId),
+            },
+          },
+        },
+        permission: {
+          permission_name: 'employee-information:update',
+        },
+      },
+    });
+
+    if (!hasPermission) {
+      throw new ForbiddenException(
+        'Bạn không có quyền cập nhật thông tin nhân viên!',
+      );
+    }
+
+    try {
+      // 2. Check whether any field was provided
+      const data: {
+        employee_full_name?: string;
+        employee_gender?: string;
+        employee_date_of_birth?: Date;
+        employee_address?: string;
+      } = {};
+
+      if (dto.employee_full_name !== undefined) {
+        data.employee_full_name = dto.employee_full_name;
+      }
+
+      if (dto.employee_gender !== undefined) {
+        data.employee_gender = dto.employee_gender;
+      }
+
+      if (dto.employee_date_of_birth !== undefined) {
+        data.employee_date_of_birth = new Date(
+          `${dto.employee_date_of_birth}T00:00:00.000Z`,
+        );
+      }
+
+      if (dto.employee_address !== undefined) {
+        data.employee_address = dto.employee_address;
+      }
+
+      if (Object.keys(data).length === 0) {
+        throw new BadRequestException(
+          'Vui lòng cung cấp ít nhất một thông tin cần cập nhật!',
+        );
+      }
+
+      // 3. Check employee existence
+      const employee = await this.prisma.employees.findUnique({
+        where: {
+          employee_user_id: BigInt(userId),
+        },
+        select: {
+          employee_id: true,
+        },
+      });
+
+      if (!employee) {
+        throw new NotFoundException(
+          'Không tìm thấy thông tin nhân viên!',
+        );
+      }
+
+      // 4. Update employee information
+      const updatedEmployee = await this.prisma.employees.update({
+        where: {
+          employee_user_id: BigInt(userId),
+        },
+        data,
+        select: {
+          employee_code: true,
+          employee_full_name: true,
+          employee_gender: true,
+          employee_date_of_birth: true,
+          employee_address: true,
+          employee_status: true,
+          employee_created_at: true,
+          employee_updated_at: true,
+          user: {
+            select: {
+              User_Roles: {
+                select: {
+                  role: {
+                    select: {
+                      role_name: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      // 5. Return updated employee information
+      const { user, ...employeeInfo } = updatedEmployee;
+
+      return {
+        ...employeeInfo,
+        roles: user.User_Roles.map(
+          (userRole) => userRole.role.role_name,
+        ),
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException(
+        'Không thể cập nhật thông tin nhân viên.',
+      );
+    }
   }
 }
