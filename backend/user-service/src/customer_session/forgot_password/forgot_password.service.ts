@@ -34,6 +34,15 @@ export class ForgotPasswordService {
       select: {
         user_id: true,
         user_email: true,
+        User_Roles: {
+          select: {
+            role: {
+              select: {
+                role_name: true,
+              },
+            },
+          },
+        },
       },
     });
   }
@@ -47,18 +56,17 @@ export class ForgotPasswordService {
     });
   }
 
-  // 1. Send OTP
+  // 1. (POST) SEND OTP FOR FORGOTPASSWORD
   async sendOtpForgotPassword(dto: SendOtpForgotPasswordDto): Promise<{ message: string; otp_expires_at: Date }> {
 
     // 1. Kiểm tra email có tồn tại trong hệ thống không
     const existedUser = await this.findByEmail(dto.user_email);
 
-    if (!existedUser) {
+    if (!existedUser || !existedUser.User_Roles.some((ur) => ur.role.role_name === "CUSTOMER")) {
       throw new BadRequestException(
-        'Email không tồn tại trong hệ thống!',
+        "Tài khoản không tồn tại trong hệ thống!",
       );
     }
-
     // 2. Key lưu OTP trong Redis
     const redisKey = `forgot-password:otp:${dto.user_email}`;
 
@@ -107,7 +115,7 @@ export class ForgotPasswordService {
   }
 
 
-  // 2. Resend OTP Forgot Password
+  // 2. (POST) RESEND OTP FOR FORGOTPASSWORD
   async reSendOtpForgotPassword(dto: ReSendOtpForgotPasswordDto): Promise<{ message: string; otp_expires_at: Date }> {
 
     const redisKey = `forgot-password:otp:${dto.user_email}`;
@@ -155,15 +163,15 @@ export class ForgotPasswordService {
     };
   }
 
-  // 3. Verify OTP
-  async verifyOtpForgotPassword(dto: VerifyOtpForgotPasswordDto): Promise<{resetToken: string; reset_expires_at: Date;}> {
+  // 3. (POST) VERIFY OTP FOR FORGOTPASSWORD
+  async verifyOtpForgotPassword(dto: VerifyOtpForgotPasswordDto): Promise<{resetToken: string; user_id: string; reset_expires_at: Date;}> {
 
     // 1. Kiểm tra email tồn tại
     const existedUser = await this.findByEmail(dto.user_email);
 
-    if (!existedUser) {
+    if (!existedUser || !existedUser.User_Roles.some((ur) => ur.role.role_name === "CUSTOMER")) {
       throw new BadRequestException(
-        'Email không tồn tại trong hệ thống!',
+        "Tài khoản không tồn tại trong hệ thống!",
       );
     }
 
@@ -256,12 +264,13 @@ export class ForgotPasswordService {
     // đặt vào HttpOnly Cookie
     return {
       resetToken,
+      user_id: String(existedUser.user_id),
       reset_expires_at: resetExpiresAt,
     };
   }
 
-  // 4. Change Password
-  async changePassword(resetToken: string, dto: ChangePasswordForgotPasswordDto): Promise<{ message: string }> {
+  // 4. (POST) CHANGE PASSWORD FOR FORGOTPASSWORD
+  async changePassword(resetToken: string, dto: ChangePasswordForgotPasswordDto): Promise<{ user_id: string; message: string }> {
 
     // 1. Kiểm tra reset token
     const resetTokenKey = `forgot-password:reset-token:${resetToken}`;
@@ -274,10 +283,14 @@ export class ForgotPasswordService {
       );
     }
 
+    if (dto.user_id !== userId) {
+      throw new UnauthorizedException(
+        'Thông tin phiên đổi mật khẩu không hợp lệ!',
+      );
+    }
+
     // 2. Hash password
     const hashedPassword = await bcrypt.hash(dto.new_password, 10);
-
-    
 
     // 3. Update password trong transaction
     await this.prisma.$transaction(async (tx) => {
@@ -310,6 +323,7 @@ export class ForgotPasswordService {
     await this.redisService.delete(resetTokenKey);
 
     return {
+      user_id: String(userId),
       message: 'Đổi mật khẩu thành công',
     };
   }
