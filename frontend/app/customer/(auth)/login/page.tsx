@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { setAccessToken } from "@/lib/access_token/customer_access_token";
+import { customerUserService } from "@/lib/axios/services/customer-services/user_service";
 import axios from "axios";
 
 export default function LoginPage() {
@@ -12,6 +13,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
+  // 1. (POST) LOGIN
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -22,18 +24,10 @@ export default function LoginPage() {
     const user_password = String(form.get("password") ?? "");
 
     try {
-      const response = await axios.post(
-        "http://localhost:3001/api/v1/customer-session/user-service/login",
-        {
-          user_email,
-          user_password,
-        },
-        {
-          withCredentials: true,
-        },
-      );
-
-      const data = response.data;
+      const data = await customerUserService.login({
+        user_email,
+        user_password,
+      });
 
       setAccessToken(data.access_token);
 

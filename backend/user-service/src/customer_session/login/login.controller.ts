@@ -20,6 +20,7 @@ const refreshCookieOptions = {
 export class LoginController {
     constructor(private readonly loginService: LoginService) {}
 
+    // 1. (POST) LOGIN
     @Post('/login')
     async login(@Body() dto: LoginDto, @Req() request: Request, @Res({ passthrough: true }) response: Response) 
     {
