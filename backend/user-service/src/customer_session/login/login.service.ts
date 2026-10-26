@@ -15,7 +15,8 @@ import { LoginDto } from '../dto/login/login.dto';
 @Injectable()
 export class LoginService {
   constructor(private readonly prisma: PrismaService) {}
-
+  
+  // 1. (POST) LOGIN
   async login(dto: LoginDto, deviceInfo?: string, ipAddress?: string): Promise<{
     access_token: string;
     refresh_token: string;
