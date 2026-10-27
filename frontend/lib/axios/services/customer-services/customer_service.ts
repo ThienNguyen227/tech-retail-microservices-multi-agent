@@ -7,68 +7,48 @@ const CUSTOMER_SERVICE_URL = "http://localhost:3002/api/v1/customer-session/cust
 // const CUSTOMER_SERVICE_URL = "http://localhost/api/v1/customer-session/customer-service";
 
 export const customerCustomerService = {
-    // ======================================== CUSTOMER_INFORMATION MODULE =================================================//
+  // ======================================== CUSTOMER_INFORMATION MODULE =================================================//
 
-    // 1. (GET) CUSTOMER-INFORMATION
-    async getCustomerInformation() {
-        const response = await customerAxios.get(`${CUSTOMER_SERVICE_URL}/customer-information`);
-        return response.data;
-    },
-
-    // 2. (PATCH) CUSTOMER-INFORMATION
-    async updateCustomerInformation(payload: {
-      customer_full_name: string | null;
-      customer_date_of_birth: string | null;
-      customer_gender: string | null;
-    }) {
-        return customerAxios.patch(`${CUSTOMER_SERVICE_URL}/customer-information`, payload);
-    },
-
-  // POST: Thêm địa chỉ
-  async createCustomerAddress(
-    customerId: string,
-    payload: {
-      customer_address_line: string;
-      customer_address_ward: string | null;
-      customer_address_province: string | null;
-      customer_address_default: boolean;
-    },
-  ) {
-    return customerAxios.post(
-      `${CUSTOMER_SERVICE_URL}/customer-address`,
-      payload,
-      {
-        params: { customerId },
-      },
-    );
+  // 1. (GET) CUSTOMER-INFORMATION
+  async getCustomerInformation() {
+    const response = await customerAxios.get(`${CUSTOMER_SERVICE_URL}/customer-information`);
+    return response.data;
   },
 
-  // PATCH: Cập nhật địa chỉ
+  // 2. (PATCH) CUSTOMER-INFORMATION
+  async updateCustomerInformation(payload: {
+    customer_full_name: string | null;
+    customer_date_of_birth: string | null;
+    customer_gender: string | null;
+  }) {
+    return customerAxios.patch(`${CUSTOMER_SERVICE_URL}/customer-information`, payload);
+  },
+
+  // 3. (POST) CUSTOMER-ADDRESS
+  async createCustomerAddress(payload: {
+    customer_address_line: string;
+    customer_address_ward: string;
+    customer_address_province: string;
+    customer_address_default: boolean;
+  }) {
+    return customerAxios.post(`${CUSTOMER_SERVICE_URL}/customer-address`, payload);
+  },
+
+  // 4. (PATCH) CUSTOMER-ADDRESS
   async updateCustomerAddress(
     addressId: string,
     payload: {
       customer_address_line: string;
-      customer_address_ward: string | null;
-      customer_address_province: string | null;
+      customer_address_ward: string;
+      customer_address_province: string;
       customer_address_default: boolean;
     },
   ) {
-    return customerAxios.patch(
-      `${CUSTOMER_SERVICE_URL}/customer-address`,
-      payload,
-      {
-        params: { addressId },
-      },
-    );
+    return customerAxios.patch(`${CUSTOMER_SERVICE_URL}/customer-address/${addressId}`, payload);
   },
 
-  // DELETE: Xóa địa chỉ
+  // 5. (DELETE) CUSTOMER-ADDRESS
   async deleteCustomerAddress(addressId: string) {
-    return customerAxios.delete(
-      `${CUSTOMER_SERVICE_URL}/customer-address`,
-      {
-        params: { addressId },
-      },
-    );
+    return customerAxios.delete(`${CUSTOMER_SERVICE_URL}/customer-address/${addressId}`);
   },
 };
