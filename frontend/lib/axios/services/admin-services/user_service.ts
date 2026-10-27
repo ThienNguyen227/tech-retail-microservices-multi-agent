@@ -76,13 +76,27 @@ export const adminUserService = {
         return response.data;
     },
 
-    // 9. (GET) EMPLOYEE-INFORMATION FOR ROLE: EMPLOYEE AND MANAGER
+    // 9. (PATCH) EMPLOYEE-LIST FOR ROLE: ADMIN
+    async updateEmployee(employeeId: string, data: {
+        employee_code: string;
+        employee_full_name: string;
+        employee_gender: string;
+        employee_date_of_birth: string;
+        employee_address: string;
+        employee_status: string;
+        roles: string[];
+    }) {
+        const response = await adminAxios.patch(`${USER_SERVICE_URL}/employee-list/${employeeId}`, data);
+        return response.data;
+    },
+
+    // 10. (GET) EMPLOYEE-INFORMATION FOR ROLE: EMPLOYEE AND MANAGER
     async getEmployeeInformation() {
         const response = await adminAxios.get(`${USER_SERVICE_URL}/employee-information`);
         return response.data;
     },
 
-    // 10. (PATCH) EMPLOYEE-INFORMATION FOR ROLE: EMPLOYEE AND MANAGER
+    // 11. (PATCH) EMPLOYEE-INFORMATION FOR ROLE: EMPLOYEE AND MANAGER
     async updateEmployeeInformation(data: {
         employee_full_name?: string;
         employee_gender?: string;
