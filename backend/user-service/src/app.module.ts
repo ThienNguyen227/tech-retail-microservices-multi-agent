@@ -1,7 +1,6 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from './prisma/prisma.module';
 import { RedisModule } from './redis/redis.module';
-import { UsersModule } from './users/user.module';
 
 // CUSTOMER - SESSION
 import { RegisterModule } from './customer_session/register/register.module';
@@ -30,8 +29,7 @@ import { SearchUserModule } from './ai_session/search_user/search_user.module';
 @Module({
   imports: [
     PrismaModule, 
-    RedisModule, 
-    UsersModule, 
+    RedisModule,  
     
     // CUSTOMER SESSION
     RegisterModule, 
