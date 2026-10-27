@@ -263,7 +263,7 @@ export default function CustomerInformationPage() {
   }, [loadCustomerInformation]);
 
   // ==========================================
-  // Edit customer information
+  // 2. (PATCH) CUSTOMER-INFORMATION
   // ==========================================
   function startEditing() {
     if (!profile) return;
@@ -289,20 +289,28 @@ export default function CustomerInformationPage() {
   }
 
   async function saveCustomerProfile() {
-    if (!profile) return;
+    if (!profile || saving) return;
 
     const name = formName.trim();
+    const today = new Date().toISOString().slice(0, 10);
+
+    if (!name) {
+      setEditError("Họ và tên không được để trống.");
+      return;
+    }
 
     if (name.length > 100) {
       setEditError("Họ và tên không được vượt quá 100 ký tự.");
       return;
     }
 
-    if (
-      formDateOfBirth &&
-      formDateOfBirth > new Date().toISOString().slice(0, 10)
-    ) {
-      setEditError("Ngày sinh không được lớn hơn ngày hiện tại.");
+    if (formDateOfBirth && formDateOfBirth > today) {
+      setEditError("Ngày sinh không được lớn hơn ngày hiện tại!");
+      return;
+    }
+
+    if (formGender && !["MALE", "FEMALE", "OTHER"].includes(formGender)) {
+      setEditError("Giới tính không hợp lệ.");
       return;
     }
 
@@ -310,65 +318,54 @@ export default function CustomerInformationPage() {
     setEditError("");
     setSuccessMessage("");
 
-    // try {
-    //   const payload: CustomerInformationPayload = {
-    //     customer_full_name: name || null,
-    //     customer_date_of_birth: formDateOfBirth || null,
-    //     customer_gender: formGender || null,
-    //   };
+    try {
+      const payload: CustomerInformationPayload = {
+        customer_full_name: name,
+        customer_date_of_birth: formDateOfBirth,
+        customer_gender: formGender,
+      };
 
-    //   // API: cập nhật thông tin khách hàng.
-    //   const response =
-    //     await customerUserService.updateCustomerInformation(
-    //       profile.customer_user_id,
-    //       payload,
-    //     );
+      const response =
+        await customerCustomerService.updateCustomerInformation(payload);
 
-    //   const result = response?.data ?? response;
-    //   const updatedCustomer =
-    //     result?.data && !Array.isArray(result.data)
-    //       ? result.data
-    //       : result;
+      const result = response?.data ?? response;
+      const updatedCustomer = result?.data ?? result;
 
-    //   setProfile((current) => {
-    //     if (!current) return current;
+      setProfile((current) => {
+        if (!current) return current;
 
-    //     return {
-    //       ...current,
-    //       ...(updatedCustomer &&
-    //       typeof updatedCustomer === "object"
-    //         ? updatedCustomer
-    //         : {}),
-    //       customer_full_name:
-    //         updatedCustomer?.customer_full_name ?? payload.customer_full_name,
-    //       customer_date_of_birth:
-    //         updatedCustomer?.customer_date_of_birth ??
-    //         payload.customer_date_of_birth,
-    //       customer_gender:
-    //         updatedCustomer?.customer_gender ?? payload.customer_gender,
-    //       addresses: current.addresses,
-    //     };
-    //   });
+        return {
+          ...current,
+          customer_full_name:
+            updatedCustomer?.customer_full_name ?? payload.customer_full_name,
+          customer_date_of_birth:
+            updatedCustomer?.customer_date_of_birth !== undefined
+              ? updatedCustomer.customer_date_of_birth
+              : payload.customer_date_of_birth,
+          customer_gender:
+            updatedCustomer?.customer_gender !== undefined
+              ? updatedCustomer.customer_gender
+              : payload.customer_gender,
+          addresses: current.addresses,
+        };
+      });
 
-    //   setEditing(false);
-    //   setSuccessMessage("Cập nhật thông tin khách hàng thành công!");
-    // } catch (err: unknown) {
-    //   if (isUnauthorized(err)) {
-    //     localStorage.removeItem("accessToken");
-    //     sessionStorage.removeItem("accessToken");
-    //     router.replace("/customer/login");
-    //     return;
-    //   }
+      setEditing(false);
+      setSuccessMessage(result?.message ?? "Cập nhật thông tin khách hàng thành công!");
+    } catch (err: unknown) {
+      if (isUnauthorized(err)) {
+        localStorage.removeItem("accessToken");
+        sessionStorage.removeItem("accessToken");
+        router.replace("/customer/login");
+        return;
+      }
 
-    //   setEditError(
-    //     getErrorMessage(
-    //       err,
-    //       "Không thể cập nhật thông tin khách hàng. Vui lòng thử lại.",
-    //     ),
-    //   );
-    // } finally {
-    //   setSaving(false);
-    // }
+      setEditError(
+        getErrorMessage(err, "Không thể cập nhật thông tin khách hàng. Vui lòng thử lại."),
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
   // ==========================================
@@ -1146,7 +1143,6 @@ export default function CustomerInformationPage() {
                       disabled={saving}
                       className="h-12 w-full appearance-none rounded-xl border border-slate-200 bg-slate-50/70 pl-11 pr-4 text-sm text-slate-800 outline-none transition focus:border-teal-500 focus:bg-white focus:ring-4 focus:ring-teal-500/10 disabled:opacity-60"
                     >
-                      <option value="">Chưa cập nhật</option>
                       <option value="MALE">Nam</option>
                       <option value="FEMALE">Nữ</option>
                       <option value="OTHER">Khác</option>
