@@ -45,6 +45,11 @@ const menuItems = [
     href: "/admin/employee-information",
     icon: Users,
   },
+  {
+    title: "Quản lý thông tin khách hàng",
+    href: "/admin/manage-customer",
+    icon: Users,
+  },
   
 ];
 
