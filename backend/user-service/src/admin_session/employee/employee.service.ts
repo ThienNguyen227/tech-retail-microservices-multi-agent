@@ -6,10 +6,12 @@ import {
   UnauthorizedException,
   NotFoundException,
   BadRequestException,
+  ConflictException,
 } from '@nestjs/common';
 
 import { PrismaService } from '../../prisma/prisma.service';
 import { GetEmployeeListDto } from '../dto/get_employee_list/get_employee_list.dto';
+import { UpdateEmployeeListDto } from "../dto/employee/update_employee_list.dto"
 import { UpdateEmployeeInformationDto } from "../dto/employee/update_employee_information.dto"
 
 @Injectable()
@@ -172,6 +174,261 @@ export class EmployeeService {
 
       throw new InternalServerErrorException(
         'Không thể lấy danh sách nhân viên.',
+      );
+    }
+  }
+
+  // 2. (PATCH) EMPLOYEE-LIST FOR ROLE: ADMIN
+  async updateEmployeeList(userId: string, employeeId: string, dto: UpdateEmployeeListDto) {
+    try {
+      // 1. Validate employeeId
+      if (!/^\d+$/.test(employeeId) || BigInt(employeeId) <= 0n) {
+        throw new BadRequestException(
+          'ID nhân viên không hợp lệ.',
+        );
+      }
+
+      if (Object.keys(dto).length === 0) {
+        throw new BadRequestException(
+          'Vui lòng cung cấp thông tin cần cập nhật.',
+        );
+      }
+
+      // 2. Check permission
+      const hasPermission =
+        await this.prisma.role_Permissions.findFirst({
+          where: {
+            role: {
+              User_Roles: {
+                some: {
+                  user_id: BigInt(userId),
+                },
+              },
+            },
+            permission: {
+              permission_name: 'employee-list:update',
+            },
+          },
+          select: {
+            role_id: true,
+          },
+        });
+
+      if (!hasPermission) {
+        throw new ForbiddenException(
+          'Bạn không có quyền cập nhật thông tin nhân viên!',
+        );
+      }
+
+      // 3. Check employee exists
+      const employee = await this.prisma.employees.findUnique({
+        where: {
+          employee_id: BigInt(employeeId),
+        },
+        select: {
+          employee_id: true,
+          employee_user_id: true,
+        },
+      });
+
+      if (!employee) {
+        throw new NotFoundException(
+          'Không tìm thấy thông tin nhân viên!',
+        );
+      }
+
+      const {
+        employee_code,
+        employee_full_name,
+        employee_gender,
+        employee_date_of_birth,
+        employee_address,
+        employee_status,
+        roles,
+      } = dto;
+
+      // 4. Check duplicate employee code
+      if (employee_code !== undefined) {
+        const existingCode =
+          await this.prisma.employees.findFirst({
+            where: {
+              employee_code,
+              employee_id: {
+                not: BigInt(employeeId),
+              },
+            },
+            select: {
+              employee_id: true,
+            },
+          });
+
+        if (existingCode) {
+          throw new ConflictException(
+            'Mã nhân viên đã tồn tại.',
+          );
+        }
+      }
+
+      // 5. Validate all roles
+      let roleIds: bigint[] | undefined;
+
+      if (roles !== undefined) {
+        const existingRoles = await this.prisma.roles.findMany({
+          where: {
+            role_name: {
+              in: roles,
+            },
+          },
+          select: {
+            role_id: true,
+            role_name: true,
+          },
+        });
+
+        const existingRoleNames = new Set(
+          existingRoles.map((item) => item.role_name),
+        );
+
+        const invalidRoles = roles.filter(
+          (role) => !existingRoleNames.has(role),
+        );
+
+        if (invalidRoles.length > 0) {
+          throw new BadRequestException(
+            `Role không tồn tại: ${invalidRoles.join(', ')}`,
+          );
+        }
+
+        roleIds = existingRoles.map((item) => item.role_id);
+      }
+
+      // 6. Update Employees and User_Roles in one transaction
+      await this.prisma.$transaction(async (tx) => {
+        await tx.employees.update({
+          where: {
+            employee_id: BigInt(employeeId),
+          },
+          data: {
+            ...(employee_code !== undefined && {
+              employee_code: employee_code.trim(),
+            }),
+            ...(employee_full_name !== undefined && {
+              employee_full_name: employee_full_name.trim(),
+            }),
+            ...(employee_gender !== undefined && {
+              employee_gender,
+            }),
+            ...(employee_date_of_birth !== undefined && {
+              employee_date_of_birth: new Date(
+                `${employee_date_of_birth.slice(0, 10)}T00:00:00.000Z`,
+              ),
+            }),
+            ...(employee_address !== undefined && {
+              employee_address: employee_address.trim(),
+            }),
+            ...(employee_status !== undefined && {
+              employee_status,
+            }),
+          },
+        });
+
+        // Only replace roles when the request contains "roles"
+        if (roleIds !== undefined) {
+          await tx.user_Roles.deleteMany({
+            where: {
+              user_id: employee.employee_user_id,
+            },
+          });
+
+          await tx.user_Roles.createMany({
+            data: roleIds.map((roleId) => ({
+              user_id: employee.employee_user_id,
+              role_id: roleId,
+            })),
+          });
+        }
+      });
+
+      // 7. Return updated employee
+      const updatedEmployee =
+        await this.prisma.employees.findUnique({
+          where: {
+            employee_id: BigInt(employeeId),
+          },
+          select: {
+            employee_id: true,
+            employee_code: true,
+            employee_full_name: true,
+            employee_gender: true,
+            employee_date_of_birth: true,
+            employee_address: true,
+            employee_status: true,
+            employee_created_at: true,
+            employee_updated_at: true,
+            user: {
+              select: {
+                user_id: true,
+                User_Roles: {
+                  select: {
+                    role: {
+                      select: {
+                        role_name: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        });
+
+      if (!updatedEmployee) {
+        throw new NotFoundException(
+          'Không tìm thấy nhân viên sau khi cập nhật.',
+        );
+      }
+
+      return {
+        message: 'Cập nhật thông tin nhân viên thành công.',
+        data: {
+          employee_id: updatedEmployee.employee_id.toString(),
+          employee_code: updatedEmployee.employee_code,
+          employee_full_name:
+            updatedEmployee.employee_full_name,
+          employee_gender: updatedEmployee.employee_gender,
+          employee_date_of_birth:
+            updatedEmployee.employee_date_of_birth,
+          employee_address: updatedEmployee.employee_address,
+          employee_status: updatedEmployee.employee_status,
+          employee_created_at:
+            updatedEmployee.employee_created_at,
+          employee_updated_at:
+            updatedEmployee.employee_updated_at,
+          user: {
+            user_id: updatedEmployee.user.user_id.toString(),
+            roles: updatedEmployee.user.User_Roles.map(
+              (item) => item.role.role_name,
+            ),
+          },
+        },
+      };
+    } catch (error) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      if (
+        error instanceof Error &&
+        'code' in error &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException(
+          'Mã nhân viên đã tồn tại.',
+        );
+      }
+
+      throw new InternalServerErrorException(
+        'Không thể cập nhật thông tin nhân viên.',
       );
     }
   }

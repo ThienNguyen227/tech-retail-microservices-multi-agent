@@ -1,6 +1,9 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from './prisma/prisma.module';
-import { CustomerModule } from './customer/customer.module';
+
+// CUSTOMER - SESSION
+import { CustomerInformationModule } from './customer-session/customer_information/customer_information.module';
+import { CustomerAddressModule } from './customer-session/customer_address/customer_address.module';
 
 // AI SESSION
 import { SearchCustomerModule } from './ai_session/search_customer/search_customer.module';
@@ -8,12 +11,16 @@ import { GetCustomerAddressesModule } from './ai_session/get_customer_addresses/
 
 @Module({
   imports: [
+    //
     PrismaModule,
-    CustomerModule,
 
     // AI SESSION
     SearchCustomerModule,
     GetCustomerAddressesModule,
+
+    // CUSTOMER - SESSION
+    CustomerInformationModule,
+    CustomerAddressModule,
   ],
 })
 export class AppModule {}

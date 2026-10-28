@@ -1,10 +1,10 @@
 import { customerAxios } from "../../customer-axios";
 
 // CALL DIRECT API
-// const USER_SERVICE_URL = "http://localhost:3001/api/v1/customer-session/user-service";
+const USER_SERVICE_URL = "http://localhost:3001/api/v1/customer-session/user-service";
 
 // CALL THROUGH API GATEWAY (NGINX)
-const USER_SERVICE_URL = "http://localhost/api/v1/customer-session/user-service";
+// const USER_SERVICE_URL = "http://localhost/api/v1/customer-session/user-service";
 
 export const customerUserService = {
     // ======================================== REGISTER MODULE =================================================//
