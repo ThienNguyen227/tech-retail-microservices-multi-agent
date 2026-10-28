@@ -13,7 +13,7 @@ from langchain_ollama import ChatOllama
 from langgraph.graph import StateGraph, MessagesState, START, END
 from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.checkpoint.mongodb import MongoDBSaver
-
+from langchain_google_genai import ChatGoogleGenerativeAI
 from prompt import CUSTOMER_AGENT_PROMPT
 
 from tools.customer_tools import (
@@ -26,37 +26,37 @@ load_dotenv()
 
 # ==================== LLM ====================
 
-# # Model xử lý câu hỏi và gọi tool
-# llm = ChatGoogleGenerativeAI(
-#     model="gemini-3.1-flash-lite",
-#     google_api_key=os.getenv("GOOGLE_API_KEY"),
-#     max_tokens=1024,
-#     timeout=60,
-#     max_retries=1,
-# )
-
-# # Model tóm tắt lịch sử hội thoại
-# summarizer_llm = ChatGoogleGenerativeAI(
-#     model="gemini-3.5-flash-lite",
-#     google_api_key=os.getenv("GOOGLE_SUMMARIZE_API_KEY"),
-#     max_tokens=500,
-#     timeout=60,
-#     max_retries=1,
-# )
-
 # Model xử lý câu hỏi và gọi tool
-llm = ChatOllama(
-    model="deepseek-r1:7b",
+llm = ChatGoogleGenerativeAI(
+    model="gemini-3.1-flash-lite",
+    google_api_key=os.getenv("GOOGLE_API_KEY"),
     max_tokens=1024,
-    temperature=0,
+    timeout=60,
+    max_retries=1,
 )
 
 # Model tóm tắt lịch sử hội thoại
-summarizer_llm = ChatOllama(
-    model="deepseek-r1:7b",
+summarizer_llm = ChatGoogleGenerativeAI(
+    model="gemini-3.5-flash-lite",
+    google_api_key=os.getenv("GOOGLE_SUMMARIZE_API_KEY"),
     max_tokens=500,
-    temperature=0,
+    timeout=60,
+    max_retries=1,
 )
+
+# # Model xử lý câu hỏi và gọi tool
+# llm = ChatOllama(
+#     model="deepseek-r1:7b",
+#     max_tokens=1024,
+#     temperature=0,
+# )
+
+# # Model tóm tắt lịch sử hội thoại
+# summarizer_llm = ChatOllama(
+#     model="deepseek-r1:7b",
+#     max_tokens=500,
+#     temperature=0,
+# )
 
 
 # ==================== TOOLS ====================
@@ -293,12 +293,12 @@ builder.add_edge("tools", "llm")
 # ==================== MONGODB CHECKPOINTER ====================
 
 mongo_client = MongoClient(
-    os.getenv("MONGODB_URI")
+    os.getenv("CUSTOMER_AI_SERVICE_MONGODB_URI")
 )
 
 checkpointer = MongoDBSaver(
     mongo_client,
-    db_name="ai_service",
+    db_name="customer_ai_service",
 )
 
 

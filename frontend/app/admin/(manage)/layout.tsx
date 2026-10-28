@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import AdminHeader from "./components/AdminHeader";
 import Sidebar from "./components/Sidebar";
+import AIChatBot from "./components/AIChatBot";
 
 export default function AdminLayout({
   children,
@@ -16,6 +17,8 @@ export default function AdminLayout({
           {children}
         </main>
       </div>
+
+      <AIChatBot />
     </div>
   );
 }
