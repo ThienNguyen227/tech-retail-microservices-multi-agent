@@ -6,6 +6,7 @@ from pymongo import MongoClient
 from langchain_core.messages import (
     SystemMessage,
     HumanMessage,
+    ToolMessage,
     trim_messages,
 )
 from langchain_ollama import ChatOllama
@@ -17,12 +18,7 @@ from langgraph.checkpoint.mongodb import MongoDBSaver
 from prompt import USER_AGENT_PROMPT
 
 from tools.user_tools import (
-    search_users,
-    get_user_detail,
-    search_employees,
-    get_employee_detail,
-    get_user_roles,
-    get_role_permissions,
+    search_user,
 )
 
 
@@ -67,12 +63,7 @@ summarizer_llm = ChatOllama(
 # ==================== TOOLS ====================
 
 tools = [
-    search_users,
-    get_user_detail,
-    search_employees,
-    get_employee_detail,
-    get_user_roles,
-    get_role_permissions,
+    search_user,
 ]
 
 llm_with_tools = llm.bind_tools(tools)
@@ -90,6 +81,12 @@ KEEP_RECENT_TOKENS = 1500
 class UserState(MessagesState):
     summary: str
     summarized_message_count: int
+
+    # Thông tin phục vụ Supervisor
+    task: str | None
+    user_id: str | None
+    result: dict | None
+    error: str | None
 
 
 # ==================== HELPER ====================
@@ -252,6 +249,130 @@ async def call_model(state: UserState):
     return {"messages": [response]}
 
 
+# ==================== EXTRACT USER RESULT NODE ====================
+
+def extract_user_result(state: UserState):
+    messages = state["messages"]
+
+    # Chỉ lấy ToolMessage cuối cùng trong lịch sử.
+    # Node này chỉ được gọi khi route_after_tools xác nhận
+    # message cuối cùng là kết quả của search_user.
+    tool_message = messages[-1] if messages else None
+
+    if (
+        not isinstance(tool_message, ToolMessage)
+        or tool_message.name != "search_user"
+    ):
+        return {
+            "result": None,
+            "error": "Không tìm thấy kết quả search_user của lượt xử lý hiện tại.",
+            "user_id": None,
+        }
+
+    content = tool_message.content
+
+    # ToolMessage có thể chứa kết quả dạng JSON string.
+    if isinstance(content, str):
+        import json
+
+        try:
+            content = json.loads(content)
+        except (json.JSONDecodeError, TypeError):
+            return {
+                "result": None,
+                "error": "Không thể đọc kết quả tra cứu tài khoản.",
+                "user_id": None,
+            }
+
+    if not isinstance(content, dict):
+        return {
+            "result": None,
+            "error": "Kết quả tra cứu tài khoản không hợp lệ.",
+            "user_id": None,
+        }
+
+    if not content.get("success", False):
+        return {
+            "result": content,
+            "error": content.get(
+                "message",
+                "Không thể tra cứu tài khoản người dùng.",
+            ),
+            "user_id": None,
+        }
+
+    users = content.get("users", [])
+
+    if not isinstance(users, list):
+        return {
+            "result": content,
+            "error": "Danh sách tài khoản trả về không hợp lệ.",
+            "user_id": None,
+        }
+
+    if not users:
+        return {
+            "result": content,
+            "error": content.get(
+                "message",
+                "Không tìm thấy tài khoản phù hợp.",
+            ),
+            "user_id": None,
+        }
+
+    if len(users) > 1:
+        return {
+            "result": content,
+            "error": (
+                "Tìm thấy nhiều tài khoản phù hợp; "
+                "cần xác định tài khoản trước khi chuyển tiếp."
+            ),
+            "user_id": None,
+        }
+
+    user = users[0]
+
+    if not isinstance(user, dict):
+        return {
+            "result": content,
+            "error": "Thông tin tài khoản trả về không hợp lệ.",
+            "user_id": None,
+        }
+
+    user_id = user.get("user_id")
+
+    if user_id is None or not str(user_id).strip():
+        return {
+            "result": content,
+            "error": "Kết quả không có user_id hợp lệ.",
+            "user_id": None,
+        }
+
+    return {
+        "result": content,
+        "error": None,
+        "user_id": str(user_id),
+    }
+
+
+# ==================== ROUTE AFTER TOOLS ====================
+
+def route_after_tools(state: UserState):
+    messages = state["messages"]
+
+    # Chỉ xét những ToolMessage mới nhất
+    last_message = messages[-1] if messages else None
+
+    if (
+        state.get("task") == "resolve_user_id"
+        and isinstance(last_message, ToolMessage)
+        and last_message.name == "search_user"
+    ):
+        return "extract_user_result"
+
+    return "llm"
+
+
 # ==================== BUILD GRAPH ====================
 
 builder = StateGraph(UserState)
@@ -259,6 +380,7 @@ builder = StateGraph(UserState)
 builder.add_node("summarize", summarize_node)
 builder.add_node("llm", call_model)
 builder.add_node("tools", ToolNode(tools))
+builder.add_node("extract_user_result", extract_user_result)
 
 builder.add_edge(START, "summarize")
 builder.add_edge("summarize", "llm")
@@ -272,7 +394,17 @@ builder.add_conditional_edges(
     },
 )
 
-builder.add_edge("tools", "llm")
+builder.add_conditional_edges(
+    "tools",
+    route_after_tools,
+    {
+        "extract_user_result": "extract_user_result",
+        "llm": "llm",
+    },
+)
+
+# Khi đã lấy user_id cho Supervisor, kết thúc lượt xử lý
+builder.add_edge("extract_user_result", END)
 
 
 # ==================== MONGODB CHECKPOINTER ====================

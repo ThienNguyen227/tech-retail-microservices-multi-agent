@@ -17,12 +17,8 @@ from langgraph.checkpoint.mongodb import MongoDBSaver
 from prompt import CUSTOMER_AGENT_PROMPT
 
 from tools.customer_tools import (
-    search_customers,
-    get_customer_detail,
+    search_customer,
     get_customer_addresses,
-    get_customer_points,
-    get_customer_membership,
-    get_membership_tier_detail,
 )
 
 load_dotenv()
@@ -66,12 +62,9 @@ summarizer_llm = ChatOllama(
 # ==================== TOOLS ====================
 
 tools = [
-    search_customers,
-    get_customer_detail,
+    search_customer,
     get_customer_addresses,
-    get_customer_points,
-    get_customer_membership,
-    get_membership_tier_detail,
+
 ]
 
 llm_with_tools = llm.bind_tools(tools)
@@ -89,6 +82,11 @@ KEEP_RECENT_TOKENS = 1500
 class CustomerState(MessagesState):
     summary: str
     summarized_message_count: int
+    task: str | None
+    user_id: str | None
+    customer_code: str | None
+    result: dict | None
+    error: str | None
 
 
 # ==================== HELPER ====================
@@ -228,6 +226,24 @@ async def call_model(state: CustomerState):
     messages = [
         SystemMessage(content=CUSTOMER_AGENT_PROMPT),
     ]
+
+    task = state.get("task")
+    user_id = state.get("user_id")
+    customer_code = state.get("customer_code")
+
+    if task:
+        messages.append(
+            SystemMessage(
+                content=(
+                    "NHIỆM VỤ ĐƯỢC SUPERVISOR GIAO:\n"
+                    f"task={task}\n"
+                    f"user_id={user_id}\n"
+                    f"customer_code={customer_code}\n"
+                    "Gọi đúng tool tương ứng với task và chỉ sử dụng "
+                    "các định danh đã được cung cấp."
+                )
+            )
+        )
 
     if summary:
         messages.append(
