@@ -9,10 +9,16 @@ import { CustomerAddressModule } from './customer-session/customer_address/custo
 import { SearchCustomerModule } from './ai_session/search_customer/search_customer.module';
 import { GetCustomerAddressesModule } from './ai_session/get_customer_addresses/get_customer_addresses.module';
 
+// ADMIN SESSION
+import { CustomerListModule } from './admin_session/customer_list/customer_list.module';
+
 @Module({
   imports: [
     //
     PrismaModule,
+
+    // ADMIN SESION
+    CustomerListModule,
 
     // AI SESSION
     SearchCustomerModule,
