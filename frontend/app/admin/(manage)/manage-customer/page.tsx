@@ -22,6 +22,8 @@ import {
   Hash,
   VenusAndMars,
   AlertCircle,
+  Pencil,
+  Save,
 } from "lucide-react";
 import axios from "axios";
 import { adminCustomerService } from "@/lib/axios/services/admin-services/customer_service";
@@ -48,6 +50,14 @@ interface Customer {
   customer_created_at: string;
   customer_updated_at: string;
   addresses: CustomerAddress[];
+}
+
+interface UpdateCustomerListDto {
+  customer_code?: string;
+  customer_full_name?: string;
+  customer_date_of_birth?: string;
+  customer_gender?: string;
+  customer_status?: "ACTIVE" | "INACTIVE" | "BLOCKED";
 }
 
 const PAGE_SIZE = 8;
@@ -157,19 +167,95 @@ function extractErrorMessage(
 export default function ManageCustomerPage() {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [statsCustomers, setStatsCustomers] = useState<Customer[]>([]);
-
   const [keyword, setKeyword] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
-
-  const [selectedCustomer, setSelectedCustomer] =
-    useState<Customer | null>(null);
-
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [loading, setLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [statsError, setStatsError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // 2. (PATCH) CUSTOMER-LIST
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [editForm, setEditForm] = useState<UpdateCustomerListDto>({
+    customer_code: "",
+    customer_full_name: "",
+    customer_date_of_birth: "",
+    customer_gender: "MALE",
+    customer_status: "ACTIVE",
+  });
+
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState("");
+
+  function handleOpenEditModal(customer: Customer) {
+    setEditingCustomer(customer);
+
+    setEditForm({
+      customer_code: customer.customer_code,
+      customer_full_name: customer.customer_full_name ?? "",
+      customer_date_of_birth: customer.customer_date_of_birth?.slice(0, 10) ?? "",
+      customer_gender: customer.customer_gender ?? "MALE",
+      customer_status: customer.customer_status as | "ACTIVE" | "INACTIVE" | "BLOCKED",
+    });
+
+    setEditError("");
+  }
+
+  async function handleUpdateCustomer(
+    event: React.FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    if (!editingCustomer || saving) return;
+
+    const customerCode = editForm.customer_code?.trim() ?? "";
+    const customerName = editForm.customer_full_name?.trim() ?? "";
+
+    if (!customerCode || !customerName) {
+      setEditError("Mã khách hàng và họ tên không được để trống.");
+      return;
+    }
+
+    if (!editForm.customer_date_of_birth) {
+      setEditError("Vui lòng chọn ngày sinh.");
+      return;
+    }
+
+    if (!editForm.customer_gender) {
+      setEditError("Vui lòng chọn giới tính.");
+      return;
+    }
+
+    setSaving(true);
+    setEditError("");
+
+    try {
+      await adminCustomerService.updateCustomer(
+        editingCustomer.customer_id,
+        {
+          ...editForm,
+          customer_code: customerCode,
+          customer_full_name: customerName,
+        },
+      );
+      setSuccess("Cập nhật thông tin khách hàng thành công!")
+      setEditingCustomer(null);
+      setRefreshKey((key) => key + 1);
+    } catch (err: unknown) {
+      setEditError(
+        extractErrorMessage(
+          err,
+          "Không thể cập nhật thông tin khách hàng.",
+        ),
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
 
   // Lấy dữ liệu tổng để thống kê
   useEffect(() => {
@@ -401,6 +487,22 @@ export default function ManageCustomerPage() {
           </div>
         )}
 
+        {/* Success message */}
+        {success && (
+          <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-medium text-emerald-700">
+            <CheckCircle2 size={18} className="mt-0.5 shrink-0" />
+            <span>{success}</span>
+            <button
+              type="button"
+              onClick={() => setSuccess("")}
+              className="ml-auto rounded p-1 hover:bg-emerald-100"
+              aria-label="Đóng thông báo"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
         {/* Danh sách khách hàng */}
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-100 p-5">
@@ -590,7 +692,7 @@ export default function ManageCustomerPage() {
                           </span>
                         </td>
 
-                        <td className="px-5 py-4 text-center">
+                        {/* <td className="px-5 py-4 text-center">
                           <button
                             type="button"
                             title="Xem chi tiết khách hàng"
@@ -600,7 +702,30 @@ export default function ManageCustomerPage() {
                           >
                             <Eye size={18} />
                           </button>
-                        </td>
+                        </td> */}
+                        <td className="px-5 py-4">
+  <div className="flex items-center justify-center gap-1">
+    <button
+      type="button"
+      title="Chỉnh sửa khách hàng"
+      aria-label={`Chỉnh sửa ${customer.customer_full_name || customer.customer_code}`}
+      onClick={() => handleOpenEditModal(customer)}
+      className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-amber-50 hover:text-amber-600"
+    >
+      <Pencil size={18} />
+    </button>
+
+    <button
+      type="button"
+      title="Xem chi tiết khách hàng"
+      aria-label={`Xem chi tiết ${customer.customer_full_name || customer.customer_code}`}
+      onClick={() => setSelectedCustomer(customer)}
+      className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-blue-50 hover:text-blue-600"
+    >
+      <Eye size={18} />
+    </button>
+  </div>
+</td>
                       </tr>
                     );
                   })
@@ -872,6 +997,232 @@ export default function ManageCustomerPage() {
           </section>
         </div>
       )}
+
+      {/* Modal chỉnh sửa khách hàng */}
+{editingCustomer && (
+  <div
+    className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
+    onMouseDown={(event) => {
+      if (event.target === event.currentTarget && !saving) {
+        setEditingCustomer(null);
+      }
+    }}
+  >
+    <section
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="customer-edit-title"
+      className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+    >
+      {/* Header */}
+      <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
+        <div>
+          <h2
+            id="customer-edit-title"
+            className="text-lg font-bold text-slate-800"
+          >
+            Chỉnh sửa khách hàng
+          </h2>
+
+          <p className="mt-1 text-sm text-slate-500">
+            Cập nhật thông tin khách hàng trong hệ thống.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => setEditingCustomer(null)}
+          aria-label="Đóng modal chỉnh sửa"
+          className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+        >
+          <X size={20} />
+        </button>
+      </div>
+
+      {/* Form */}
+      <form onSubmit={handleUpdateCustomer}>
+        <div className="max-h-[65vh] space-y-5 overflow-y-auto p-6">
+          {/* Mã khách hàng */}
+          <div>
+            <label
+              htmlFor="customer_code"
+              className="mb-2 block text-sm font-semibold text-slate-700"
+            >
+              Mã khách hàng <span className="text-rose-500">*</span>
+            </label>
+
+            <input
+              id="customer_code"
+              type="text"
+              required
+              maxLength={50}
+              value={editForm.customer_code ?? ""}
+              onChange={(event) =>
+                setEditForm((prev) => ({
+                  ...prev,
+                  customer_code: event.target.value,
+                }))
+              }
+              className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              placeholder="Nhập mã khách hàng"
+            />
+          </div>
+
+          {/* Họ tên */}
+          <div>
+            <label
+              htmlFor="customer_full_name"
+              className="mb-2 block text-sm font-semibold text-slate-700"
+            >
+              Họ và tên <span className="text-rose-500">*</span>
+            </label>
+
+            <input
+              id="customer_full_name"
+              type="text"
+              required
+              maxLength={100}
+              value={editForm.customer_full_name ?? ""}
+              onChange={(event) =>
+                setEditForm((prev) => ({
+                  ...prev,
+                  customer_full_name: event.target.value,
+                }))
+              }
+              className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              placeholder="Nhập họ và tên"
+            />
+          </div>
+
+          {/* Ngày sinh */}
+          <div>
+            <label
+              htmlFor="customer_date_of_birth"
+              className="mb-2 block text-sm font-semibold text-slate-700"
+            >
+              Ngày sinh <span className="text-rose-500">*</span>
+            </label>
+
+            <input
+              id="customer_date_of_birth"
+              type="date"
+              required
+              max={new Date().toISOString().slice(0, 10)}
+              value={editForm.customer_date_of_birth ?? ""}
+              onChange={(event) =>
+                setEditForm((prev) => ({
+                  ...prev,
+                  customer_date_of_birth: event.target.value,
+                }))
+              }
+              className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            />
+          </div>
+
+          {/* Giới tính */}
+          <div>
+            <label
+              htmlFor="customer_gender"
+              className="mb-2 block text-sm font-semibold text-slate-700"
+            >
+              Giới tính <span className="text-rose-500">*</span>
+            </label>
+
+            <select
+              id="customer_gender"
+              required
+              value={editForm.customer_gender ?? ""}
+              onChange={(event) =>
+                setEditForm((prev) => ({
+                  ...prev,
+                  customer_gender: event.target.value,
+                }))
+              }
+              className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="MALE">Nam</option>
+              <option value="FEMALE">Nữ</option>
+              <option value="OTHER">Khác</option>
+            </select>
+          </div>
+
+          {/* Trạng thái */}
+          <div>
+            <label
+              htmlFor="customer_status"
+              className="mb-2 block text-sm font-semibold text-slate-700"
+            >
+              Trạng thái <span className="text-rose-500">*</span>
+            </label>
+
+            <select
+              id="customer_status"
+              required
+              value={editForm.customer_status ?? ""}
+              onChange={(event) =>
+                setEditForm((prev) => ({
+                  ...prev,
+                  customer_status: event.target.value as
+                    | "ACTIVE"
+                    | "INACTIVE"
+                    | "BLOCKED",
+                }))
+              }
+              className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            >
+              <option value="ACTIVE">Đang hoạt động</option>
+              <option value="INACTIVE">Không hoạt động</option>
+              <option value="BLOCKED">Đã khóa</option>
+            </select>
+          </div>
+
+          {editError && (
+            <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3">
+              <AlertCircle
+                size={18}
+                className="mt-0.5 shrink-0 text-rose-600"
+              />
+              <p className="text-sm text-rose-700">{editError}</p>
+            </div>
+          )}
+        </div>
+
+        
+
+        {/* Footer */}
+        <div className="flex flex-col-reverse gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4 sm:flex-row sm:justify-end">
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => setEditingCustomer(null)}
+            className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Hủy
+          </button>
+
+          <button
+            type="submit"
+            disabled={saving}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {saving ? (
+              <>
+                <LoaderCircle size={16} className="animate-spin" />
+                Đang lưu...
+              </>
+            ) : (
+              <>
+                <Save size={16} />
+                Lưu thay đổi
+              </>
+            )}
+          </button>
+        </div>
+      </form>
+    </section>
+  </div>
+)}
     </>
   );
 }
