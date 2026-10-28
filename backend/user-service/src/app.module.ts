@@ -22,6 +22,7 @@ import { UpdateUserStatusModule } from './admin_session/update_user_status/updat
 import { CreateEmloyeeModule } from './admin_session/create_employee/create_employee.module';
 import { UpdateUserModule } from './admin_session/update_user/update_user.module';
 import { EmployeeModule } from './admin_session/employee/employee.module';
+import { CheckPermissionModule } from './admin_session/check_permission/check_permission.module';
 
 // AI SESSION
 import { SearchUserModule } from './ai_session/search_user/search_user.module';
@@ -45,6 +46,8 @@ import { SearchUserModule } from './ai_session/search_user/search_user.module';
     LogoutAdminModule,
     RefreshAccessTokenModule,
     ForgotPasswordAdminModule,
+    CheckPermissionModule,
+
 
     /// 2. USER
     AdminProfileModule,
