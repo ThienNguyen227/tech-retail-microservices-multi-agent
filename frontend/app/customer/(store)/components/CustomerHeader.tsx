@@ -15,6 +15,7 @@ import {
   Laptop,
   Tablet,
   Home,
+  FileTextIcon,
 } from "lucide-react";
 import { clearAccessToken } from "@/lib/access_token/customer_access_token";
 import { customerUserService } from "@/lib/axios/services/customer-services/user_service";
@@ -244,6 +245,7 @@ export default function CustomerHeader() {
           <Link
             href="/customer/order"
             aria-label="Đơn hàng"
+            title="Đơn hàng của tôi"
             className="relative flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100 hover:text-[#168b87]"
           >
             <ClipboardList
@@ -262,6 +264,7 @@ export default function CustomerHeader() {
           <Link
             href="/customer/cart"
             aria-label="Giỏ hàng"
+            title="Giỏ hàng của tôi"
             className="relative flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100 hover:text-[#168b87]"
           >
             <ShoppingCart
@@ -274,6 +277,16 @@ export default function CustomerHeader() {
                 {cartCount > 99 ? "99+" : cartCount}
               </span>
             )}
+          </Link>
+
+          {/* Warranty */}
+          <Link
+            href="/customer/warranty"
+            aria-label="Bảo hành của tôi"
+            title="Bảo hành của tôi"
+            className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100 hover:text-[#168b87]"
+          >
+            <FileTextIcon size={21} strokeWidth={1.9} />
           </Link>
 
           {/* Divider */}
@@ -416,3 +429,4 @@ export default function CustomerHeader() {
     </header>
   );
 }
+
