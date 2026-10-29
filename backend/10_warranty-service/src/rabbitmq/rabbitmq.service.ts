@@ -6,7 +6,7 @@ import {
 
 import * as amqp from 'amqplib';
 
-import { CreateWarrantyService } from '../customer-session/create_warranty/create_warranty.service';
+import { CreateWarrantyService } from '../customer_session/create_warranty/create_warranty.service';
 
 @Injectable()
 export class RabbitMQService
