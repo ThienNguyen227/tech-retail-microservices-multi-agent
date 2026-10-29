@@ -18,7 +18,7 @@ import {
   FilterX,
   ChevronRight,
 } from "lucide-react";
-
+import { useRouter } from "next/navigation";
 import { customerCustomerService } from "@/lib/axios/services/customer-services/warranty_service";
 
 type WarrantyStatus = {
@@ -293,6 +293,16 @@ export default function WarrantyPage() {
 
   const hasFilters = Boolean(keyword.trim()) || filterStatus !== "ALL";
 
+  const router = useRouter();
+
+  useEffect(() => {
+    const userId = sessionStorage.getItem("userId");
+
+    if (!userId) {
+      router.replace("/customer/login");
+    }
+  }, [router]);
+
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-6 text-slate-800 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl space-y-6">
@@ -427,7 +437,11 @@ export default function WarrantyPage() {
                   <p className="text-sm font-semibold text-rose-800">
                     Không thể tải dữ liệu bảo hành
                   </p>
-                  <p className="mt-1 text-sm text-rose-700">{error}</p>
+                  <p className="mt-1 text-sm text-rose-700">
+                    {error === "Network Error"
+                      ? "Không thể kết nối đến máy chủ. Vui lòng thử lại sau."
+                      : error}
+                  </p>
                 </div>
               </div>
 
