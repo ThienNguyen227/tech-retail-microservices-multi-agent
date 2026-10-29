@@ -1,0 +1,122 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================
+// 1. WARRANTY (Phiếu bảo hành)
+// ============================================================
+
+model Warranty {
+  warranty_id              Int      @id @default(autoincrement())
+  warranty_code            String   @unique @db.VarChar(50)
+  user_id                  Int      // LR
+  customer_id              Int      // LR
+  order_id                 Int      // LR
+  order_item_id            Int      // LR
+  warranty_sku             String   @db.VarChar(100)
+  warranty_serial_number   String?  @unique @db.VarChar(150)
+  warranty_start_date      DateTime @db.Date
+  warranty_end_date        DateTime @db.Date
+  warranty_duration_months Int
+  warranty_created_at      DateTime @default(now())
+  warranty_updated_at      DateTime @updatedAt
+
+  warranty_status_id       Int
+
+  status                   WarrantyStatus @relation(fields: [warranty_status_id], references: [warranty_status_id], onDelete: Restrict, onUpdate: Cascade)
+  requests                 WarrantyRequest[]
+
+  @@map("warranties")
+}
+
+// ============================================================
+// 2. WARRANTY STATUS (Trạng thái phiếu bảo hành)
+// ============================================================
+// 1, ACTIVE, Đang còn hiệu lực
+// 2, EXPIRED, Hết hiệu lực
+// ============================================================
+
+model WarrantyStatus {
+  warranty_status_id         Int      @id @default(autoincrement())
+  warranty_status_code       String   @unique @db.VarChar(50)
+  warranty_status_name       String   @db.VarChar(100)
+
+  warranties Warranty[]
+
+  @@map("warranty_statuses")
+}
+
+// ============================================================
+// 3. WARRANTY REQUEST (Quản trị viên -> Tạo phiếu yêu cầu bảo hành)
+// ============================================================
+
+model WarrantyRequest {
+  warranty_request_id           Int      @id @default(autoincrement())
+  warranty_request_code         String   @unique @db.VarChar(50)
+  warranty_request_description  String   @db.Text
+  warranty_request_received_at  DateTime?
+  warranty_request_completed_at DateTime?
+  warranty_request_created_at   DateTime @default(now())
+  warranty_request_updated_at   DateTime @updatedAt
+
+  warranty_id                   Int
+  warranty_request_type_id      Int
+  warranty_request_status_id    Int
+
+  warranty Warranty @relation(fields: [warranty_id], references: [warranty_id], onDelete: Restrict, onUpdate: Cascade)
+
+  type WarrantyRequestType @relation(fields: [warranty_request_type_id], references: [warranty_request_type_id], onDelete: Restrict, onUpdate: Cascade)
+
+  status WarrantyRequestStatus @relation(fields: [warranty_request_status_id], references: [warranty_request_status_id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@map("warranty_requests")
+}
+
+// ============================================================
+// 4. WARRANTY REQUEST TYPE
+// ============================================================
+// 1, WARRANTY, Bảo hành sản phẩm
+// 2, REPAIR, Sửa chửa sản phẩm
+// ============================================================
+
+model WarrantyRequestType {
+  warranty_request_type_id         Int      @id @default(autoincrement())
+  warranty_request_type_code       String   @unique @db.VarChar(50)
+  warranty_request_type_name       String   @db.VarChar(100)
+
+  requests WarrantyRequest[]
+
+  @@map("warranty_request_types")
+}
+
+// ============================================================
+// 5. WARRANTY REQUEST STATUS (Trạng thái phiếu yêu cầu bảo hành)
+// ============================================================
+// 1, RECEIVED, Đã tiếp nhận yêu cầu bảo hành
+// 2, INSPECTING, Đang kiểm tra
+// 3, IN_REPAIR, Đang sửa chữa
+// 4, COMPLETED, Hoàn thành
+// 5, REJECTED, Từ chối yêu cầu bảo hành
+// ============================================================
+model WarrantyRequestStatus {
+  warranty_request_status_id         Int      @id @default(autoincrement())
+  warranty_request_status_code       String   @unique @db.VarChar(50)
+  warranty_request_status_name       String   @db.VarChar(100)
+
+  requests WarrantyRequest[]
+
+  @@map("warranty_request_statuses")
+}
+
+
+
+
+
+
+
+
