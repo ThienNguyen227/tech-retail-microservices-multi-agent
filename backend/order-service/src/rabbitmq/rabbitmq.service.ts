@@ -1,156 +1,3 @@
-// import {
-//   Injectable,
-//   OnModuleDestroy,
-//   OnModuleInit,
-// } from '@nestjs/common';
-
-// import * as amqp from 'amqplib';
-
-// import { UpdateOrderStatusService } from '../orders/update_order_status/update_order_status.service';
-
-// @Injectable()
-// export class RabbitMQService
-//   implements OnModuleInit, OnModuleDestroy
-// {
-//   private connection: amqp.ChannelModel;
-//   private channel: amqp.Channel;
-
-//   constructor(
-//     private readonly updateOrderStatusService: UpdateOrderStatusService,
-//   ) {}
-
-//   async onModuleInit() {
-//     try {
-//       // 1. Kết nối RabbitMQ
-//       this.connection = await amqp.connect(
-//         'amqp://admin:password@localhost:5672',
-//       );
-
-//       // 2. Tạo channel
-//       this.channel = await this.connection.createChannel();
-
-
-//       // Tạo Exchange (Order-Inventory)
-//       await this.channel.assertExchange(
-//         'order.events',
-//         'direct',
-//         {
-//           durable: true,
-//         },
-//       );
-
-//       // Tạo Queue (Payment-Order)
-//       await this.channel.assertQueue(
-//         'payment.order.queue',
-//         {
-//           durable: true,
-//         },
-//       );
-
-//       // Binding: payment.succeeded (Payment-Order)
-//       await this.channel.bindQueue(
-//         'payment.order.queue',
-//         'payment.events',
-//         'payment.succeeded',
-//       );
-
-//       // Binding: payment.failed (Payment-Order)
-//       await this.channel.bindQueue(
-//         'payment.order.queue',
-//         'payment.events',
-//         'payment.failed',
-//       );
-
-//       console.log('RabbitMQ connected');
-//       console.log('Queue "payment.order.queue" is ready');
-
-//       // 6. Bắt đầu Consumer
-//       await this.consume();
-//     } catch (error) {
-//       console.error('RabbitMQ setup failed:', error);
-//     }
-//   }
-
-//   async publish(routingKey: string, message: any) 
-//   {
-//     this.channel.publish('order.events', routingKey, Buffer.from(JSON.stringify(message)));
-
-//     console.log('Published:', {routingKey, message});
-//   }
-
-//   async consume() {
-//     await this.channel.consume(
-//       'payment.order.queue',
-//       async (message) => {
-//         if (!message) return;
-
-//         try {
-//           const routingKey = message.fields.routingKey;
-
-//           const data = JSON.parse(
-//             message.content.toString(),
-//           );
-
-//           console.log('Received event:', {
-//             routingKey,
-//             data,
-//           });
-
-//           // ======================================================
-//           // Payment thành công
-//           // ======================================================
-
-//           if (routingKey === 'payment.succeeded') {
-//             await this.updateOrderStatusService.markAsPaid(
-//               Number(data.orderId),
-//             );
-
-//             console.log(
-//               `Order ${data.orderId} đã được cập nhật thành PAID`,
-//             );
-//           }
-
-//           // ======================================================
-//           // Payment thất bại
-//           // ======================================================
-
-//           if (routingKey === 'payment.failed') {
-//             console.log(
-//               `Payment failed for order ${data.orderId}`,
-//             );
-
-//             // Sau này có thể xử lý Order khi payment failed
-//           }
-
-//           // Message xử lý thành công
-//           this.channel.ack(message);
-//         } catch (error) {
-//           console.error(
-//             'Error processing RabbitMQ message:',
-//             error,
-//           );
-
-//           // Không ack nếu xử lý thất bại
-//           // RabbitMQ có thể requeue message
-//           this.channel.nack(
-//             message,
-//             false,
-//             true,
-//           );
-//         }
-//       },
-//     );
-
-//     console.log('Consumer is listening...');
-//   }
-
-//   async onModuleDestroy() {
-//     await this.channel?.close();
-//     await this.connection?.close();
-//   }
-// }
-
-
 import {
   Injectable,
   OnModuleDestroy,
@@ -162,12 +9,8 @@ import * as amqp from 'amqplib';
 import { UpdateOrderStatusService } from '../orders/update_order_status/update_order_status.service';
 
 @Injectable()
-export class RabbitMQService
-  implements OnModuleInit, OnModuleDestroy
-{
-  constructor(
-    private readonly updateOrderStatusService: UpdateOrderStatusService,
-  ) {}
+export class RabbitMQService implements OnModuleInit, OnModuleDestroy{
+  constructor(private readonly updateOrderStatusService: UpdateOrderStatusService) {}
 
   // ======================================================
   // RABBITMQ
@@ -190,19 +33,16 @@ export class RabbitMQService
   // CONFIG
   // ======================================================
 
-  private readonly rabbitmqUrl =
-    'amqp://admin:password@localhost:5672';
+  private readonly rabbitmqUrl = 'amqp://admin:password@localhost:5672';
 
   // Order -> Inventory
-  private readonly orderExchange =
-    'order.events';
+  // Order -> Warranty
+  private readonly orderExchange = 'order.events';
 
   // Payment -> Order
-  private readonly paymentExchange =
-    'payment.events';
+  private readonly paymentExchange = 'payment.events';
 
-  private readonly paymentQueue =
-    'payment.order.queue';
+  private readonly paymentQueue = 'payment.order.queue';
 
   private readonly reconnectDelay = 5000;
 
@@ -236,24 +76,17 @@ export class RabbitMQService
     this.reconnecting = true;
 
     try {
-      console.log(
-        'Connecting RabbitMQ...',
-      );
+      console.log('Connecting RabbitMQ...');
 
       // ======================================================
       // CONNECT
       // ======================================================
 
-      const connection =
-        await amqp.connect(
-          this.rabbitmqUrl,
-        );
+      const connection = await amqp.connect(this.rabbitmqUrl);
 
       this.connection = connection;
 
-      console.log(
-        'RabbitMQ connected',
-      );
+      console.log('RabbitMQ connected');
 
       // ======================================================
       // CONNECTION ERROR
@@ -295,14 +128,11 @@ export class RabbitMQService
       // CREATE CHANNEL
       // ======================================================
 
-      const channel =
-        await connection.createChannel();
+      const channel = await connection.createChannel();
 
       this.channel = channel;
 
-      console.log(
-        'RabbitMQ channel created',
-      );
+      console.log('RabbitMQ channel created');
 
       // ======================================================
       // ORDER EXCHANGE
@@ -316,9 +146,7 @@ export class RabbitMQService
         },
       );
 
-      console.log(
-        `Exchange "${this.orderExchange}" ready`,
-      );
+      console.log(`Exchange "${this.orderExchange}" ready`);
 
       // ======================================================
       // PAYMENT EXCHANGE
@@ -446,14 +274,9 @@ export class RabbitMQService
   // PUBLISH
   // ======================================================
 
-  async publish(
-    routingKey: string,
-    message: any,
-  ) {
+  async publish(routingKey: string, message: any) {
     if (!this.channel) {
-      throw new Error(
-        'RabbitMQ channel is not available',
-      );
+      throw new Error('RabbitMQ channel is not available!');
     }
 
     this.channel.publish(
