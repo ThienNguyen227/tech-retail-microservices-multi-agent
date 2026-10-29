@@ -15,10 +15,12 @@ model Warranty {
   warranty_id              Int      @id @default(autoincrement())
   warranty_code            String   @unique @db.VarChar(50)
   user_id                  Int      // LR
-  customer_id              Int      // LR
   order_id                 Int      // LR
+  order_code               String   @db.VarChar(100) // LR
   order_item_id            Int      // LR
-  warranty_sku             String   @db.VarChar(100)
+  warranty_product_name    String?   @db.VarChar(255)
+  warranty_product_image   String?  @db.VarChar(255)
+  warranty_sku             String   @db.VarChar(255)
   warranty_serial_number   String?  @unique @db.VarChar(150)
   warranty_start_date      DateTime @db.Date
   warranty_end_date        DateTime @db.Date
@@ -113,7 +115,14 @@ model WarrantyRequestStatus {
   @@map("warranty_request_statuses")
 }
 
+model ProcessedEvent {
+  processed_event_id         Int      @id @default(autoincrement())
+  processed_event_event_id   Int      @unique
+  processed_event_event_type String
+  processed_event_created_at DateTime @default(now())
 
+  @@map("processed_event")
+}
 
 
 

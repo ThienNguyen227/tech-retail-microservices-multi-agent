@@ -11,7 +11,11 @@ export class OutboxWorker {
 
   @Cron('*/15 * * * * *')
   async processOutbox() {
-    await this.outboxService.processPendingEvents();
+    await this.outboxService.checkEligibleOrders();
+
+    await this.outboxService.processPendingEventsFromOrderToInventory();
+
+    await this.outboxService.processPendingEventsFromOrderToWarranty();
   }
 }
 
