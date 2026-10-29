@@ -81,6 +81,7 @@ async def search_customer(
         customer_code=customer_code,
     )
 
+
 # GET CUSTOMER ADDRESSES
 @tool
 async def get_customer_addresses(

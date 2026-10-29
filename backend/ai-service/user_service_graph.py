@@ -45,16 +45,16 @@ summarizer_llm = ChatGoogleGenerativeAI(
     max_retries=1,
 )
 
-# # Model xử lý câu hỏi và gọi tool
+# Model xử lý câu hỏi và gọi tool
 # llm = ChatOllama(
-#     model="deepseek-r1:7b",
+#     model="deepseek-r1:1.5b",
 #     max_tokens=1024,
 #     temperature=0,
 # )
 
 # # Model tóm tắt lịch sử hội thoại
 # summarizer_llm = ChatOllama(
-#     model="deepseek-r1:7b",
+#     model="deepseek-r1:1.5b",
 #     max_tokens=500,
 #     temperature=0,
 # )

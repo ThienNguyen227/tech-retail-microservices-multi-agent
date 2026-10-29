@@ -5,6 +5,7 @@ from services.user_service import (
 )
 
 
+# SEARCH USER
 @tool
 async def search_user(
     phone: str | None = None,

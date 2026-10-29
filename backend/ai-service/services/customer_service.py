@@ -1,4 +1,3 @@
-
 import os
 
 import httpx
@@ -42,7 +41,7 @@ async def search_customer(
             "Customer Service chưa được cấu hình địa chỉ kết nối."
         )
 
-    url = f"{CUSTOMER_SERVICE_URL}/api/v1/customer"
+    url = f"{CUSTOMER_SERVICE_URL}/api/v1/ai/customer-service/search"
 
     params = {
         "userId": user_id,
@@ -83,6 +82,14 @@ async def search_customer(
                 "Customer Service trả về dữ liệu không hợp lệ."
             )
 
+        if isinstance(data, list) and not data:
+            return {
+                "success": True,
+                "found": False,
+                "data": [],
+                "message": "Không tìm thấy khách hàng phù hợp.",
+            }
+
         return {
             "success": True,
             "found": True,
@@ -115,14 +122,16 @@ async def get_customer_addresses(
     customer_code = customer_code.strip() if customer_code else None
 
     if not user_id and not customer_code:
-        return _error_response("Cần cung cấp user_id hoặc customer_code.")
+        return _error_response(
+            "Cần cung cấp user_id hoặc customer_code."
+        )
 
     if not CUSTOMER_SERVICE_URL:
         return _error_response(
             "Customer Service chưa được cấu hình địa chỉ kết nối."
         )
 
-    url = f"{CUSTOMER_SERVICE_URL}/api/v1/customer/address"
+    url = f"{CUSTOMER_SERVICE_URL}/api/v1/ai/customer-service/addresses"
 
     params = {
         "userId": user_id,
@@ -143,7 +152,8 @@ async def get_customer_addresses(
                 "success": True,
                 "found": False,
                 "data": None,
-                "message": "Không tìm thấy khách hàng hoặc địa chỉ.",
+                "message": "Customer Service trả về HTTP 404.",
+                "status_code": 404,
             }
 
         response.raise_for_status()
@@ -151,16 +161,15 @@ async def get_customer_addresses(
         try:
             data = response.json()
         except ValueError:
-            return {
-                "success": False,
-                "found": False,
-                "data": None,
-                "message": "Customer Service trả về dữ liệu không hợp lệ.",
-            }
+            return _error_response(
+                "Customer Service trả về dữ liệu không hợp lệ.",
+                response.status_code,
+            )
 
         if not isinstance(data, list):
             return _error_response(
-                "Customer Service trả về danh sách địa chỉ không hợp lệ."
+                "Customer Service trả về danh sách địa chỉ không hợp lệ.",
+                response.status_code,
             )
 
         return {
@@ -170,12 +179,14 @@ async def get_customer_addresses(
             "message": (
                 "Lấy danh sách địa chỉ thành công."
                 if data
-                else "Khách hàng chưa có địa chỉ đã đăng ký."
+                else "API trả về danh sách địa chỉ rỗng."
             ),
         }
 
     except httpx.TimeoutException:
-        return _error_response("Customer Service phản hồi quá thời gian.")
+        return _error_response(
+            "Customer Service phản hồi quá thời gian."
+        )
 
     except httpx.HTTPStatusError as e:
         return _error_response(
@@ -183,5 +194,7 @@ async def get_customer_addresses(
             e.response.status_code,
         )
 
-    except httpx.RequestError:
-        return _error_response("Không thể kết nối đến Customer Service.")
+    except httpx.RequestError as e:
+        return _error_response(
+            "Không thể kết nối đến Customer Service."
+        )
