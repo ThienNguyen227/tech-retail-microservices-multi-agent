@@ -16,7 +16,7 @@ import {
   CircleX,
   Loader2,
 } from "lucide-react";
-
+import { useRouter } from "next/navigation";
 // ============================================================
 // Types
 // ============================================================
@@ -243,6 +243,16 @@ export default function OrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  const router = useRouter();
+
+  useEffect(() => {
+    const userId = sessionStorage.getItem("userId");
+
+    if (!userId) {
+      router.replace("/customer/login");
+    }
+  }, [router]);
 
   // ============================================================
   // Fetch Orders
