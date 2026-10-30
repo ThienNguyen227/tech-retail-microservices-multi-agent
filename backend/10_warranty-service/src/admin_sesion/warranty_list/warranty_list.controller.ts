@@ -1,11 +1,11 @@
-import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, Req, UseGuards, Headers, UnauthorizedException } from '@nestjs/common';
 import type { JwtPayload } from 'jsonwebtoken';
 import { IsIn, IsOptional, IsString } from 'class-validator';
 
 import { WarrantyListService } from './warranty_list.service';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 
-class GetWarranty {
+class GetWarrantyList {
   @IsOptional()
   @IsString({ message: 'Từ khóa tìm kiếm phải là chuỗi ký tự.' })
   search?: string;
@@ -18,18 +18,30 @@ class GetWarranty {
   status?: string;
 }
 
-@Controller('api/v1/admin-session/warranty-service')
-export class GetWarrantyController {
-  constructor(private readonly warrantyListService: WarrantyListService) {}
 
+@Controller('api/v1/admin-session/warranty-service')
+export class WarrantyListController {
+  constructor(
+    private readonly warrantyListService: WarrantyListService,
+  ) {}
+
+  // 1. (GET) WARRANTY-LIST
   @UseGuards(JwtAuthGuard)
   @Get('warranty-list')
   getWarrantyList(
-    @Req() req: { user: JwtPayload },
-    @Query() query: GetWarranty,
+    @Headers('authorization') authorization: string,
+    @Query() query: GetWarrantyList,
   ) {
-    const userId = req.user.sub as string;
+    const accessToken = authorization?.replace(/^Bearer\s+/i, '');
 
-    return this.warrantyListService.getWarrantyList(userId, query.search, query.status);
+    if (!accessToken) {
+      throw new UnauthorizedException('Thiếu access token.');
+    }
+
+    return this.warrantyListService.getWarrantyList(
+      accessToken,
+      query.search,
+      query.status,
+    );
   }
 }
