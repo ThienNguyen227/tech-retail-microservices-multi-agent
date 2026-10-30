@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -17,14 +18,51 @@ import {
   ShoppingBag,
   FilterX,
   ChevronRight,
+  ClipboardList,
+  Wrench,
+  FileText,
+  CalendarCheck,
+  Hourglass,
+  LoaderCircle,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { customerCustomerService } from "@/lib/axios/services/customer-services/warranty_service";
+
+// ============================================================
+// 1. TYPES
+// ============================================================
 
 type WarrantyStatus = {
   warranty_status_id: number;
   warranty_status_code: string;
   warranty_status_name: string;
+};
+
+type WarrantyRequestType = {
+  warranty_request_type_id: number;
+  warranty_request_type_code: string;
+  warranty_request_type_name: string;
+};
+
+type WarrantyRequestStatus = {
+  warranty_request_status_id: number;
+  warranty_request_status_code: string;
+  warranty_request_status_name: string;
+};
+
+type WarrantyRequest = {
+  warranty_request_id: number;
+  warranty_request_code: string;
+  warranty_request_description: string;
+  warranty_request_received_at: string | null;
+  warranty_request_completed_at: string | null;
+  warranty_request_created_at: string;
+  warranty_request_updated_at: string;
+  warranty_id: number;
+  warranty_request_type_id: number;
+  warranty_request_status_id: number;
+  type: WarrantyRequestType;
+  status: WarrantyRequestStatus;
 };
 
 type Warranty = {
@@ -45,6 +83,7 @@ type Warranty = {
   warranty_updated_at: string;
   warranty_status_id: number;
   status: WarrantyStatus;
+  requests: WarrantyRequest[];
 };
 
 type WarrantyResponse = {
@@ -57,7 +96,19 @@ type WarrantyResponse = {
 type FilterStatus = "ALL" | "ACTIVE" | "EXPIRED";
 type EffectiveStatus = "ACTIVE" | "EXPIRED" | "OTHER";
 
-const formatDate = (value: string) => {
+type RequestStatusCode =
+  | "RECEIVED"
+  | "INSPECTING"
+  | "IN_REPAIR"
+  | "COMPLETED"
+  | "REJECTED"
+  | "OTHER";
+
+// ============================================================
+// 2. FORMAT HELPERS
+// ============================================================
+
+const formatDate = (value: string | null | undefined) => {
   if (!value) return "—";
 
   const date = new Date(value);
@@ -68,6 +119,22 @@ const formatDate = (value: string) => {
     day: "2-digit",
     month: "2-digit",
     year: "numeric",
+  });
+};
+
+const formatDateTime = (value: string | null | undefined) => {
+  if (!value) return "—";
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) return "—";
+
+  return date.toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 };
 
@@ -111,6 +178,10 @@ function getProductImage(image: string | null) {
   return `/product/${image}`;
 }
 
+// ============================================================
+// 3. WARRANTY STATUS BADGE
+// ============================================================
+
 function StatusBadge({ warranty }: { warranty: Warranty }) {
   const status = getEffectiveStatus(warranty);
 
@@ -144,6 +215,117 @@ function StatusBadge({ warranty }: { warranty: Warranty }) {
     </span>
   );
 }
+
+// ============================================================
+// 4. WARRANTY REQUEST STATUS
+// ============================================================
+
+function getRequestStatusCode(
+  request: WarrantyRequest,
+): RequestStatusCode {
+  const code = request.status?.warranty_request_status_code?.toUpperCase();
+
+  switch (code) {
+    case "RECEIVED":
+    case "INSPECTING":
+    case "IN_REPAIR":
+    case "COMPLETED":
+    case "REJECTED":
+      return code;
+    default:
+      return "OTHER";
+  }
+}
+
+function RequestStatusBadge({
+  request,
+}: {
+  request: WarrantyRequest;
+}) {
+  const status = getRequestStatusCode(request);
+
+  const config: Record<
+    RequestStatusCode,
+    { label: string; className: string; icon: typeof Clock }
+  > = {
+    RECEIVED: {
+      label: "Đã tiếp nhận",
+      className: "bg-blue-50 text-blue-700 ring-blue-200",
+      icon: ClipboardList,
+    },
+    INSPECTING: {
+      label: "Đang kiểm tra",
+      className: "bg-amber-50 text-amber-700 ring-amber-200",
+      icon: Search,
+    },
+    IN_REPAIR: {
+      label: "Đang sửa chữa",
+      className: "bg-violet-50 text-violet-700 ring-violet-200",
+      icon: Wrench,
+    },
+    COMPLETED: {
+      label: "Hoàn thành",
+      className: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+      icon: CheckCircle2,
+    },
+    REJECTED: {
+      label: "Từ chối",
+      className: "bg-rose-50 text-rose-700 ring-rose-200",
+      icon: XCircle,
+    },
+    OTHER: {
+      label:
+        request.status?.warranty_request_status_name ||
+        "Chưa xác định",
+      className: "bg-slate-100 text-slate-600 ring-slate-200",
+      icon: AlertCircle,
+    },
+  };
+
+  const item = config[status];
+  const Icon = item.icon;
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${item.className}`}
+    >
+      <Icon size={13} />
+      {item.label}
+    </span>
+  );
+}
+
+// ============================================================
+// 5. WARRANTY REQUEST TYPE BADGE
+// ============================================================
+
+function RequestTypeBadge({
+  request,
+}: {
+  request: WarrantyRequest;
+}) {
+  const code = request.type?.warranty_request_type_code?.toUpperCase();
+
+  const isRepair = code === "REPAIR";
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${
+        isRepair
+          ? "bg-violet-50 text-violet-700"
+          : "bg-teal-50 text-teal-700"
+      }`}
+    >
+      {isRepair ? <Wrench size={13} /> : <ShieldCheck size={13} />}
+      {request.type?.warranty_request_type_name ||
+        (isRepair ? "Sửa chữa sản phẩm" : "Bảo hành sản phẩm")}
+    </span>
+  );
+}
+
+// ============================================================
+// 6. COMMON COMPONENTS
+// ============================================================
 
 function StatCard({
   title,
@@ -200,7 +382,157 @@ function DetailItem({
   );
 }
 
+// ============================================================
+// 7. WARRANTY REQUEST HISTORY
+// ============================================================
+
+function WarrantyRequestHistory({
+  requests,
+}: {
+  requests: WarrantyRequest[];
+}) {
+  const sortedRequests = useMemo(() => {
+    return [...(requests ?? [])].sort((a, b) => {
+      return (
+        new Date(b.warranty_request_created_at).getTime() -
+        new Date(a.warranty_request_created_at).getTime()
+      );
+    });
+  }, [requests]);
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white">
+      <div className="flex flex-col justify-between gap-2 border-b border-slate-100 p-4 sm:flex-row sm:items-center">
+        <div>
+          <div className="flex items-center gap-2">
+            <ClipboardList size={18} className="text-teal-600" />
+            <h3 className="text-sm font-bold text-slate-900">
+              Lịch sử yêu cầu bảo hành
+            </h3>
+          </div>
+
+          <p className="mt-1 text-xs text-slate-500">
+            Theo dõi quá trình bảo hành và sửa chữa sản phẩm
+          </p>
+        </div>
+
+        <span className="inline-flex w-fit items-center rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-700">
+          {sortedRequests.length} yêu cầu
+        </span>
+      </div>
+
+      {sortedRequests.length === 0 ? (
+        <div className="flex flex-col items-center justify-center px-5 py-10 text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+            <FileText size={25} />
+          </div>
+
+          <p className="mt-3 text-sm font-semibold text-slate-700">
+            Chưa có yêu cầu bảo hành
+          </p>
+
+          <p className="mt-1 max-w-sm text-xs leading-5 text-slate-500">
+            Sản phẩm này chưa phát sinh yêu cầu bảo hành hoặc sửa chữa nào.
+          </p>
+        </div>
+      ) : (
+        <div className="divide-y divide-slate-100">
+          {sortedRequests.map((request, index) => (
+            <article
+              key={request.warranty_request_id}
+              className="p-4 transition hover:bg-slate-50/70"
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
+                  <span className="text-sm font-bold">{index + 1}</span>
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
+                    <div className="min-w-0">
+                      <p className="break-all text-sm font-bold text-slate-800">
+                        {request.warranty_request_code}
+                      </p>
+
+                      <p className="mt-1 text-xs text-slate-500">
+                        ID yêu cầu: {request.warranty_request_id}
+                      </p>
+                    </div>
+
+                    <RequestStatusBadge request={request} />
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <RequestTypeBadge request={request} />
+                  </div>
+
+                  <div className="mt-3 rounded-xl bg-slate-50 p-3">
+                    <p className="text-xs font-semibold text-slate-500">
+                      Mô tả tình trạng sản phẩm
+                    </p>
+
+                    <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">
+                      {request.warranty_request_description || "Không có mô tả"}
+                    </p>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <div className="flex items-start gap-2 text-xs">
+                      <CalendarDays
+                        size={15}
+                        className="mt-0.5 shrink-0 text-slate-400"
+                      />
+
+                      <div>
+                        <p className="text-slate-500">Ngày tiếp nhận</p>
+                        <p className="mt-0.5 font-semibold text-slate-700">
+                          {formatDateTime(
+                            request.warranty_request_received_at,
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-2 text-xs">
+                      <CalendarCheck
+                        size={15}
+                        className="mt-0.5 shrink-0 text-slate-400"
+                      />
+
+                      <div>
+                        <p className="text-slate-500">Ngày hoàn thành</p>
+                        <p className="mt-0.5 font-semibold text-slate-700">
+                          {formatDateTime(
+                            request.warranty_request_completed_at,
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 border-t border-slate-100 pt-2">
+                    <p className="text-xs text-slate-400">
+                      Ngày tạo yêu cầu:{" "}
+                      {formatDateTime(request.warranty_request_created_at)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+// ============================================================
+// 8. MAIN PAGE
+// ============================================================
+
 export default function WarrantyPage() {
+  const router = useRouter();
+
   const [warranties, setWarranties] = useState<Warranty[]>([]);
   const [total, setTotal] = useState(0);
 
@@ -215,7 +547,22 @@ export default function WarrantyPage() {
   const [selectedWarranty, setSelectedWarranty] =
     useState<Warranty | null>(null);
 
-  // Debounce từ khóa tìm kiếm.
+  // ==========================================================
+  // 8.1. AUTHENTICATION
+  // ==========================================================
+
+  useEffect(() => {
+    const userId = sessionStorage.getItem("userId");
+
+    if (!userId) {
+      router.replace("/customer/login");
+    }
+  }, [router]);
+
+  // ==========================================================
+  // 8.2. DEBOUNCE SEARCH
+  // ==========================================================
+
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       setDebouncedKeyword(keyword.trim());
@@ -223,6 +570,10 @@ export default function WarrantyPage() {
 
     return () => clearTimeout(timeoutId);
   }, [keyword]);
+
+  // ==========================================================
+  // 8.3. FETCH WARRANTIES
+  // ==========================================================
 
   const fetchWarranties = useCallback(
     async (isRefresh = false) => {
@@ -246,11 +597,23 @@ export default function WarrantyPage() {
         }
 
         setWarranties(response.data);
+
         setTotal(
           typeof response.total === "number"
             ? response.total
             : response.data.length,
         );
+
+        // Cập nhật dữ liệu modal nếu đang mở.
+        setSelectedWarranty((current) => {
+          if (!current) return null;
+
+          const updatedWarranty = response.data.find(
+            (item) => item.warranty_id === current.warranty_id,
+          );
+
+          return updatedWarranty ?? null;
+        });
       } catch (err: unknown) {
         const axiosError = err as {
           response?: { data?: { message?: string } };
@@ -274,16 +637,25 @@ export default function WarrantyPage() {
     void fetchWarranties();
   }, [fetchWarranties]);
 
+  // ==========================================================
+  // 8.4. STATISTICS
+  // ==========================================================
+
   const stats = useMemo(() => {
     return {
       active: warranties.filter(
         (item) => getEffectiveStatus(item) === "ACTIVE",
       ).length,
+
       expired: warranties.filter(
         (item) => getEffectiveStatus(item) === "EXPIRED",
       ).length,
     };
   }, [warranties]);
+
+  // ==========================================================
+  // 8.5. FILTER HELPERS
+  // ==========================================================
 
   const clearFilters = () => {
     setKeyword("");
@@ -291,22 +663,17 @@ export default function WarrantyPage() {
     setFilterStatus("ALL");
   };
 
-  const hasFilters = Boolean(keyword.trim()) || filterStatus !== "ALL";
+  const hasFilters =
+    Boolean(keyword.trim()) || filterStatus !== "ALL";
 
-  const router = useRouter();
-
-  useEffect(() => {
-    const userId = sessionStorage.getItem("userId");
-
-    if (!userId) {
-      router.replace("/customer/login");
-    }
-  }, [router]);
+  // ==========================================================
+  // 9. RENDER
+  // ==========================================================
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-6 text-slate-800 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl space-y-6">
-        {/* Page heading */}
+        {/* PAGE HEADING */}
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div>
             <div className="mb-2 flex items-center gap-2 text-sm font-medium text-teal-700">
@@ -339,7 +706,7 @@ export default function WarrantyPage() {
           </button>
         </div>
 
-        {/* Statistics: no pending card */}
+        {/* STATISTICS */}
         <section className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <StatCard
             title="Tổng bảo hành"
@@ -366,7 +733,7 @@ export default function WarrantyPage() {
           />
         </section>
 
-        {/* Warranty list */}
+        {/* WARRANTY LIST */}
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="border-b border-slate-200 p-5 sm:p-6">
             <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
@@ -425,6 +792,7 @@ export default function WarrantyPage() {
             </div>
           </div>
 
+          {/* ERROR */}
           {error && (
             <div className="m-5 flex flex-col gap-3 rounded-xl border border-rose-200 bg-rose-50 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-start gap-3">
@@ -437,6 +805,7 @@ export default function WarrantyPage() {
                   <p className="text-sm font-semibold text-rose-800">
                     Không thể tải dữ liệu bảo hành
                   </p>
+
                   <p className="mt-1 text-sm text-rose-700">
                     {error === "Network Error"
                       ? "Không thể kết nối đến máy chủ. Vui lòng thử lại sau."
@@ -455,14 +824,20 @@ export default function WarrantyPage() {
             </div>
           )}
 
+          {/* LOADING */}
           {loading ? (
             <div className="flex min-h-72 flex-col items-center justify-center gap-3 p-8">
-              <div className="h-10 w-10 animate-spin rounded-full border-4 border-teal-100 border-t-teal-600" />
+              <LoaderCircle
+                size={38}
+                className="animate-spin text-teal-600"
+              />
+
               <p className="text-sm text-slate-500">
                 Đang tải danh sách bảo hành...
               </p>
             </div>
           ) : !error && warranties.length === 0 ? (
+            /* EMPTY STATE */
             <div className="flex min-h-72 flex-col items-center justify-center px-6 py-12 text-center">
               <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-teal-50 text-teal-600">
                 {hasFilters ? <Search size={28} /> : <ShieldCheck size={30} />}
@@ -493,7 +868,7 @@ export default function WarrantyPage() {
             </div>
           ) : !error ? (
             <>
-              {/* Desktop table */}
+              {/* DESKTOP TABLE */}
               <div className="hidden overflow-x-auto md:block">
                 <table className="w-full min-w-[900px] border-collapse text-left">
                   <thead>
@@ -517,12 +892,20 @@ export default function WarrantyPage() {
                             <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
                               {warranty.warranty_product_image ? (
                                 <img
-                                  src={getProductImage(warranty.warranty_product_image)}
-                                  alt={warranty.warranty_product_name || "Sản phẩm"}
+                                  src={getProductImage(
+                                    warranty.warranty_product_image,
+                                  )}
+                                  alt={
+                                    warranty.warranty_product_name ||
+                                    "Sản phẩm"
+                                  }
                                   className="h-full w-full object-contain"
                                 />
                               ) : (
-                                <Package size={23} className="text-slate-400" />
+                                <Package
+                                  size={23}
+                                  className="text-slate-400"
+                                />
                               )}
                             </div>
 
@@ -547,6 +930,7 @@ export default function WarrantyPage() {
                           <p className="text-sm font-semibold text-teal-700">
                             {warranty.warranty_code}
                           </p>
+
                           <p className="mt-1 text-xs text-slate-500">
                             ID: {warranty.warranty_id}
                           </p>
@@ -556,9 +940,11 @@ export default function WarrantyPage() {
                           <p className="text-sm font-medium text-slate-700">
                             {formatDate(warranty.warranty_start_date)}
                           </p>
+
                           <p className="mt-1 text-xs text-slate-500">
                             đến {formatDate(warranty.warranty_end_date)}
                           </p>
+
                           <p className="mt-1 text-xs text-slate-400">
                             {warranty.warranty_duration_months} tháng
                           </p>
@@ -585,7 +971,7 @@ export default function WarrantyPage() {
                 </table>
               </div>
 
-              {/* Mobile cards */}
+              {/* MOBILE CARDS */}
               <div className="space-y-3 p-4 md:hidden">
                 {warranties.map((warranty) => (
                   <article
@@ -596,12 +982,19 @@ export default function WarrantyPage() {
                       <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
                         {warranty.warranty_product_image ? (
                           <img
-                            src={getProductImage(warranty.warranty_product_image)}
-                            alt={warranty.warranty_product_name || "Sản phẩm"}
+                            src={getProductImage(
+                              warranty.warranty_product_image,
+                            )}
+                            alt={
+                              warranty.warranty_product_name || "Sản phẩm"
+                            }
                             className="h-full w-full object-contain"
                           />
                         ) : (
-                          <Package size={25} className="text-slate-400" />
+                          <Package
+                            size={25}
+                            className="text-slate-400"
+                          />
                         )}
                       </div>
 
@@ -651,6 +1044,7 @@ export default function WarrantyPage() {
             </>
           ) : null}
 
+          {/* FOOTER */}
           {!loading && !error && warranties.length > 0 && (
             <div className="flex flex-col gap-2 border-t border-slate-100 bg-slate-50/70 px-5 py-4 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
               <span>
@@ -664,7 +1058,10 @@ export default function WarrantyPage() {
         </section>
       </div>
 
-      {/* Warranty detail modal */}
+      {/* ======================================================
+          WARRANTY DETAIL MODAL
+      ====================================================== */}
+
       {selectedWarranty && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/50 p-4 backdrop-blur-sm"
@@ -678,8 +1075,9 @@ export default function WarrantyPage() {
             role="dialog"
             aria-modal="true"
             aria-labelledby="warranty-modal-title"
-            className="my-auto max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl"
+            className="my-auto max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white shadow-2xl"
           >
+            {/* MODAL HEADER */}
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4 sm:px-6">
               <div>
                 <h2
@@ -704,13 +1102,19 @@ export default function WarrantyPage() {
               </button>
             </div>
 
+            {/* MODAL BODY */}
             <div className="space-y-5 p-5 sm:p-6">
+              {/* PRODUCT SUMMARY */}
               <div className="flex flex-col gap-4 rounded-2xl border border-teal-100 bg-teal-50/60 p-4 sm:flex-row sm:items-center">
                 <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white">
                   {selectedWarranty.warranty_product_image ? (
                     <img
-                      src={getProductImage(selectedWarranty.warranty_product_image)}
-                      alt={selectedWarranty.warranty_product_name || "Sản phẩm"}
+                      src={getProductImage(
+                        selectedWarranty.warranty_product_image,
+                      )}
+                      alt={
+                        selectedWarranty.warranty_product_name || "Sản phẩm"
+                      }
                       className="h-full w-full object-contain"
                     />
                   ) : (
@@ -734,8 +1138,10 @@ export default function WarrantyPage() {
                 </div>
               </div>
 
-              <div>
-                <h3 className="mb-3 text-sm font-bold text-slate-800">
+              {/* WARRANTY INFORMATION */}
+              <section>
+                <h3 className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-800">
+                  <ShieldCheck size={17} className="text-teal-600" />
                   Thông tin bảo hành
                 </h3>
 
@@ -755,13 +1161,17 @@ export default function WarrantyPage() {
                   <DetailItem
                     icon={<CalendarDays size={17} />}
                     label="Ngày bắt đầu"
-                    value={formatDate(selectedWarranty.warranty_start_date)}
+                    value={formatDate(
+                      selectedWarranty.warranty_start_date,
+                    )}
                   />
 
                   <DetailItem
                     icon={<CalendarDays size={17} />}
                     label="Ngày kết thúc"
-                    value={formatDate(selectedWarranty.warranty_end_date)}
+                    value={formatDate(
+                      selectedWarranty.warranty_end_date,
+                    )}
                   />
 
                   <DetailItem
@@ -791,16 +1201,19 @@ export default function WarrantyPage() {
                     }
                   />
                 </div>
-              </div>
+              </section>
 
-              <div className="rounded-xl border border-slate-200 p-4">
-                <h3 className="text-sm font-bold text-slate-800">
+              {/* SYSTEM INFORMATION */}
+              <section className="rounded-xl border border-slate-200 p-4">
+                <h3 className="flex items-center gap-2 text-sm font-bold text-slate-800">
+                  <Clock size={17} className="text-teal-600" />
                   Thông tin hệ thống
                 </h3>
 
                 <div className="mt-3 space-y-3 text-sm">
                   <div className="flex items-start justify-between gap-4">
                     <span className="text-slate-500">Trạng thái gốc</span>
+
                     <span className="text-right font-medium text-slate-700">
                       {getStatusLabel(selectedWarranty)}
                     </span>
@@ -808,8 +1221,11 @@ export default function WarrantyPage() {
 
                   <div className="flex items-start justify-between gap-4">
                     <span className="text-slate-500">Ngày tạo</span>
+
                     <span className="text-right font-medium text-slate-700">
-                      {formatDate(selectedWarranty.warranty_created_at)}
+                      {formatDate(
+                        selectedWarranty.warranty_created_at,
+                      )}
                     </span>
                   </div>
 
@@ -817,14 +1233,23 @@ export default function WarrantyPage() {
                     <span className="text-slate-500">
                       Cập nhật lần cuối
                     </span>
+
                     <span className="text-right font-medium text-slate-700">
-                      {formatDate(selectedWarranty.warranty_updated_at)}
+                      {formatDate(
+                        selectedWarranty.warranty_updated_at,
+                      )}
                     </span>
                   </div>
                 </div>
-              </div>
+              </section>
+
+              {/* WARRANTY REQUEST HISTORY */}
+              <WarrantyRequestHistory
+                requests={selectedWarranty.requests ?? []}
+              />
             </div>
 
+            {/* MODAL FOOTER */}
             <div className="flex justify-end border-t border-slate-200 bg-slate-50 px-5 py-4 sm:px-6">
               <button
                 type="button"

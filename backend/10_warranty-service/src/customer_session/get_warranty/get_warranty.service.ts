@@ -1,3 +1,4 @@
+
 import {
   Injectable,
   InternalServerErrorException,
@@ -66,6 +67,9 @@ export class GetWarrantyService {
         },
 
         select: {
+          // ==================================================
+          // 1. WARRANTY INFORMATION
+          // ==================================================
           warranty_id: true,
           warranty_code: true,
 
@@ -88,11 +92,62 @@ export class GetWarrantyService {
 
           warranty_status_id: true,
 
+          // ==================================================
+          // 2. WARRANTY STATUS
+          // ==================================================
           status: {
             select: {
               warranty_status_id: true,
               warranty_status_code: true,
               warranty_status_name: true,
+            },
+          },
+
+          // ==================================================
+          // 3. WARRANTY REQUEST HISTORY
+          // ==================================================
+          requests: {
+            select: {
+              warranty_request_id: true,
+              warranty_request_code: true,
+              warranty_request_description: true,
+
+              warranty_request_received_at: true,
+              warranty_request_completed_at: true,
+
+              warranty_request_created_at: true,
+              warranty_request_updated_at: true,
+
+              warranty_id: true,
+
+              warranty_request_type_id: true,
+              warranty_request_status_id: true,
+
+              // ----------------------------------------------
+              // 3.1. REQUEST TYPE
+              // ----------------------------------------------
+              type: {
+                select: {
+                  warranty_request_type_id: true,
+                  warranty_request_type_code: true,
+                  warranty_request_type_name: true,
+                },
+              },
+
+              // ----------------------------------------------
+              // 3.2. REQUEST STATUS
+              // ----------------------------------------------
+              status: {
+                select: {
+                  warranty_request_status_id: true,
+                  warranty_request_status_code: true,
+                  warranty_request_status_name: true,
+                },
+              },
+            },
+
+            orderBy: {
+              warranty_request_created_at: 'desc',
             },
           },
         },
