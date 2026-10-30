@@ -18,7 +18,7 @@ model Warranty {
   order_id                 Int      // LR
   order_code               String   @db.VarChar(100) // LR
   order_item_id            Int      // LR
-  warranty_product_name    String?   @db.VarChar(255)
+  warranty_product_name    String?  @db.VarChar(255)
   warranty_product_image   String?  @db.VarChar(255)
   warranty_sku             String   @db.VarChar(255)
   warranty_serial_number   String?  @unique @db.VarChar(150)

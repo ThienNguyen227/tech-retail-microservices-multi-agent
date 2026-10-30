@@ -16,6 +16,7 @@ import {
   ContactRound,
   UserCog,
   UserRound,
+  FileText,
 } from "lucide-react";
 
 const menuItems = [
@@ -55,6 +56,11 @@ const menuItems = [
     title: "Quản lý thông tin khách hàng",
     href: "/admin/manage-customer",
     icon: UserRound,
+  },
+  {
+    title: "Quản lý bảo hành",
+    href: "/admin/manage-warranty",
+    icon: FileText,
   },
 ];
 
