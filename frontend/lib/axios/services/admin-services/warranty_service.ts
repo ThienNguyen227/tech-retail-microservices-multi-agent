@@ -23,4 +23,18 @@ export const adminWarrantyService = {
 
     return response.data;
   },
+
+  // 2. (POST) WARRANTY-REQUEST
+  async createWarrantyRequest(payload: {
+    warranty_request_description: string;
+    warranty_id: number;
+    warranty_request_type_id: number;
+  }) {
+    const response = await adminAxios.post(
+      `${WARRANTY_SERVICE_URL}/warranty-request`,
+      payload,
+    );
+
+    return response.data;
+  },
 };

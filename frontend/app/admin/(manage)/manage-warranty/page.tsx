@@ -26,6 +26,7 @@ import {
   FileText,
   UserRound,
   ImageIcon,
+  CirclePlus
 } from "lucide-react";
 import axios from "axios";
 import { adminWarrantyService } from "@/lib/axios/services/admin-services/warranty_service";
@@ -289,8 +290,7 @@ export default function ManageWarrantyPage() {
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
 
-  const [selectedWarranty, setSelectedWarranty] =
-    useState<Warranty | null>(null);
+  const [selectedWarranty, setSelectedWarranty] = useState<Warranty | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(true);
@@ -299,6 +299,116 @@ export default function ManageWarrantyPage() {
   const [statsError, setStatsError] = useState("");
 
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // ======================================================
+  // CREATE WARRANTY REQUEST MODAL
+  // ======================================================
+  const [showCreateRequestModal, setShowCreateRequestModal] = useState(false);
+
+  const [requestType, setRequestType] = useState<"WARRANTY" | "REPAIR">("WARRANTY");
+
+  const [requestDescription, setRequestDescription] = useState("");
+
+  const [requestFormError, setRequestFormError] = useState("");
+
+  const [successMessage, setSuccessMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  function handleOpenCreateRequest() {
+    if (selectedWarranty?.status?.warranty_status_code !== "ACTIVE") return;
+
+    setRequestType("WARRANTY");
+    setRequestDescription("");
+    setRequestFormError("");
+    setShowCreateRequestModal(true);
+  }
+
+  function handleCloseCreateRequest() {
+    setShowCreateRequestModal(false);
+    setRequestFormError("");
+  }
+
+  useEffect(() => {
+    if (!successMessage) return;
+
+    const timer = setTimeout(() => {
+      setSuccessMessage("");
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, [successMessage]);
+
+  async function handleCreateRequestSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    setRequestFormError("");
+    setSuccessMessage("");
+
+    if (!selectedWarranty) {
+      setRequestFormError("Không tìm thấy thông tin phiếu bảo hành!");
+      return;
+    }
+
+    if (!requestDescription.trim()) {
+      setRequestFormError("Vui lòng nhập mô tả tình trạng sản phẩm!");
+      return;
+    }
+
+    const payload = {
+      warranty_request_description: requestDescription.trim(),
+      warranty_id: selectedWarranty.warranty_id,
+      warranty_request_type_id: requestType === "WARRANTY" ? 1 : 2,
+    };
+
+    try {
+      setIsSubmitting(true);
+
+      // Gọi API tạo yêu cầu
+      const response =
+        await adminWarrantyService.createWarrantyRequest(payload);
+
+      // Lấy yêu cầu vừa được tạo từ response backend
+      const createdRequest = response?.data as WarrantyRequest;
+
+      // Cập nhật lịch sử yêu cầu ngay trên Modal chi tiết
+      if (createdRequest) {
+        setSelectedWarranty((current) => {
+          if (!current) return current;
+
+          return {
+            ...current,
+            requests: [
+              createdRequest,
+              ...(current.requests ?? []),
+            ],
+          };
+        });
+      }
+
+      // Đóng Modal tạo yêu cầu
+      handleCloseCreateRequest();
+
+      // Thông báo thành công
+      setSuccessMessage(
+        response?.message || "Tạo yêu cầu bảo hành thành công!"
+      );
+
+      // Tải lại danh sách và thống kê
+      setRefreshKey((prev) => prev + 1);
+
+    } catch (error: unknown) {
+      console.error("Create warranty request error:", error);
+
+      setRequestFormError(
+        extractErrorMessage(
+          error,
+          "Không thể tạo yêu cầu. Vui lòng thử lại."
+        )
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   // ======================================================
   // LOAD STATISTICS
@@ -467,6 +577,32 @@ export default function ManageWarrantyPage() {
 
   return (
     <>
+      {/* SUCCESS TOAST */}
+{successMessage && (
+  <div className="fixed right-5 top-5 z-[100] flex w-[calc(100%-40px)] max-w-md items-start gap-3 rounded-xl border border-emerald-200 bg-white p-4 shadow-xl">
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+      <CheckCircle2 size={22} />
+    </div>
+
+    <div className="min-w-0 flex-1">
+      <p className="font-semibold text-emerald-700">
+        Thành công
+      </p>
+
+      <p className="mt-1 text-sm text-slate-600">
+        {successMessage}
+      </p>
+    </div>
+
+    <button
+      type="button"
+      onClick={() => setSuccessMessage("")}
+      className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+    >
+      <X size={18} />
+    </button>
+  </div>
+)}
       <div className="min-h-full space-y-6">
 
         {/* PAGE HEADER */}
@@ -1142,20 +1278,27 @@ export default function ManageWarrantyPage() {
               {/* WARRANTY REQUEST HISTORY */}
 
               <section>
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
-
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-2">
                   <h3 className="flex items-center gap-2 text-sm font-bold text-slate-700">
-                    <ClipboardList
-                      size={18}
-                      className="text-blue-600"
-                    />
+                    <ClipboardList size={18} className="text-blue-600" />
                     Lịch sử yêu cầu bảo hành / sửa chữa
                   </h3>
 
-                  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
-                    {selectedWarranty.requests?.length ?? 0} yêu cầu
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                      {selectedWarranty.requests?.length ?? 0} yêu cầu
+                    </span>
 
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateRequestModal(true)}
+                      className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-700"
+                    >
+                      <CirclePlus size={15} />
+                      Thêm yêu cầu
+                    </button>
+  
+                  </div>
                 </div>
 
                 {!selectedWarranty.requests ||
@@ -1163,7 +1306,7 @@ export default function ManageWarrantyPage() {
                   <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center">
 
                     <FileText
-                      size={28}
+                      size={20}
                       className="mx-auto text-slate-300"
                     />
 
@@ -1300,6 +1443,199 @@ export default function ManageWarrantyPage() {
               </button>
             </div>
 
+          </section>
+        </div>
+      )}
+
+      {/* ================================================== */}
+      {/* CREATE WARRANTY REQUEST MODAL */}
+      {/* ================================================== */}
+      {showCreateRequestModal && selectedWarranty && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              handleCloseCreateRequest();
+            }
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="create-warranty-request-title"
+            className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+          >
+            {/* HEADER */}
+            <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
+              <div>
+                <div className="mb-2 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                  <FileText size={20} />
+                </div>
+
+                <h2
+                  id="create-warranty-request-title"
+                  className="text-lg font-bold text-slate-800"
+                >
+                  Tạo yêu cầu bảo hành / sửa chữa
+                </h2>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Nhập thông tin yêu cầu cho sản phẩm đang được bảo hành.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCloseCreateRequest}
+                aria-label="Đóng cửa sổ"
+                className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateRequestSubmit}>
+              <div className="space-y-5 p-6">
+
+                {/* WARRANTY SUMMARY */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">
+                    Thông tin phiếu bảo hành
+                  </p>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                      <p className="text-xs text-slate-400">Mã bảo hành</p>
+                      <p className="mt-1 break-all text-sm font-semibold text-slate-800">
+                        {selectedWarranty.warranty_code}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-slate-400">Sản phẩm</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-800">
+                        {selectedWarranty.warranty_product_name || "Chưa cập nhật"}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-slate-400">SKU</p>
+                      <p className="mt-1 break-all text-sm font-medium text-slate-700">
+                        {selectedWarranty.warranty_sku}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-slate-400">Serial Number</p>
+                      <p className="mt-1 break-all text-sm font-medium text-slate-700">
+                        {selectedWarranty.warranty_serial_number || "—"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* REQUEST TYPE */}
+                <div>
+                  <label
+                    htmlFor="warranty-request-type"
+                    className="mb-2 block text-sm font-semibold text-slate-700"
+                  >
+                    Loại yêu cầu <span className="text-rose-500">*</span>
+                  </label>
+
+                  <select
+                    id="warranty-request-type"
+                    value={requestType}
+                    onChange={(event) =>
+                      setRequestType(event.target.value as "WARRANTY" | "REPAIR")
+                    }
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  >
+                    <option value="WARRANTY">
+                      Bảo hành sản phẩm
+                    </option>
+
+                    <option value="REPAIR">
+                      Sửa chữa sản phẩm
+                    </option>
+                  </select>
+                </div>
+
+                {/* REQUEST DESCRIPTION */}
+                <div>
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <label
+                      htmlFor="warranty-request-description"
+                      className="block text-sm font-semibold text-slate-700"
+                    >
+                      Mô tả tình trạng sản phẩm{" "}
+                      <span className="text-rose-500">*</span>
+                    </label>
+
+                    <span className="text-xs text-slate-400">
+                      {requestDescription.length}/500
+                    </span>
+                  </div>
+
+                  <textarea
+                    id="warranty-request-description"
+                    value={requestDescription}
+                    onChange={(event) => {
+                      setRequestDescription(event.target.value);
+
+                      if (requestFormError) {
+                        setRequestFormError("");
+                      }
+                    }}
+                    rows={2}
+                    maxLength={500}
+                    placeholder="Mô tả lỗi sản phẩm, tình trạng hiện tại hoặc vấn đề khách hàng phản ánh..."
+                    className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm leading-6 text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+
+                  <p className="mt-1.5 text-xs text-slate-400">
+                    Vui lòng mô tả rõ tình trạng để thuận tiện cho quá trình kiểm tra và xử lý.
+                  </p>
+                </div>
+
+                {/* ERROR MESSAGE */}
+                {requestFormError && (
+                  <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                    <AlertCircle size={18} className="mt-0.5 shrink-0" />
+                    <p>{requestFormError}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* FOOTER */}
+              <div className="flex flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={handleCloseCreateRequest}
+                  className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+                >
+                  Hủy
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <LoaderCircle size={16} className="animate-spin" />
+                      Đang tạo...
+                    </>
+                  ) : (
+                    <>
+                      <CirclePlus size={16} />
+                      Tạo yêu cầu
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </section>
         </div>
       )}
