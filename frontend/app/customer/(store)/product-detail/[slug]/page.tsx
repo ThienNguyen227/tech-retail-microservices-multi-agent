@@ -5,7 +5,7 @@ import TabletProductDetail from '../../components/TabletProductDetail';
 async function getProductDetail(slug: string) {
   try {
     const res = await fetch(
-      `http://localhost:3003/api/v1/products/product-detail?name=${encodeURIComponent(slug)}`,
+      `http://localhost:3003/api/v1/customer-session/product-service/product-detail?name=${encodeURIComponent(slug)}`,
       {
         cache: 'no-store',
       },

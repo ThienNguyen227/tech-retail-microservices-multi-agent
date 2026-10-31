@@ -4,9 +4,6 @@ import { promotionApi } from '@/lib/axios/promotion-api';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 
-// ============================
-// 1. Schema Laptop Variant
-// ============================
 export type LaptopVariant = {
   sku: string;
   slug: string;
@@ -18,10 +15,6 @@ export type LaptopVariant = {
   images: string[];
 };
 
-// ============================
-// 2. Schema Laptop
-// Không sử dụng ProductSpecifications
-// ============================
 export type Laptop = {
   _id: string;
   image: string;
@@ -49,31 +42,16 @@ type PromotionDiscount = {
 export default function LaptopProductCard({
   product,
 }: LaptopProductCardProps) {
-  // ============================
-  // 3. Lấy danh sách RAM
-  // ============================
-  const rams = useMemo(() => {
-    return [
-      ...new Set(
-        (product.variants ?? []).map((variant) => variant.ram),
-      ),
-    ];
-  }, [product.variants]);
+  const rams = useMemo(
+    () => [...new Set((product.variants ?? []).map((variant) => variant.ram))],
+    [product.variants],
+  );
 
-  // ============================
-  // 4. Lấy danh sách SSD
-  // ============================
-  const ssds = useMemo(() => {
-    return [
-      ...new Set(
-        (product.variants ?? []).map((variant) => variant.ssd),
-      ),
-    ];
-  }, [product.variants]);
+  const ssds = useMemo(
+    () => [...new Set((product.variants ?? []).map((variant) => variant.ssd))],
+    [product.variants],
+  );
 
-  // ============================
-  // 5. Lấy danh sách màu
-  // ============================
   const colors = useMemo(() => {
     const uniqueColors = new Map<string, LaptopVariant>();
 
@@ -86,9 +64,6 @@ export default function LaptopProductCard({
     return Array.from(uniqueColors.values());
   }, [product.variants]);
 
-  // ============================
-  // 6. State cấu hình đang chọn
-  // ============================
   const [selectedRam, setSelectedRam] = useState(
     product.variants?.[0]?.ram ?? product.ram ?? '',
   );
@@ -101,11 +76,10 @@ export default function LaptopProductCard({
     product.variants?.[0]?.colorSlug ?? '',
   );
 
-  // ============================
-  // 7. Tìm variant tương ứng
-  // ============================
-  const selectedVariant = useMemo(() => {
-    return (
+  const [promotion, setPromotion] = useState<PromotionDiscount | null>(null);
+
+  const selectedVariant = useMemo(
+    () =>
       product.variants?.find(
         (variant) =>
           variant.ram === selectedRam &&
@@ -114,69 +88,41 @@ export default function LaptopProductCard({
       ) ??
       product.variants?.find(
         (variant) =>
-          variant.ram === selectedRam &&
-          variant.ssd === selectedSsd,
+          variant.ram === selectedRam && variant.ssd === selectedSsd,
       ) ??
-      product.variants?.find(
-        (variant) => variant.ram === selectedRam,
-      ) ??
-      product.variants?.[0]
-    );
-  }, [
-    product.variants,
-    selectedRam,
-    selectedSsd,
-    selectedColorSlug,
-  ]);
+      product.variants?.find((variant) => variant.ram === selectedRam) ??
+      product.variants?.[0],
+    [product.variants, selectedRam, selectedSsd, selectedColorSlug],
+  );
 
-  // ============================
-  // 8. Thông tin variant hiện tại
-  // ============================
   const currentPrice = selectedVariant?.price ?? 0;
-
   const currentSlug = selectedVariant?.slug ?? product.slug;
-
-  const currentImage =
-    selectedVariant?.images?.[0] ?? product.image;
-
+  const currentImage = selectedVariant?.images?.[0] ?? product.image;
   const currentRam = selectedVariant?.ram ?? product.ram;
-
   const currentSsd = selectedVariant?.ssd ?? product.ssd;
-
   const currentColor = selectedVariant?.color ?? '';
 
-  // ============================
-  // 9. Format giá
-  // ============================
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('vi-VN', {
+  const formatPrice = (price: number) =>
+    new Intl.NumberFormat('vi-VN', {
       style: 'currency',
       currency: 'VND',
+      maximumFractionDigits: 0,
     }).format(price);
-  };
-
-  // ============================
-  // 10. Lấy khuyến mãi trực tiếp
-  // ============================
-  const [promotion, setPromotion] =
-    useState<PromotionDiscount | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+
     if (!selectedVariant?.sku) {
       setPromotion(null);
       return;
     }
-
-    let cancelled = false;
 
     const fetchPromotion = async () => {
       try {
         const response = await promotionApi.get(
           '/api/v1/promotion/direct-discount',
           {
-            params: {
-              sku: selectedVariant.sku,
-            },
+            params: { sku: selectedVariant.sku },
           },
         );
 
@@ -199,9 +145,7 @@ export default function LaptopProductCard({
     };
   }, [selectedVariant?.sku]);
 
-  const discountValue = Number(
-    promotion?.discountValue ?? 0,
-  );
+  const discountValue = Number(promotion?.discountValue ?? 0);
 
   const finalPrice =
     promotion?.discountType === 'PERCENTAGE'
@@ -210,142 +154,202 @@ export default function LaptopProductCard({
         ? Math.max(0, currentPrice - discountValue)
         : currentPrice;
 
-  // ============================
-  // 11. Giao diện sản phẩm
-  // ============================
+  const hasPromotion = Boolean(promotion);
+  const savedAmount = Math.max(0, currentPrice - finalPrice);
+
+  const discountLabel =
+    promotion?.discountType === 'PERCENTAGE'
+      ? `-${discountValue}%`
+      : `-${formatPrice(discountValue)}`;
+
   return (
-    <div className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition-all duration-300 hover:border-red-300 hover:shadow-lg">
-      <div>
-        {/* Ảnh sản phẩm */}
-        <Link
-          href={`/customer/product-detail/${currentSlug}`}
-          className="relative block aspect-square w-full overflow-hidden rounded-xl bg-gray-50"
-        >
-          <img
-            src={`/product/laptop/${currentImage}`}
-            alt={`${product.name} ${currentRam} ${currentSsd} ${currentColor}`}
-            className="h-full w-full object-contain p-2 transition-transform duration-300 group-hover:scale-105"
-            loading="lazy"
-          />
+    <article className="group flex h-full flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white transition duration-300 hover:-translate-y-1 hover:border-teal-200 hover:shadow-xl hover:shadow-slate-900/8">
+      {/* Product image */}
+      <Link
+        href={`/customer/product-detail/${currentSlug}`}
+        aria-label={`Xem chi tiết ${product.name}`}
+        className="relative m-3 block aspect-[4/3] shrink-0 overflow-hidden rounded-2xl bg-slate-50 sm:m-4"
+      >
+        <div className="absolute inset-0 bg-gradient-to-br from-teal-50/70 via-white to-cyan-50/50" />
+
+        <img
+          src={`/product/laptop/${currentImage}`}
+          alt={`${product.name} ${currentRam} ${currentSsd} ${currentColor}`}
+          loading="lazy"
+          className="relative h-full w-full object-contain p-2 transition-transform duration-500 group-hover:scale-105"
+        />
+
+        {hasPromotion && (
+          <span className="absolute left-3 top-3 rounded-full bg-rose-500 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm">
+            {discountLabel}
+          </span>
+        )}
+
+        <span className="absolute bottom-3 right-3 rounded-full border border-white/80 bg-white/90 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm backdrop-blur">
+          {currentColor || 'Laptop'}
+        </span>
+      </Link>
+
+      {/* Product information */}
+      <div className="flex flex-1 flex-col px-4 pb-4 sm:px-5 sm:pb-5">
+        <Link href={`/customer/product-detail/${currentSlug}`}>
+          <h3 className="line-clamp-2 min-h-11 text-[15px] font-semibold leading-5 text-slate-900 transition-colors group-hover:text-teal-700">
+            {product.name} {currentRam} {currentSsd}
+          </h3>
         </Link>
 
-        {/* Tên sản phẩm */}
-        <div className="mt-5">
-          <h3 className="line-clamp-2 text-xs font-bold text-gray-900 transition-colors group-hover:text-red-600">
-            {product.name}
-          </h3>
-        </div>
+        {/* RAM selector */}
+        <div className="mt-3 min-h-[58px]">
+          {rams.length > 0 && (
+            <>
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                RAM
+              </p>
 
-        {/* Chọn RAM */}
-{rams.length > 0 && (
-  <div className="mt-3 flex items-center gap-2">
-    <span className="w-9 shrink-0 text-xs font-semibold text-gray-700">
-      RAM :
-    </span>
+              <div className="flex flex-wrap gap-2">
+                {rams.map((ram) => {
+                  const isSelected = ram === selectedRam;
 
-    <div className="flex flex-wrap gap-1.5">
-      {rams.map((ram) => (
-        <button
-          key={ram}
-          type="button"
-          onClick={() => setSelectedRam(ram)}
-          className={`rounded-md border px-2 py-1 text-xs font-medium transition-all ${
-            ram === selectedRam
-              ? 'border-red-600 bg-red-50 text-red-600'
-              : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
-          }`}
-        >
-          {ram}
-        </button>
-      ))}
-    </div>
-  </div>
-)}
-
-
-        {/* Chọn SSD */}
-{ssds.length > 0 && (
-  <div className="mt-2 flex items-center gap-2">
-    <span className="w-9 shrink-0 text-xs font-semibold text-gray-700">
-      SSD :
-    </span>
-
-    <div className="flex flex-wrap gap-1.5">
-      {ssds.map((ssd) => (
-        <button
-          key={ssd}
-          type="button"
-          onClick={() => setSelectedSsd(ssd)}
-          className={`rounded-md border px-2 py-1 text-xs font-medium transition-all ${
-            ssd === selectedSsd
-              ? 'border-red-600 bg-red-50 text-red-600'
-              : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
-          }`}
-        >
-          {ssd}
-        </button>
-      ))}
-    </div>
-  </div>
-)}
-
-        {/* Chọn màu */}
-{colors.length > 0 && (
-  <div className="mt-2 flex items-center gap-2">
-    <span className="w-9 shrink-0 text-xs font-semibold text-gray-700">
-      Màu :
-    </span>
-
-    <div className="flex flex-wrap gap-1.5">
-      {colors.map((colorVariant) => (
-        <button
-          key={colorVariant.colorSlug}
-          type="button"
-          onClick={() =>
-            setSelectedColorSlug(colorVariant.colorSlug)
-          }
-          className={`rounded-md border px-2 py-1 text-xs font-medium transition-all ${
-            colorVariant.colorSlug === selectedColorSlug
-              ? 'border-red-600 bg-red-50 text-red-600'
-              : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
-          }`}
-        >
-          {colorVariant.color}
-        </button>
-      ))}
-    </div>
-  </div>
-)}
-
-        {/* Giá và khuyến mãi */}
-        <div className="mt-3">
-          {promotion ? (
-            <div className="flex flex-col">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500 line-through">
-                  {formatPrice(currentPrice)}
-                </span>
-
-                <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-bold text-red-600">
-                  {promotion.discountType === 'PERCENTAGE'
-                    ? `-${discountValue}%`
-                    : `-${formatPrice(discountValue)}`}
-                </span>
+                  return (
+                    <button
+                      key={ram}
+                      type="button"
+                      onClick={() => setSelectedRam(ram)}
+                      aria-pressed={isSelected}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+                        isSelected
+                          ? 'border-teal-600 bg-teal-600 text-white shadow-sm'
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-teal-300 hover:text-teal-700'
+                      }`}
+                    >
+                      {ram}
+                    </button>
+                  );
+                })}
               </div>
-
-              <span className="mt-0.5 text-xl font-extrabold text-red-600">
-                {formatPrice(finalPrice)}
-              </span>
-            </div>
-          ) : (
-            <span className="text-lg font-extrabold text-red-600">
-              {currentPrice > 0
-                ? formatPrice(currentPrice)
-                : 'Liên hệ'}
-            </span>
+            </>
           )}
         </div>
+
+        {/* SSD selector */}
+        <div className="mt-3 min-h-[58px]">
+          {ssds.length > 0 && (
+            <>
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                SSD
+              </p>
+
+              <div className="flex flex-wrap gap-2">
+                {ssds.map((ssd) => {
+                  const isSelected = ssd === selectedSsd;
+
+                  return (
+                    <button
+                      key={ssd}
+                      type="button"
+                      onClick={() => setSelectedSsd(ssd)}
+                      aria-pressed={isSelected}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
+                        isSelected
+                          ? 'border-teal-600 bg-teal-600 text-white shadow-sm'
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-teal-300 hover:text-teal-700'
+                      }`}
+                    >
+                      {ssd}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Color selector */}
+        <div className="mt-3 min-h-[58px]">
+          {colors.length > 0 && (
+            <>
+              <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                Màu sắc
+                <span className="ml-1.5 normal-case tracking-normal text-slate-600">
+                  {currentColor}
+                </span>
+              </p>
+
+              <div className="flex flex-wrap gap-2">
+                {colors.map((colorVariant) => {
+                  const isSelected =
+                    colorVariant.colorSlug === selectedColorSlug;
+
+                  return (
+                    <button
+                      key={colorVariant.colorSlug}
+                      type="button"
+                      onClick={() => setSelectedColorSlug(colorVariant.colorSlug)}
+                      aria-pressed={isSelected}
+                      className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
+                        isSelected
+                          ? 'border-teal-600 bg-teal-50 text-teal-800 ring-1 ring-teal-600'
+                          : 'border-slate-200 bg-white text-slate-600 hover:border-teal-300 hover:text-teal-700'
+                      }`}
+                    >
+                      {colorVariant.color}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Price */}
+        <div className="mt-4 border-t border-slate-100 pt-3">
+          {currentPrice > 0 ? (
+            <div className="flex min-h-[62px] flex-col justify-center">
+              <div className="flex flex-wrap items-baseline gap-x-2">
+                <p className="text-lg font-semibold leading-tight tracking-tight text-teal-700">
+                  {formatPrice(hasPromotion ? finalPrice : currentPrice)}
+                </p>
+
+                {hasPromotion && (
+                  <span className="rounded bg-rose-50 px-1.5 py-0.5 text-[10px] font-medium text-rose-600">
+                    {discountLabel}
+                  </span>
+                )}
+              </div>
+
+              {hasPromotion && (
+                <div className="mt-1 flex flex-wrap items-center gap-x-2">
+                  <span className="text-xs text-slate-400 line-through">
+                    {formatPrice(currentPrice)}
+                  </span>
+
+                  {savedAmount > 0 && (
+                    <span className="text-[10px] text-emerald-600">
+                      Tiết kiệm {formatPrice(savedAmount)}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex min-h-[62px] flex-col justify-center">
+              <p className="text-xs text-slate-400">Giá bán</p>
+              <p className="text-lg font-medium text-slate-600">Liên hệ</p>
+            </div>
+          )}
+        </div>
+
+        {/* Action */}
+        <Link
+          href={`/customer/product-detail/${currentSlug}`}
+          className="mt-auto inline-flex w-full items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-teal-800"
+        >
+          Xem chi tiết
+          <span className="transition-transform group-hover:translate-x-1">
+            →
+          </span>
+        </Link>
       </div>
-    </div>
+    </article>
   );
 }
