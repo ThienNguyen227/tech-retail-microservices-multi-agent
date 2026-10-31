@@ -1,12 +1,21 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   ChevronDown,
   Check,
   ShoppingCart,
-  Zap,
+  ShieldCheck,
+  Truck,
+  RotateCcw,
+  Sparkles,
+  Cpu,
+  Monitor,
+  MemoryStick,
+  Cable,
+  BatteryCharging,
+  Laptop,
 } from 'lucide-react';
 
 type LaptopVariant = {
@@ -16,6 +25,7 @@ type LaptopVariant = {
   ssd: string;
   color: string;
   colorSlug: string;
+  colorHex?: string;
   price: number;
   images: string[];
 };
@@ -31,18 +41,15 @@ type Laptop = {
   ram: string;
   ssd: string;
   variants: LaptopVariant[];
-
   processor?: {
     cpuTechnology?: string;
     cpuCores?: number;
     cpuThreads?: number;
     cpuSpeed?: string;
   };
-
   graphics?: {
     graphicsCard?: string;
   };
-
   memoryAndStorage?: {
     ram?: string;
     ramType?: string;
@@ -50,7 +57,6 @@ type Laptop = {
     maxRamCapacity?: string;
     storage?: string;
   };
-
   display?: {
     screenSize?: string;
     resolution?: string;
@@ -59,7 +65,6 @@ type Laptop = {
     colorCoverage?: string;
     screenTechnology?: string[];
   };
-
   connectivityAndExpansion?: {
     ports?: string[];
     wirelessConnectivity?: string[];
@@ -70,7 +75,6 @@ type Laptop = {
     audioTechnology?: string[];
     cooling?: string;
   };
-
   dimensionsAndBattery?: {
     battery?: string;
     operatingSystem?: string;
@@ -86,39 +90,75 @@ type LaptopProductDetailProps = {
   selectedSlug?: string;
 };
 
+type DetailSectionProps = {
+  title: string;
+  subtitle: string;
+  icon: ReactNode;
+  children: ReactNode;
+  defaultOpen?: boolean;
+};
+
+type ColorOption = {
+  color: string;
+  colorSlug: string;
+  colorHex?: string;
+};
+
 function DetailSection({
   title,
+  subtitle,
+  icon,
   children,
   defaultOpen = false,
-}: {
-  title: string;
-  children: React.ReactNode;
-  defaultOpen?: boolean;
-}) {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
+}: DetailSectionProps) {
+  const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+    <section
+      className={`group overflow-hidden rounded-2xl border bg-white transition-all duration-300 ${
+        open
+          ? 'border-teal-200 shadow-md shadow-teal-900/5'
+          : 'border-slate-200 shadow-sm hover:-translate-y-0.5 hover:border-teal-300 hover:shadow-lg'
+      }`}
+    >
       <button
         type="button"
-        onClick={() => setIsOpen((previous) => !previous)}
-        className="flex w-full items-center justify-between gap-3 px-4 py-4 text-left font-semibold text-gray-800 hover:bg-gray-50"
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        className="flex w-full items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-teal-50/70 sm:px-5"
       >
-        <span>{title}</span>
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-teal-100 text-teal-800 transition-colors group-hover:bg-teal-200">
+          {icon}
+        </span>
+
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-slate-800">
+            {title}
+          </span>
+          <span className="mt-0.5 block text-xs text-slate-500">
+            {subtitle}
+          </span>
+        </span>
 
         <ChevronDown
-          size={20}
-          className={`shrink-0 transition-transform ${
-            isOpen ? 'rotate-180' : ''
+          size={18}
+          className={`shrink-0 text-slate-400 transition-transform duration-300 ${
+            open ? 'rotate-180 text-teal-700' : ''
           }`}
         />
       </button>
 
-      {isOpen && (
-        <div className="border-t border-gray-100 px-4 py-3">
-          {children}
+      <div
+        className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${
+          open ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+        }`}
+      >
+        <div className="overflow-hidden">
+          <div className="border-t border-slate-100 bg-slate-50/60 px-4 py-2 sm:px-5">
+            {children}
+          </div>
         </div>
-      )}
+      </div>
     </section>
   );
 }
@@ -130,17 +170,17 @@ function InfoRow({
   label: string;
   value?: string | number | boolean | null;
 }) {
-  if (value === undefined || value === null || value === '') {
-    return null;
-  }
+  if (value === undefined || value === null || value === '') return null;
+
+  const displayValue =
+    typeof value === 'boolean' ? (value ? 'Có' : 'Không') : value;
 
   return (
-    <div className="grid grid-cols-1 gap-1 border-b border-gray-100 py-3 last:border-b-0 sm:grid-cols-[40%_60%]">
-      <div className="text-sm text-gray-500">{label}</div>
-
-      <div className="break-words text-sm font-medium text-gray-800">
-        {typeof value === 'boolean' ? (value ? 'Có' : 'Không') : value}
-      </div>
+    <div className="grid grid-cols-[minmax(110px,0.8fr)_minmax(0,1.2fr)] gap-4 border-b border-slate-100 py-3 last:border-0">
+      <span className="text-sm leading-6 text-slate-500">{label}</span>
+      <span className="break-words text-right text-sm font-medium leading-6 text-slate-800">
+        {displayValue}
+      </span>
     </div>
   );
 }
@@ -152,19 +192,17 @@ function InfoList({
   label: string;
   items?: string[];
 }) {
-  if (!items || items.length === 0) {
-    return null;
-  }
+  if (!items?.length) return null;
 
   return (
-    <div className="border-b border-gray-100 py-3 last:border-b-0">
-      <div className="mb-2 text-sm text-gray-500">{label}</div>
+    <div className="border-b border-slate-100 py-3 last:border-0">
+      <p className="mb-2 text-sm text-slate-500">{label}</p>
 
       <div className="flex flex-wrap gap-2">
         {items.map((item, index) => (
           <span
             key={`${item}-${index}`}
-            className="rounded-lg bg-gray-100 px-3 py-1.5 text-sm text-gray-700"
+            className="rounded-lg border border-teal-100 bg-teal-50 px-3 py-1.5 text-xs leading-5 text-teal-800 transition-colors hover:border-teal-200 hover:bg-teal-100"
           >
             {item}
           </span>
@@ -175,27 +213,11 @@ function InfoList({
 }
 
 function formatPrice(price: number) {
-  return `${new Intl.NumberFormat('vi-VN').format(price)}₫`;
-}
-
-function getColorClass(colorSlug: string) {
-  switch (colorSlug.toLowerCase()) {
-    case 'bac':
-      return 'bg-gray-300';
-    case 'den':
-      return 'bg-gray-900';
-    case 'xam':
-      return 'bg-gray-500';
-    case 'trang':
-      return 'bg-white';
-    case 'xanh':
-    case 'xanh-dam':
-      return 'bg-blue-700';
-    case 'vang':
-      return 'bg-yellow-400';
-    default:
-      return 'bg-orange-400';
-  }
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND',
+    maximumFractionDigits: 0,
+  }).format(price);
 }
 
 export default function LaptopProductDetail({
@@ -204,25 +226,19 @@ export default function LaptopProductDetail({
 }: LaptopProductDetailProps) {
   const router = useRouter();
 
-  const initialVariant = useMemo(
-    () =>
-      product.variants.find((variant) => variant.slug === selectedSlug) ??
-      product.variants[0],
-    [product.variants, selectedSlug],
-  );
+  const initialVariant =
+    product.variants.find((variant) => variant.slug === selectedSlug) ??
+    product.variants[0];
 
   const [selectedRam, setSelectedRam] = useState(
     initialVariant?.ram ?? product.ram,
   );
-
   const [selectedSsd, setSelectedSsd] = useState(
     initialVariant?.ssd ?? product.ssd,
   );
-
   const [selectedColorSlug, setSelectedColorSlug] = useState(
     initialVariant?.colorSlug ?? '',
   );
-
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
 
@@ -236,53 +252,46 @@ export default function LaptopProductDetail({
     [product.variants],
   );
 
-  const colorOptions = useMemo(() => {
-    const uniqueColors = new Map<
-      string,
-      { color: string; colorSlug: string }
-    >();
+  const colorOptions = useMemo<ColorOption[]>(() => {
+    const colors = new Map<string, ColorOption>();
 
     product.variants.forEach((variant) => {
-      if (!uniqueColors.has(variant.colorSlug)) {
-        uniqueColors.set(variant.colorSlug, {
+      if (!colors.has(variant.colorSlug)) {
+        colors.set(variant.colorSlug, {
           color: variant.color,
           colorSlug: variant.colorSlug,
+          colorHex: variant.colorHex,
         });
       }
     });
 
-    return [...uniqueColors.values()];
+    return [...colors.values()];
   }, [product.variants]);
 
-  const selectedVariant = useMemo(
-    () =>
-      product.variants.find(
-        (variant) =>
-          variant.ram === selectedRam &&
-          variant.ssd === selectedSsd &&
-          variant.colorSlug === selectedColorSlug,
-      ),
-    [product.variants, selectedRam, selectedSsd, selectedColorSlug],
-  );
+  const selectedVariant =
+    product.variants.find(
+      (variant) =>
+        variant.ram === selectedRam &&
+        variant.ssd === selectedSsd &&
+        variant.colorSlug === selectedColorSlug,
+    ) ?? initialVariant;
 
-  const currentImages =
-    selectedVariant?.images?.length
-      ? selectedVariant.images
-      : [product.image];
+  const currentImages = selectedVariant?.images?.length
+    ? selectedVariant.images
+    : [product.image];
 
   const currentImage =
     currentImages[selectedImageIndex] ?? currentImages[0] ?? product.image;
 
-  const changeVariant = (variant: LaptopVariant) => {
+  function changeVariant(variant: LaptopVariant) {
     setSelectedRam(variant.ram);
     setSelectedSsd(variant.ssd);
     setSelectedColorSlug(variant.colorSlug);
     setSelectedImageIndex(0);
-
     router.push(`/customer/product-detail/${variant.slug}`);
-  };
+  }
 
-  const handleRamChange = (ram: string) => {
+  function handleRamChange(ram: string) {
     const variant = product.variants.find(
       (item) =>
         item.ram === ram &&
@@ -290,12 +299,10 @@ export default function LaptopProductDetail({
         item.colorSlug === selectedColorSlug,
     );
 
-    if (variant) {
-      changeVariant(variant);
-    }
-  };
+    if (variant) changeVariant(variant);
+  }
 
-  const handleSsdChange = (ssd: string) => {
+  function handleSsdChange(ssd: string) {
     const variant = product.variants.find(
       (item) =>
         item.ram === selectedRam &&
@@ -303,12 +310,10 @@ export default function LaptopProductDetail({
         item.colorSlug === selectedColorSlug,
     );
 
-    if (variant) {
-      changeVariant(variant);
-    }
-  };
+    if (variant) changeVariant(variant);
+  }
 
-  const handleColorChange = (colorSlug: string) => {
+  function handleColorChange(colorSlug: string) {
     const variant = product.variants.find(
       (item) =>
         item.ram === selectedRam &&
@@ -316,12 +321,10 @@ export default function LaptopProductDetail({
         item.colorSlug === colorSlug,
     );
 
-    if (variant) {
-      changeVariant(variant);
-    }
-  };
+    if (variant) changeVariant(variant);
+  }
 
-  const handleAddToCart = async () => {
+  async function handleAddToCart() {
     if (!selectedVariant) {
       alert('Phiên bản sản phẩm này hiện không khả dụng.');
       return;
@@ -348,7 +351,6 @@ export default function LaptopProductDetail({
 
       const cartData = await cartResponse.json();
       const cart = cartData.cart ?? cartData;
-
       const existingItems = Array.isArray(cart.items) ? cart.items : [];
 
       const existingItem = existingItems.find(
@@ -368,16 +370,11 @@ export default function LaptopProductDetail({
         },
       };
 
-      const response = await fetch(
-        'http://localhost:3004/api/v1/carts/add',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload),
-        },
-      );
+      const response = await fetch('http://localhost:3004/api/v1/carts/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
 
       const result = await response.json().catch(() => ({}));
 
@@ -396,7 +393,6 @@ export default function LaptopProductDetail({
       window.dispatchEvent(new Event('cart-updated'));
     } catch (error) {
       console.error('Add to cart error:', error);
-
       alert(
         error instanceof Error
           ? error.message
@@ -405,21 +401,12 @@ export default function LaptopProductDetail({
     } finally {
       setIsAddingToCart(false);
     }
-  };
+  }
 
-  const handleBuyNow = async () => {
-    if (!selectedVariant) {
-      alert('Vui lòng chọn phiên bản sản phẩm hợp lệ.');
-      return;
-    }
-
-    await handleAddToCart();
-  };
-
-  if (!product.variants || product.variants.length === 0) {
+  if (!product.variants?.length) {
     return (
       <div className="mx-auto max-w-7xl px-4 py-12">
-        <p className="text-center text-gray-600">
+        <p className="text-center text-slate-500">
           Sản phẩm hiện chưa có phiên bản để hiển thị.
         </p>
       </div>
@@ -427,341 +414,338 @@ export default function LaptopProductDetail({
   }
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-      {/* Breadcrumb */}
-      <nav className="mb-5 text-sm text-gray-500">
-        <span>Trang chủ</span>
-        <span className="mx-2">/</span>
-        <span>Laptop</span>
-        <span className="mx-2">/</span>
-        <span className="text-gray-800">{product.name}</span>
-      </nav>
+    <main className="min-h-screen bg-slate-50">
+      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-slate-500">
+          <span className="transition-colors hover:text-teal-700">
+            Trang chủ
+          </span>
+          <span className="text-slate-300">/</span>
+          <span className="transition-colors hover:text-teal-700">Laptop</span>
+          <span className="text-slate-300">/</span>
+          <span className="font-medium text-slate-800">{product.name}</span>
+        </nav>
 
-      {/* Product title */}
-      <h1 className="mb-6 text-xl font-bold text-gray-900 sm:text-2xl">
-        {product.name}
-      </h1>
+        <h1 className="mb-6 text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+          {product.name}
+        </h1>
 
-      {/* Product overview */}
-      <div className="grid grid-cols-1 items-stretch gap-8 lg:grid-cols-12">
-        {/* Images */}
-        <div className="flex flex-col lg:col-span-5">
-          <div className="flex flex-1 items-center justify-center rounded-2xl border border-gray-100 bg-white p-4">
-            <img
-              src={`/product/laptop/${currentImage}`}
-              alt={product.name}
-              className="max-h-[400px] w-full object-contain"
-            />
+        <div className="mb-12 grid grid-cols-1 items-stretch gap-6 lg:grid-cols-12">
+          <div className="lg:col-span-5">
+            <div className="group h-full rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-teal-200 hover:shadow-xl sm:p-5">
+              <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-teal-50 via-white to-cyan-50">
+                <img
+                  src={`/product/laptop/${currentImage}`}
+                  alt={`${product.name} ${selectedVariant?.color ?? ''}`}
+                  className="h-full w-full object-contain p-6 transition-transform duration-500 ease-out group-hover:scale-105 sm:p-8"
+                />
+              </div>
+
+              {currentImages.length > 1 && (
+                <div className="mt-4 grid grid-cols-4 gap-3">
+                  {currentImages.map((image, index) => {
+                    const isSelected = index === selectedImageIndex;
+
+                    return (
+                      <button
+                        key={`${image}-${index}`}
+                        type="button"
+                        onClick={() => setSelectedImageIndex(index)}
+                        aria-label={`Xem ảnh ${index + 1}`}
+                        aria-pressed={isSelected}
+                        className={`aspect-square overflow-hidden rounded-xl border-2 bg-slate-50 transition-all duration-300 hover:-translate-y-1 hover:shadow-md ${
+                          isSelected
+                            ? 'border-teal-600 bg-teal-50 ring-2 ring-teal-600/15'
+                            : 'border-slate-200 hover:border-teal-300'
+                        }`}
+                      >
+                        <img
+                          src={`/product/laptop/${image}`}
+                          alt={`${product.name} ${index + 1}`}
+                          className="h-full w-full object-contain p-2 transition-transform duration-300 hover:scale-110"
+                        />
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Image thumbnails */}
-          {currentImages.length > 1 && (
-            <div className="mt-4 grid grid-cols-4 gap-3">
-              {currentImages.map((image, index) => (
-                <button
-                  key={image}
-                  type="button"
-                  onClick={() => setSelectedImageIndex(index)}
-                  className={`flex h-20 items-center justify-center rounded-xl border p-2 transition sm:h-24 ${
-                    selectedImageIndex === index
-                      ? 'border-[#168b87] ring-1 ring-[#168b87]'
-                      : 'border-gray-200 hover:border-gray-400'
-                  }`}
-                >
-                  <img
-                    src={`/product/laptop/${image}`}
-                    alt={`${product.name} - ảnh ${index + 1}`}
-                    className="h-full w-full object-contain"
-                  />
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+          <div className="lg:col-span-7">
+            <div className="h-full rounded-3xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-300 hover:border-teal-200 hover:shadow-xl sm:p-7">
+              <div className="border-b border-slate-100 pb-5">
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-700">
+                    Laptop
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
+                    <Sparkles size={13} />
+                    Sản phẩm nổi bật
+                  </span>
+                </div>
 
-        {/* Product information */}
-        <div className="flex flex-col lg:col-span-7">
-          <div className="flex-1 rounded-2xl border border-gray-200 bg-white p-5 sm:p-6">
-            {/* RAM */}
-            <div className="mb-5">
-              <p className="mb-3 text-sm font-semibold text-gray-800">
-                RAM:
-                <span className="ml-1 font-normal">{selectedRam}</span>
-              </p>
+                <h2 className="text-2xl font-bold tracking-tight text-slate-900">
+                  {product.name}
+                </h2>
 
-              <div className="flex flex-wrap gap-2">
-                {ramOptions.map((ram) => {
-                  const available = product.variants.some(
-                    (variant) =>
-                      variant.ram === ram &&
-                      variant.ssd === selectedSsd &&
-                      variant.colorSlug === selectedColorSlug,
-                  );
-
-                  const selected = selectedRam === ram;
-
-                  return (
-                    <button
-                      key={ram}
-                      type="button"
-                      disabled={!available}
-                      onClick={() => handleRamChange(ram)}
-                      className={`rounded-lg border px-4 py-2 text-sm transition ${
-                        selected
-                          ? 'border-[#168b87] bg-[#168b87]/5 font-semibold text-[#168b87]'
-                          : 'border-gray-300 text-gray-700 hover:border-[#168b87]'
-                      } ${
-                        !available
-                          ? 'cursor-not-allowed opacity-40'
-                          : ''
-                      }`}
-                    >
-                      {selected && (
-                        <Check size={14} className="mr-1 inline" />
-                      )}
-                      {ram}
-                    </button>
-                  );
-                })}
+                {selectedVariant && (
+                  <p className="mt-2 text-sm text-slate-500">
+                    {selectedVariant.ram} · {selectedVariant.ssd} ·{' '}
+                    {selectedVariant.color}
+                  </p>
+                )}
               </div>
-            </div>
 
-            {/* SSD */}
-            <div className="mb-5">
-              <p className="mb-3 text-sm font-semibold text-gray-800">
-                SSD:
-                <span className="ml-1 font-normal">{selectedSsd}</span>
-              </p>
-
-              <div className="flex flex-wrap gap-2">
-                {ssdOptions.map((ssd) => {
-                  const available = product.variants.some(
-                    (variant) =>
-                      variant.ram === selectedRam &&
-                      variant.ssd === ssd &&
-                      variant.colorSlug === selectedColorSlug,
-                  );
-
-                  const selected = selectedSsd === ssd;
-
-                  return (
-                    <button
-                      key={ssd}
-                      type="button"
-                      disabled={!available}
-                      onClick={() => handleSsdChange(ssd)}
-                      className={`rounded-lg border px-4 py-2 text-sm transition ${
-                        selected
-                          ? 'border-[#168b87] bg-[#168b87]/5 font-semibold text-[#168b87]'
-                          : 'border-gray-300 text-gray-700 hover:border-[#168b87]'
-                      } ${
-                        !available
-                          ? 'cursor-not-allowed opacity-40'
-                          : ''
-                      }`}
-                    >
-                      {selected && (
-                        <Check size={14} className="mr-1 inline" />
-                      )}
-                      {ssd}
-                    </button>
-                  );
-                })}
+              <div className="my-5 rounded-2xl bg-gradient-to-r from-teal-50 to-cyan-50 p-4 sm:p-5">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                  Giá bán
+                </p>
+                <p className="mt-2 text-3xl font-bold tracking-tight text-teal-800">
+                  {selectedVariant
+                    ? formatPrice(selectedVariant.price)
+                    : 'Liên hệ'}
+                </p>
               </div>
-            </div>
 
-            {/* Color */}
-            <div className="mb-5">
-              <p className="mb-3 text-sm font-semibold text-gray-800">
-                Màu sắc:
-                <span className="ml-1 font-normal">
+              <div className="grid grid-cols-1 gap-4 border-b border-slate-100 py-5 sm:grid-cols-2">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold text-slate-800">RAM</h3>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Đang chọn: {selectedRam}
+                  </p>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {ramOptions.map((ram) => {
+                      const isSelected = ram === selectedRam;
+                      const available = product.variants.some(
+                        (variant) =>
+                          variant.ram === ram &&
+                          variant.ssd === selectedSsd &&
+                          variant.colorSlug === selectedColorSlug,
+                      );
+
+                      return (
+                        <button
+                          key={ram}
+                          type="button"
+                          disabled={!available}
+                          onClick={() => handleRamChange(ram)}
+                          aria-pressed={isSelected}
+                          className={`relative rounded-xl border px-3 py-2 text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 ${
+                            isSelected
+                              ? 'border-teal-600 bg-teal-50 text-teal-800 shadow-sm'
+                              : available
+                                ? 'border-slate-200 bg-white text-slate-700 hover:border-teal-300 hover:bg-teal-50/50'
+                                : 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
+                          }`}
+                        >
+                          {ram}
+                          {isSelected && (
+                            <span className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-teal-600 text-white shadow-sm">
+                              <Check size={12} />
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="min-w-0">
+                  <h3 className="text-sm font-semibold text-slate-800">
+                    Ổ cứng SSD
+                  </h3>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Đang chọn: {selectedSsd}
+                  </p>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {ssdOptions.map((ssd) => {
+                      const isSelected = ssd === selectedSsd;
+                      const available = product.variants.some(
+                        (variant) =>
+                          variant.ram === selectedRam &&
+                          variant.ssd === ssd &&
+                          variant.colorSlug === selectedColorSlug,
+                      );
+
+                      return (
+                        <button
+                          key={ssd}
+                          type="button"
+                          disabled={!available}
+                          onClick={() => handleSsdChange(ssd)}
+                          aria-pressed={isSelected}
+                          className={`relative rounded-xl border px-3 py-2 text-sm font-semibold transition-all duration-200 hover:-translate-y-0.5 ${
+                            isSelected
+                              ? 'border-teal-600 bg-teal-50 text-teal-800 shadow-sm'
+                              : available
+                                ? 'border-slate-200 bg-white text-slate-700 hover:border-teal-300 hover:bg-teal-50/50'
+                                : 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
+                          }`}
+                        >
+                          {ssd}
+                          {isSelected && (
+                            <span className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-teal-600 text-white shadow-sm">
+                              <Check size={12} />
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Màu sắc: bỏ vòng tròn màu, chỉ hiển thị tên màu */}
+              <div className="border-b border-slate-100 py-5">
+                <h3 className="text-sm font-semibold text-slate-800">
+                  Màu sắc
+                </h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Đang chọn:{' '}
                   {colorOptions.find(
                     (color) => color.colorSlug === selectedColorSlug,
                   )?.color ?? 'Chưa chọn'}
-                </span>
-              </p>
+                </p>
 
-              <div className="flex flex-wrap gap-3">
-                {colorOptions.map(({ color, colorSlug }) => {
-                  const available = product.variants.some(
-                    (variant) =>
-                      variant.ram === selectedRam &&
-                      variant.ssd === selectedSsd &&
-                      variant.colorSlug === colorSlug,
-                  );
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {colorOptions.map(({ color, colorSlug }) => {
+                    const isSelected = colorSlug === selectedColorSlug;
+                    const available = product.variants.some(
+                      (variant) =>
+                        variant.ram === selectedRam &&
+                        variant.ssd === selectedSsd &&
+                        variant.colorSlug === colorSlug,
+                    );
 
-                  const selected = selectedColorSlug === colorSlug;
-
-                  return (
-                    <button
-                      key={colorSlug}
-                      type="button"
-                      disabled={!available}
-                      onClick={() => handleColorChange(colorSlug)}
-                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
-                        selected
-                          ? 'border-[#168b87] bg-[#168b87]/5 text-[#168b87]'
-                          : 'border-gray-300 text-gray-700 hover:border-[#168b87]'
-                      } ${
-                        !available
-                          ? 'cursor-not-allowed opacity-40'
-                          : ''
-                      }`}
-                    >
-                      <span
-                        className={`h-5 w-5 rounded-full border border-gray-300 ${getColorClass(
-                          colorSlug,
-                        )}`}
-                      />
-                      {color}
-                      {selected && <Check size={15} />}
-                    </button>
-                  );
-                })}
+                    return (
+                      <button
+                        key={colorSlug}
+                        type="button"
+                        disabled={!available}
+                        onClick={() => handleColorChange(colorSlug)}
+                        aria-pressed={isSelected}
+                        className={`flex items-center gap-2 rounded-xl border px-4 py-2.5 transition-all duration-200 hover:-translate-y-0.5 ${
+                          isSelected
+                            ? 'border-teal-600 bg-teal-50 text-teal-800 shadow-sm'
+                            : available
+                              ? 'border-slate-200 bg-white text-slate-700 hover:border-teal-300 hover:bg-teal-50/50'
+                              : 'cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300'
+                        }`}
+                      >
+                        <span className="text-sm font-medium">{color}</span>
+                        {isSelected && (
+                          <Check size={15} className="text-teal-700" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
 
-            <div className="mb-4">
-              <p className="text-sm text-gray-500">Giá bán</p>
+              {selectedVariant && (
+                <div className="mt-4 flex items-center justify-between rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3">
+                  <span className="text-xs text-slate-400">Mã sản phẩm</span>
+                  <span className="text-xs font-semibold text-slate-700">
+                    {selectedVariant.sku}
+                  </span>
+                </div>
+              )}
 
-              <div className="mt-1 text-xl font-bold text-[#d70018] sm:text-xl">
-                {selectedVariant
-                  ? formatPrice(selectedVariant.price)
-                  : 'Phiên bản không khả dụng'}
+              <div className="mt-5">
+                <button
+                  type="button"
+                  onClick={handleAddToCart}
+                  disabled={!selectedVariant || isAddingToCart}
+                  className="flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-teal-700 text-sm font-semibold text-teal-800 transition-all duration-300 hover:-translate-y-0.5 hover:bg-teal-50 hover:shadow-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <ShoppingCart size={19} />
+                  {isAddingToCart ? 'Đang thêm...' : 'Thêm vào giỏ'}
+                </button>
               </div>
-            </div>
 
-            {/* SKU */}
-            <div className="mb-5 border-t border-gray-100 pt-4 text-sm">
-              <span className="text-gray-500">SKU: </span>
-              <span className="font-medium text-gray-800">
-                {selectedVariant?.sku ?? 'Không khả dụng'}
-              </span>
-            </div>
-
-            {/* Actions */}
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <button
-                type="button"
-                disabled={!selectedVariant || isAddingToCart}
-                onClick={handleAddToCart}
-                className="flex items-center justify-center gap-2 rounded-xl bg-[#168b87] px-5 py-3 font-semibold text-white transition hover:bg-[#11736f] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <ShoppingCart size={19} />
-                {isAddingToCart ? 'Đang xử lý...' : 'Thêm vào giỏ hàng'}
-              </button>
-
-              <button
-                type="button"
-                disabled={!selectedVariant || isAddingToCart}
-                onClick={handleBuyNow}
-                className="flex items-center justify-center gap-2 rounded-xl bg-[#d70018] px-5 py-3 font-semibold text-white transition hover:bg-[#b50015] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <Zap size={19} />
-                Mua ngay
-              </button>
+              <div className="mt-5 grid grid-cols-1 gap-3 border-t border-slate-100 pt-5 sm:grid-cols-3">
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <ShieldCheck size={17} className="shrink-0 text-teal-700" />
+                  Bảo hành chính hãng
+                </div>
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <Truck size={17} className="shrink-0 text-teal-700" />
+                  Giao hàng toàn quốc
+                </div>
+                <div className="flex items-center gap-2 text-xs text-slate-500">
+                  <RotateCcw size={17} className="shrink-0 text-teal-700" />
+                  Hỗ trợ đổi trả
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Specifications */}
-      <section className="mt-10">
-        <h2 className="mb-5 text-xl font-bold text-gray-900 sm:text-2xl">
-          Thông số kỹ thuật chi tiết
-        </h2>
-
-        <div className="grid grid-cols-1 items-start gap-4 grid-cols-1">
-          {/* Processor and graphics */}
-          <div className="space-y-4">
-            <DetailSection title="Bộ xử lý" defaultOpen>
-              <InfoRow
-                label="Công nghệ CPU"
-                value={product.processor?.cpuTechnology}
-              />
-              <InfoRow
-                label="Số nhân"
-                value={product.processor?.cpuCores}
-              />
-              <InfoRow
-                label="Số luồng"
-                value={product.processor?.cpuThreads}
-              />
-              <InfoRow
-                label="Tốc độ CPU"
-                value={product.processor?.cpuSpeed}
-              />
-              <InfoRow
-                label="Card đồ họa"
-                value={product.graphics?.graphicsCard}
-              />
-            </DetailSection>
-
-            <DetailSection title="Đồ họa GPU">
-              <InfoRow
-                label="Card màn hình"
-                value={product.graphics?.graphicsCard}
-              />
-            </DetailSection>
-
-            <DetailSection title="Bộ nhớ RAM - Ổ cứng">
-              <InfoRow
-                label="RAM"
-                value={product.memoryAndStorage?.ram}
-              />
-              <InfoRow
-                label="Loại RAM"
-                value={product.memoryAndStorage?.ramType}
-              />
-              <InfoRow
-                label="Tốc độ Bus RAM"
-                value={product.memoryAndStorage?.ramBusSpeed}
-              />
-              <InfoRow
-                label="Hỗ trợ RAM tối đa"
-                value={product.memoryAndStorage?.maxRamCapacity}
-              />
-              <InfoRow
-                label="Ổ cứng"
-                value={product.memoryAndStorage?.storage}
-              />
-            </DetailSection>
-
-            <DetailSection title="Màn hình">
-              <InfoRow
-                label="Kích thước màn hình"
-                value={product.display?.screenSize}
-              />
-              <InfoRow
-                label="Độ phân giải"
-                value={product.display?.resolution}
-              />
-              <InfoRow
-                label="Tấm nền"
-                value={product.display?.panelType}
-              />
-              <InfoRow
-                label="Tần số quét"
-                value={product.display?.refreshRate}
-              />
-              <InfoRow
-                label="Độ phủ màu"
-                value={product.display?.colorCoverage}
-              />
-              <InfoList
-                label="Công nghệ màn hình"
-                items={product.display?.screenTechnology}
-              />
-            </DetailSection>
+        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-7">
+          <div className="mb-6">
+            <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">
+              Thông số kỹ thuật
+            </h2>
+            <p className="mt-2 text-sm text-slate-500">
+              Thông tin cấu hình và tính năng chi tiết của laptop
+            </p>
           </div>
 
-          {/* Connectivity, design and battery */}
-          <div className="space-y-4">
-            <DetailSection title="Cổng kết nối - Tính năng mở rộng">
-              <InfoList
-                label="Cổng giao tiếp"
-                items={product.connectivityAndExpansion?.ports}
-              />
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <DetailSection
+              title="Bộ xử lý"
+              subtitle="Thông tin CPU và hiệu năng"
+              defaultOpen
+              icon={<Cpu size={18} />}
+            >
+              <InfoRow label="Công nghệ CPU" value={product.processor?.cpuTechnology} />
+              <InfoRow label="Số nhân" value={product.processor?.cpuCores} />
+              <InfoRow label="Số luồng" value={product.processor?.cpuThreads} />
+              <InfoRow label="Tốc độ CPU" value={product.processor?.cpuSpeed} />
+            </DetailSection>
+
+            <DetailSection
+              title="Đồ họa GPU"
+              subtitle="Card đồ họa tích hợp hoặc rời"
+              icon={<Monitor size={18} />}
+            >
+              <InfoRow label="Card màn hình" value={product.graphics?.graphicsCard} />
+            </DetailSection>
+
+            <DetailSection
+              title="Bộ nhớ RAM - Ổ cứng"
+              subtitle="Dung lượng và khả năng nâng cấp"
+              icon={<MemoryStick size={18} />}
+            >
+              <InfoRow label="RAM" value={product.memoryAndStorage?.ram} />
+              <InfoRow label="Loại RAM" value={product.memoryAndStorage?.ramType} />
+              <InfoRow label="Tốc độ Bus RAM" value={product.memoryAndStorage?.ramBusSpeed} />
+              <InfoRow label="Hỗ trợ RAM tối đa" value={product.memoryAndStorage?.maxRamCapacity} />
+              <InfoRow label="Ổ cứng" value={product.memoryAndStorage?.storage} />
+            </DetailSection>
+
+            <DetailSection
+              title="Màn hình"
+              subtitle="Kích thước, độ phân giải và hiển thị"
+              icon={<Laptop size={18} />}
+            >
+              <InfoRow label="Kích thước màn hình" value={product.display?.screenSize} />
+              <InfoRow label="Độ phân giải" value={product.display?.resolution} />
+              <InfoRow label="Tấm nền" value={product.display?.panelType} />
+              <InfoRow label="Tần số quét" value={product.display?.refreshRate} />
+              <InfoRow label="Độ phủ màu" value={product.display?.colorCoverage} />
+              <InfoList label="Công nghệ màn hình" items={product.display?.screenTechnology} />
+            </DetailSection>
+
+            <DetailSection
+              title="Cổng kết nối - Tính năng mở rộng"
+              subtitle="Cổng giao tiếp và tiện ích"
+              icon={<Cable size={18} />}
+            >
+              <InfoList label="Cổng giao tiếp" items={product.connectivityAndExpansion?.ports} />
               <InfoList
                 label="Kết nối không dây"
                 items={product.connectivityAndExpansion?.wirelessConnectivity}
@@ -770,18 +754,12 @@ export default function LaptopProductDetail({
                 label="Khe đọc thẻ nhớ"
                 value={product.connectivityAndExpansion?.memoryCardSlot}
               />
-              <InfoRow
-                label="Webcam"
-                value={product.connectivityAndExpansion?.webcam}
-              />
+              <InfoRow label="Webcam" value={product.connectivityAndExpansion?.webcam} />
               <InfoRow
                 label="Đèn bàn phím"
                 value={product.connectivityAndExpansion?.keyboardBacklight}
               />
-              <InfoRow
-                label="Bảo mật"
-                value={product.connectivityAndExpansion?.security}
-              />
+              <InfoRow label="Bảo mật" value={product.connectivityAndExpansion?.security} />
               <InfoList
                 label="Công nghệ âm thanh"
                 items={product.connectivityAndExpansion?.audioTechnology}
@@ -792,11 +770,12 @@ export default function LaptopProductDetail({
               />
             </DetailSection>
 
-            <DetailSection title="Kích thước - Khối lượng - Pin">
-              <InfoRow
-                label="Pin"
-                value={product.dimensionsAndBattery?.battery}
-              />
+            <DetailSection
+              title="Kích thước - Khối lượng - Pin"
+              subtitle="Thiết kế, pin và hệ điều hành"
+              icon={<BatteryCharging size={18} />}
+            >
+              <InfoRow label="Pin" value={product.dimensionsAndBattery?.battery} />
               <InfoRow
                 label="Hệ điều hành"
                 value={product.dimensionsAndBattery?.operatingSystem}
@@ -805,22 +784,13 @@ export default function LaptopProductDetail({
                 label="Năm ra mắt"
                 value={product.dimensionsAndBattery?.releaseYear}
               />
-              <InfoRow
-                label="Kích thước"
-                value={product.dimensionsAndBattery?.dimensions}
-              />
-              <InfoRow
-                label="Trọng lượng"
-                value={product.dimensionsAndBattery?.weight}
-              />
-              <InfoRow
-                label="Chất liệu"
-                value={product.dimensionsAndBattery?.material}
-              />
+              <InfoRow label="Kích thước" value={product.dimensionsAndBattery?.dimensions} />
+              <InfoRow label="Trọng lượng" value={product.dimensionsAndBattery?.weight} />
+              <InfoRow label="Chất liệu" value={product.dimensionsAndBattery?.material} />
             </DetailSection>
           </div>
-        </div>
-      </section>
+        </section>
+      </div>
     </main>
   );
 }
