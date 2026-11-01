@@ -15,7 +15,19 @@ export class CartService {
     return items.reduce((total, item) => total + item.price * item.quantity, 0);
   }
 
-  // 1. Thêm sản phẩm vào giỏ hàng
+  // 1. (GET) CART
+  async getCartByUserId(userId: string): Promise<Cart> 
+  {
+    let cart = await this.cartModel.findOne({ userId }).lean().exec();
+
+    if (!cart) {
+      cart = await this.cartModel.create({userId, items: [], totalPrice: 0});
+    }
+
+    return cart;
+  }
+
+  // 2. (POST) ITEM
   async addItemToCart(userId: string, item: CartItem): Promise<Cart> 
   {
     let cart = await this.cartModel.findOne({ userId }).exec();
@@ -43,18 +55,6 @@ export class CartService {
     cart.totalPrice = this.calculateTotalPrice(cart.items);
 
     return cart.save();
-  }
-
-  // 2. Lấy giỏ hàng của người dùng
-  async getCartByUserId(userId: string): Promise<Cart> 
-  {
-    let cart = await this.cartModel.findOne({ userId }).lean().exec();
-
-    if (!cart) {
-      cart = await this.cartModel.create({userId, items: [], totalPrice: 0});
-    }
-
-    return cart;
   }
 
   // 3. Xóa một sản phẩm khỏi giỏ hàng theo SKU

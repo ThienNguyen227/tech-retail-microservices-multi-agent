@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { customerPromotionService } from '@/lib/axios/services/customer-services/promotion_service';
+import { customerCartService } from '@/lib/axios/services/customer-services/cart_service';
 
 import {
   BatteryCharging,
@@ -422,14 +423,15 @@ export default function TabletProductDetail({
   }
 
   async function handleAddToCart() {
-    if (!selectedVariant || isAddingToCart) {
+    if (!selectedVariant) {
+      alert('Vui lòng chọn phiên bản sản phẩm!');
       return;
     }
 
     const userId = sessionStorage.getItem('userId');
 
     if (!userId) {
-      alert('Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng.');
+      alert('Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng!');
       router.push('/customer/login');
       return;
     }
@@ -437,61 +439,32 @@ export default function TabletProductDetail({
     setIsAddingToCart(true);
 
     try {
-      const cartUrl = 'http://localhost:3004/api/v1/carts';
-      const cartResponse = await fetch(
-        `${cartUrl}?userId=${encodeURIComponent(userId)}`,
-      );
+      const imageUrl = selectedVariant.images?.[0] || product.image;
 
-      if (!cartResponse.ok) {
-        throw new Error('Không thể kiểm tra giỏ hàng.');
-      }
-
-      const cartData = await cartResponse.json();
-      const cart = cartData.cart ?? cartData;
-      const existingItems = Array.isArray(cart.items) ? cart.items : [];
-      const existingItem = existingItems.find(
-        (item: { sku?: string }) => item.sku === selectedVariant.sku,
-      );
-
-      const response = await fetch(`${cartUrl}/add`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          item: {
-            productId: product._id,
-            sku: selectedVariant.sku,
-            variantSlug: selectedVariant.slug,
-            productName: `${product.name} ${selectedVariant.storage} ${selectedVariant.color}`,
-            imageUrl: selectedVariant.images?.[0] ?? product.image,
-            quantity: 1,
-            price: selectedVariant.price,
-          },
-        }),
+      await customerCartService.addItem({
+        userId,
+        item: {
+          productId: product._id,
+          sku: selectedVariant.sku,
+          variantSlug: selectedVariant.slug,
+          productName: `${product.name} ${selectedVariant.storage} ${selectedVariant.color}`,
+          imageUrl,
+          quantity: 1,
+          price: selectedVariant.price,
+        },
       });
 
-      const result = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(
-          result.message || 'Không thể thêm sản phẩm vào giỏ hàng.',
-        );
-      }
-
-      alert(
-        existingItem
-          ? 'Đã cập nhật sản phẩm trong giỏ hàng!'
-          : 'Đã thêm sản phẩm vào giỏ hàng!',
-      );
-
+      alert('Thêm vào giỏ hàng thành công!');
       window.dispatchEvent(new Event('cart-updated'));
-    } catch (error) {
-      console.error('Add to cart error:', error);
-      alert(
+    } catch (error: unknown) {
+      console.error('Lỗi khi thêm sản phẩm vào giỏ hàng:', error);
+
+      const message =
         error instanceof Error
           ? error.message
-          : 'Đã xảy ra lỗi khi thêm sản phẩm vào giỏ hàng.',
-      );
+          : 'Có lỗi xảy ra khi thêm vào giỏ hàng!';
+
+      alert(message);
     } finally {
       setIsAddingToCart(false);
     }

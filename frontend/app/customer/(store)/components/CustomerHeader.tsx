@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { clearAccessToken } from "@/lib/access_token/customer_access_token";
 import { customerUserService } from "@/lib/axios/services/customer-services/user_service";
+import { customerCartService } from "@/lib/axios/services/customer-services/cart_service";
 
 export default function CustomerHeader() {
   const router = useRouter();
@@ -100,14 +101,8 @@ export default function CustomerHeader() {
       }
 
       try {
-        const res = await fetch(
-          `http://localhost:3004/api/v1/carts?userId=${userId}`,
-        );
-
-        if (!res.ok) return;
-
-        const data = await res.json();
-        const cartData = data.cart || data;
+        const data = await customerCartService.getCart();
+        const cartData = data.cart ?? data;
 
         const totalItems = (cartData.items || []).reduce(
           (sum: number, item: any) =>

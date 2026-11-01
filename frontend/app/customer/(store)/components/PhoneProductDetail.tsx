@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { customerPromotionService } from '@/lib/axios/services/customer-services/promotion_service';
+import { customerCartService } from '@/lib/axios/services/customer-services/cart_service';
 
 import {
   ChevronDown,
@@ -383,71 +384,48 @@ export default function PhoneProductDetail({
   }
 
   async function handleAddToCart() {
+    if (!selectedVariant) {
+      alert('Vui lòng chọn phiên bản sản phẩm!');
+      return;
+    }
+
+    const userId = sessionStorage.getItem('userId');
+
+    if (!userId) {
+      alert('Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng!');
+      router.push('/customer/login');
+      return;
+    }
+
+    setIsAddingToCart(true);
+
     try {
-      if (!selectedVariant) {
-        alert('Vui lòng chọn phiên bản sản phẩm!');
-        return;
-      }
+      const imageUrl = selectedVariant.images?.[0] || product.image;
 
-      const userId = sessionStorage.getItem('userId');
-
-      if (!userId) {
-        alert('Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng!');
-        router.push('/customer/login');
-        return;
-      }
-
-      setIsAddingToCart(true);
-
-      const cartRes = await fetch(
-        `http://localhost:3004/api/v1/carts?userId=${userId}`,
-      );
-      const cartData = await cartRes.json();
-
-      if (!cartRes.ok) {
-        throw new Error(cartData?.message || 'Không thể lấy giỏ hàng');
-      }
-
-      const image = selectedVariant.images?.[0] || product.image;
-
-      const payload = {
+      await customerCartService.addItem({
         userId,
         item: {
           productId: product._id,
           sku: selectedVariant.sku,
           variantSlug: selectedVariant.slug,
           productName: `${product.name} ${selectedVariant.storage} ${selectedVariant.color}`,
-          imageUrl: image,
+          imageUrl,
           quantity: 1,
           price: selectedVariant.price,
         },
-      };
-
-      const res = await fetch('http://localhost:3004/api/v1/carts/add', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
       });
-
-      const data = await res.json().catch(() => null);
-
-      if (!res.ok) {
-        const message =
-          data?.message ||
-          `Lỗi HTTP ${res.status}: Thêm vào giỏ hàng thất bại!`;
-
-        throw new Error(
-          Array.isArray(message) ? message.join(', ') : message,
-        );
-      }
 
       alert('Thêm vào giỏ hàng thành công!');
       window.dispatchEvent(new Event('cart-updated'));
-    } catch (error: any) {
-      console.error(error);
-      alert(error?.message || 'Có lỗi xảy ra khi thêm vào giỏ hàng!');
+    } catch (error: unknown) {
+      console.error('Lỗi khi thêm sản phẩm vào giỏ hàng:', error);
+
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Có lỗi xảy ra khi thêm vào giỏ hàng!';
+
+      alert(message);
     } finally {
       setIsAddingToCart(false);
     }
