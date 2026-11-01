@@ -1,15 +1,26 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, BadRequestException } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, BadRequestException, UseGuards, Req } from '@nestjs/common';
 import { CartService } from './cart.service';
 import { CartItem } from './schemas/cart.schema';
+import { JwtAuthGuard } from "../auth/jwt-auth.guard";
+import type { JwtPayload } from "jsonwebtoken";
 
-@Controller('api/v1/carts')
+@Controller('api/v1/customer-session/cart-service')
 export class CartController {
   constructor(private readonly cartService: CartService) {}
 
-  // 1. Thêm item vào giỏ hàng
-  // POST http://localhost:3004/api/v1/carts/add
-  @Post('add')
-  async addToCart(@Body('userId') userId: string, @Body('item') item: CartItem) {
+  // 1. (GET) CART
+  @UseGuards(JwtAuthGuard)
+  @Get("cart")
+  async getCart(@Req() req: { user: JwtPayload }) {
+    const userId = req.user.sub as string;
+    return this.cartService.getCartByUserId(userId);
+  }
+
+  // 2. (POST) ITEM
+  @UseGuards(JwtAuthGuard)
+  @Post('item')
+  async addToCart(@Req() req: { user: JwtPayload }, @Body('item') item: CartItem) {
+    const userId = req.user.sub as string;
     if (!userId) {
       throw new BadRequestException('userId không được để trống');
     }
@@ -21,24 +32,11 @@ export class CartController {
     return this.cartService.addItemToCart(userId, item);
   }
 
-  // 2. Lấy giỏ hàng của người dùng
-  @Get()
-  async getCart(@Query('userId') userId: string) {
-    if (!userId) {
-      throw new BadRequestException('userId không được để trống');
-    }
-    return this.cartService.getCartByUserId(userId);
-  }
-
-  // 3. Cập nhật số lượng sản phẩm
-  // PATCH http://localhost:3004/api/v1/carts/update-quantity
-  // Body: { userId, sku, action: "increase" | "decrease" }
-  @Put('update-quantity')
-  async updateQuantity(
-    @Body('userId') userId: string,
-    @Body('sku') sku: string,
-    @Body('action') action: string,
-  ) {
+  // 3. (PUT) ITEM QUANTITY
+  @UseGuards(JwtAuthGuard)
+  @Put('item/quantity')
+  async updateQuantity(@Req() req: { user: JwtPayload }, @Body('sku') sku: string, @Body('action') action: string) {
+    const userId = req.user.sub as string;
     if (!userId) throw new BadRequestException('userId không được để trống');
     if (!sku) throw new BadRequestException('sku không được để trống');
     if (action !== 'increase' && action !== 'decrease') {
@@ -47,26 +45,33 @@ export class CartController {
     return this.cartService.updateItemQuantity(userId, sku, action);
   }
 
-  // 4. Xóa một item khỏi giỏ hàng
-  // DELETE http://localhost:3004/api/v1/carts/remove-item?userId=19&sku=IP17PM-256-CAM-VU-TRU
-  @Delete('remove-item')
-  async removeItem(@Query('userId') userId: string, @Query('sku') sku: string) {
+  // 4. (DELETE) REMOVE ITEM
+  @UseGuards(JwtAuthGuard)
+  @Delete('item')
+  async removeItem(@Req() req: { user: JwtPayload }, @Query('sku') sku: string) {
+    const userId = req.user.sub as string;
+
     if (!userId) {
       throw new BadRequestException('userId không được để trống');
     }
+
     if (!sku) {
       throw new BadRequestException('sku không được để trống');
     }
-    return this.cartService.removeItemFromCart(userId, sku);
-  }
 
-  // 4. Xóa toàn bộ giỏ hàng
-  // DELETE http://localhost:3004/api/v1/carts/clear?userId=19
-  @Delete('clear')
-  async clearCart(@Query('userId') userId: string) {
+    return this.cartService.removeItemFromCart(userId, sku);
+}
+
+  // 5. (DELETE) CLEAR CART
+  @UseGuards(JwtAuthGuard)
+  @Delete('all-items')
+  async clearCart(@Req() req: { user: JwtPayload }) {
+    const userId = req.user.sub as string;
+
     if (!userId) {
       throw new BadRequestException('userId không được để trống');
     }
+
     return this.cartService.clearCart(userId);
   }
 }

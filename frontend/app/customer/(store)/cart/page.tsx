@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { customerCartService } from "@/lib/axios/services/customer-services/cart_service";
 import {
   ShoppingBag,
   ArrowLeft,
@@ -225,10 +226,6 @@ export default function CartPage() {
     return 0;
   };
 
-  
-
-  
-
   // INVENTORY
   const [inventoryStocks, setInventoryStocks] = useState<Record<string, InventoryStock>>({});
 
@@ -345,49 +342,10 @@ const totalAmount = (cart?.totalPrice || 0) - discountAmount;
         // FETCH CART
         // =========================
 
-        const res = await fetch(`http://localhost:3004/api/v1/carts?userId=${encodeURIComponent(validUserId)}`);
-
-        if (!res.ok) {
-          throw new Error("Không thể tải thông tin giỏ hàng");
-        }
-
-        const data = await res.json();
-
-        const cartData = data.cart || data;
+        const data = await customerCartService.getCart();
+        const cartData = data.cart ?? data;
 
         setCart(cartData);
-
-        // =========================
-        // CHECK INVENTORY
-        // =========================
-
-        // const stockResults = await Promise.all(
-        //   cartData.items.map(async (item: CartItem) => {
-        //     try {
-        //       const res = await fetch(`http://localhost:3006/api/v1/inventories/check?sku=${encodeURIComponent(item.sku)}&branch_id=1`);
-
-        //       if (!res.ok) {
-        //         return null;
-        //       }
-
-        //       const stock: InventoryStock = await res.json();
-
-        //       return stock;
-        //     } catch {
-        //       return null;
-        //     }
-        //   }),
-        // );
-
-        // const stockMap: Record<string, InventoryStock> = {};
-
-        // stockResults.forEach((stock) => {
-        //   if (stock) {
-        //     stockMap[stock.sku] = stock;
-        //   }
-        // });
-
-        // setInventoryStocks(stockMap);
       } catch (err: any) {
         setError(err.message || "Đã xảy ra lỗi khi tải dữ liệu");
       } finally {
@@ -533,34 +491,23 @@ const totalAmount = (cart?.totalPrice || 0) - discountAmount;
     sku: string,
     action: "increase" | "decrease",
   ) => {
-    const userId =
-      localStorage.getItem("userId") ?? sessionStorage.getItem("userId");
-
-    if (!userId) return;
-
     try {
       setUpdatingSkus((prev) => new Set(prev).add(sku));
 
-      const res = await fetch(
-        "http://localhost:3004/api/v1/carts/update-quantity",
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId, sku, action }),
-        },
-      );
-
-      if (!res.ok) {
-        throw new Error("Cập nhật số lượng thất bại!");
-      }
-
-      const updatedCart = await res.json();
+      const updatedCart = await customerCartService.updateQuantity({
+        sku,
+        action,
+      });
 
       setCart(updatedCart);
 
       window.dispatchEvent(new Event("cart-updated"));
     } catch (err: any) {
-      alert(err.message || "Có lỗi xảy ra khi cập nhật số lượng");
+      alert(
+        err.response?.data?.message ||
+          err.message ||
+          "Có lỗi xảy ra khi cập nhật số lượng",
+      );
     } finally {
       setUpdatingSkus((prev) => {
         const next = new Set(prev);
@@ -569,11 +516,8 @@ const totalAmount = (cart?.totalPrice || 0) - discountAmount;
       });
     }
   };
-
-  // =========================
+  
   // REMOVE ITEM
-  // =========================
-
   const handleRemoveItem = async (sku: string) => {
     const confirmDelete = window.confirm(
       "Bạn có chắc muốn xóa sản phẩm này khỏi giỏ hàng?",
@@ -581,43 +525,26 @@ const totalAmount = (cart?.totalPrice || 0) - discountAmount;
 
     if (!confirmDelete) return;
 
-    const userId =
-      localStorage.getItem("userId") ?? sessionStorage.getItem("userId");
-
-    if (!userId) return;
-
     try {
       setDeletingSku(sku);
 
-      const res = await fetch(
-        `http://localhost:3004/api/v1/carts/remove-item?userId=${encodeURIComponent(
-          userId,
-        )}&sku=${encodeURIComponent(sku)}`,
-        {
-          method: "DELETE",
-        },
-      );
-
-      if (!res.ok) {
-        throw new Error("Xóa sản phẩm thất bại!");
-      }
-
-      const updatedCart = await res.json();
+      const updatedCart = await customerCartService.removeItem(sku);
 
       setCart(updatedCart);
 
       window.dispatchEvent(new Event("cart-updated"));
     } catch (err: any) {
-      alert(err.message || "Có lỗi xảy ra khi xóa sản phẩm");
+      alert(
+        err.response?.data?.message ||
+          err.message ||
+          "Có lỗi xảy ra khi xóa sản phẩm",
+      );
     } finally {
       setDeletingSku(null);
     }
   };
 
-  // =========================
   // CLEAR CART
-  // =========================
-
   const handleClearCart = async () => {
     const confirmClear = window.confirm(
       "Bạn có chắc muốn xóa tất cả sản phẩm trong giỏ hàng?",
@@ -625,34 +552,20 @@ const totalAmount = (cart?.totalPrice || 0) - discountAmount;
 
     if (!confirmClear) return;
 
-    const userId =
-      localStorage.getItem("userId") ?? sessionStorage.getItem("userId");
-
-    if (!userId) return;
-
     try {
       setClearing(true);
 
-      const res = await fetch(
-        `http://localhost:3004/api/v1/carts/clear?userId=${encodeURIComponent(
-          userId,
-        )}`,
-        {
-          method: "DELETE",
-        },
-      );
-
-      if (!res.ok) {
-        throw new Error("Xóa toàn bộ giỏ hàng thất bại!");
-      }
-
-      const updatedCart = await res.json();
+      const updatedCart = await customerCartService.clearCart();
 
       setCart(updatedCart);
 
       window.dispatchEvent(new Event("cart-updated"));
     } catch (err: any) {
-      alert(err.message || "Có lỗi xảy ra khi làm trống giỏ hàng");
+      alert(
+        err.response?.data?.message ||
+          err.message ||
+          "Có lỗi xảy ra khi làm trống giỏ hàng",
+      );
     } finally {
       setClearing(false);
     }
@@ -939,7 +852,7 @@ const totalAmount = (cart?.totalPrice || 0) - discountAmount;
                       className="aspect-square h-20 w-20 shrink-0 overflow-hidden rounded-xl border border-slate-100 bg-slate-50 p-2"
                     >
                       <img
-                        src={`/product/phone/${item.imageUrl}`}
+                        src={`/product/${item.imageUrl}`}
                         alt={item.productName}
                         className="h-full w-full object-contain"
                       />
