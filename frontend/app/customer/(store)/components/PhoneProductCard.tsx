@@ -1,7 +1,6 @@
 'use client';
 
-import { promotionApi } from '@/lib/axios/promotion-api';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 
 export type ProductVariant = {
@@ -27,7 +26,7 @@ export type Phone = {
   variants: ProductVariant[];
 };
 
-type PromotionDiscount = {
+export type PromotionDiscount = {
   promotionId: number;
   promotionName: string;
   sku: string;
@@ -37,10 +36,12 @@ type PromotionDiscount = {
 
 type PhoneProductCardProps = {
   product: Phone;
+  promotions: PromotionDiscount[];
 };
 
 export default function PhoneProductCard({
   product,
+  promotions,
 }: PhoneProductCardProps) {
   const storages = useMemo(
     () => [...new Set((product.variants ?? []).map((variant) => variant.storage))],
@@ -63,7 +64,6 @@ export default function PhoneProductCard({
   const [selectedColorSlug, setSelectedColorSlug] = useState(
     colors[0]?.colorSlug ?? '',
   );
-  const [promotion, setPromotion] = useState<PromotionDiscount | null>(null);
 
   const selectedVariant = useMemo(
     () =>
@@ -73,6 +73,14 @@ export default function PhoneProductCard({
           variant.colorSlug === selectedColorSlug,
       ) ?? product.variants[0],
     [product.variants, selectedStorage, selectedColorSlug],
+  );
+
+  const promotion = useMemo(
+    () =>
+      promotions.find(
+        (item) => item.sku === selectedVariant?.sku,
+      ) ?? null,
+    [promotions, selectedVariant?.sku],
   );
 
   const currentPrice = selectedVariant?.price ?? 0;
@@ -88,53 +96,17 @@ export default function PhoneProductCard({
       maximumFractionDigits: 0,
     }).format(price);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    if (!selectedVariant?.sku) {
-      setPromotion(null);
-      return;
-    }
-
-    const fetchPromotion = async () => {
-      try {
-        const response = await promotionApi.get(
-          '/api/v1/promotion/direct-discount',
-          {
-            params: { sku: selectedVariant.sku },
-          },
-        );
-
-        if (!cancelled) {
-          setPromotion(response.data ?? null);
-        }
-      } catch (error) {
-        console.error('Fetch promotion error:', error);
-
-        if (!cancelled) {
-          setPromotion(null);
-        }
-      }
-    };
-
-    fetchPromotion();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedVariant?.sku]);
-
   const discountValue = Number(promotion?.discountValue ?? 0);
 
   const finalPrice =
     promotion?.discountType === 'PERCENTAGE'
-      ? currentPrice * (1 - discountValue / 100)
+      ? Math.max(0, currentPrice * (1 - discountValue / 100))
       : promotion?.discountType === 'FIXED_AMOUNT'
         ? Math.max(0, currentPrice - discountValue)
         : currentPrice;
 
-  const hasPromotion = Boolean(promotion);
   const savedAmount = Math.max(0, currentPrice - finalPrice);
+  const hasPromotion = Boolean(promotion && discountValue > 0);
 
   const discountLabel =
     promotion?.discountType === 'PERCENTAGE'
@@ -143,7 +115,6 @@ export default function PhoneProductCard({
 
   return (
     <article className="group flex h-full flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white transition duration-300 hover:-translate-y-1 hover:border-teal-200 hover:shadow-xl hover:shadow-slate-900/8">
-      {/* Product image */}
       <Link
         href={`/customer/product-detail/${currentSlug}`}
         aria-label={`Xem chi tiết ${product.name}`}
@@ -169,7 +140,6 @@ export default function PhoneProductCard({
         </span>
       </Link>
 
-      {/* Product information */}
       <div className="flex flex-1 flex-col px-4 pb-4 sm:px-5 sm:pb-5">
         <Link href={`/customer/product-detail/${currentSlug}`}>
           <h3 className="line-clamp-2 min-h-11 text-[15px] font-semibold leading-5 text-slate-900 transition-colors group-hover:text-teal-700">
@@ -177,7 +147,6 @@ export default function PhoneProductCard({
           </h3>
         </Link>
 
-        {/* Screen information */}
         <div className="mt-2 flex min-h-7 flex-wrap content-start gap-1.5">
           {product.screenTech && (
             <span className="rounded-md bg-slate-100 px-2 py-1 text-[10px] font-medium text-slate-600">
@@ -192,7 +161,6 @@ export default function PhoneProductCard({
           )}
         </div>
 
-        {/* Storage selector */}
         <div className="mt-3 min-h-[58px]">
           {storages.length > 0 && (
             <>
@@ -225,7 +193,6 @@ export default function PhoneProductCard({
           )}
         </div>
 
-        {/* Color selector */}
         <div className="mt-3 min-h-[58px]">
           {colors.length > 0 && (
             <>
@@ -262,7 +229,6 @@ export default function PhoneProductCard({
           )}
         </div>
 
-        {/* Price */}
         <div className="mt-4 border-t border-slate-100 pt-3">
           {currentPrice > 0 ? (
             <div className="flex min-h-[62px] flex-col justify-center">
@@ -300,7 +266,6 @@ export default function PhoneProductCard({
           )}
         </div>
 
-        {/* Action */}
         <Link
           href={`/customer/product-detail/${currentSlug}`}
           className="mt-auto inline-flex w-full items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-teal-800"

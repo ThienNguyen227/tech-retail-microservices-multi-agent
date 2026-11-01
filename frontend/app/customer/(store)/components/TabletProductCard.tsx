@@ -1,6 +1,5 @@
 'use client';
 
-import { promotionApi } from '@/lib/axios/promotion-api';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 
@@ -26,7 +25,7 @@ export type Tablet = {
   variants: TabletVariant[];
 };
 
-type PromotionDiscount = {
+export type PromotionDiscount = {
   promotionId: number;
   promotionName: string;
   sku: string;
@@ -36,13 +35,16 @@ type PromotionDiscount = {
 
 type TabletProductCardProps = {
   product: Tablet;
+  promotions: PromotionDiscount[];
 };
 
 export default function TabletProductCard({
   product,
+  promotions,
 }: TabletProductCardProps) {
   const storages = useMemo(
-    () => [...new Set((product.variants ?? []).map((variant) => variant.storage))],
+    () =>
+      [...new Set((product.variants ?? []).map((variant) => variant.storage))],
     [product.variants],
   );
 
@@ -58,25 +60,37 @@ export default function TabletProductCard({
     return Array.from(uniqueColors.values());
   }, [product.variants]);
 
-  const [selectedStorage, setSelectedStorage] = useState(storages[0] ?? '');
-  const [selectedColorSlug, setSelectedColorSlug] = useState(
-    colors[0]?.colorSlug ?? '',
+  const [selectedStorage, setSelectedStorage] = useState(
+    product.variants?.[0]?.storage ?? '',
   );
-  const [promotion, setPromotion] = useState<PromotionDiscount | null>(null);
+
+  const [selectedColorSlug, setSelectedColorSlug] = useState(
+    product.variants?.[0]?.colorSlug ?? '',
+  );
 
   useEffect(() => {
-    setSelectedStorage(storages[0] ?? '');
-    setSelectedColorSlug(colors[0]?.colorSlug ?? '');
-  }, [storages, colors]);
+    setSelectedStorage(product.variants?.[0]?.storage ?? '');
+    setSelectedColorSlug(product.variants?.[0]?.colorSlug ?? '');
+  }, [product._id, product.variants]);
 
   const selectedVariant = useMemo(
     () =>
-      product.variants.find(
+      product.variants?.find(
         (variant) =>
           variant.storage === selectedStorage &&
           variant.colorSlug === selectedColorSlug,
-      ) ?? product.variants[0],
+      ) ??
+      product.variants?.find(
+        (variant) => variant.storage === selectedStorage,
+      ) ??
+      product.variants?.[0],
     [product.variants, selectedStorage, selectedColorSlug],
+  );
+
+  const promotion = useMemo(
+    () =>
+      promotions.find((item) => item.sku === selectedVariant?.sku) ?? null,
+    [promotions, selectedVariant?.sku],
   );
 
   const currentPrice = selectedVariant?.price ?? 0;
@@ -91,42 +105,6 @@ export default function TabletProductCard({
       currency: 'VND',
       maximumFractionDigits: 0,
     }).format(price);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    if (!selectedVariant?.sku) {
-      setPromotion(null);
-      return;
-    }
-
-    const fetchPromotion = async () => {
-      try {
-        const response = await promotionApi.get(
-          '/api/v1/promotion/direct-discount',
-          {
-            params: { sku: selectedVariant.sku },
-          },
-        );
-
-        if (!cancelled) {
-          setPromotion(response.data ?? null);
-        }
-      } catch (error) {
-        console.error('Fetch tablet promotion error:', error);
-
-        if (!cancelled) {
-          setPromotion(null);
-        }
-      }
-    };
-
-    fetchPromotion();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedVariant?.sku]);
 
   const discountValue = Number(promotion?.discountValue ?? 0);
 
@@ -249,7 +227,9 @@ export default function TabletProductCard({
                     <button
                       key={colorVariant.colorSlug}
                       type="button"
-                      onClick={() => setSelectedColorSlug(colorVariant.colorSlug)}
+                      onClick={() =>
+                        setSelectedColorSlug(colorVariant.colorSlug)
+                      }
                       aria-pressed={isSelected}
                       className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
                         isSelected

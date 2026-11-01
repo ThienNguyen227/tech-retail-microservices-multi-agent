@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import { customerPromotionService } from '@/lib/axios/services/customer-services/promotion_service';
+
 import {
   BatteryCharging,
   Camera,
@@ -18,6 +20,14 @@ import {
   RotateCcw,
   Cable,
 } from 'lucide-react';
+
+type PromotionDiscount = {
+  promotionId: number;
+  promotionName: string;
+  sku: string;
+  discountType: string;
+  discountValue: string;
+};
 
 type TabletVariant = {
   sku: string;
@@ -273,6 +283,7 @@ export default function TabletProductDetail({
   );
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [promotion, setPromotion] = useState<PromotionDiscount | null>(null);
 
   useEffect(() => {
     setSelectedStorage(initialVariant?.storage ?? '');
@@ -306,6 +317,65 @@ export default function TabletProductDetail({
         variant.storage === selectedStorage &&
         variant.colorSlug === selectedColorSlug,
     ) ?? initialVariant;
+
+  useEffect(() => {
+    if (!selectedVariant?.sku) {
+      setPromotion(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function fetchPromotion() {
+      setPromotion(null);
+
+      try {
+        const result =
+          await customerPromotionService.getDirectDiscount(
+            selectedVariant.sku,
+          );
+
+        if (!cancelled) {
+          setPromotion(result ?? null);
+        }
+      } catch (error) {
+        console.error('Không thể lấy khuyến mãi:', error);
+
+        if (!cancelled) {
+          setPromotion(null);
+        }
+      }
+    }
+
+    fetchPromotion();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedVariant?.sku]);
+
+  const originalPrice = selectedVariant?.price ?? 0;
+  const discountValue = Number(promotion?.discountValue ?? 0);
+
+  const discountAmount =
+    promotion?.discountType === 'PERCENTAGE'
+      ? Math.round((originalPrice * discountValue) / 100)
+      : promotion?.discountType === 'FIXED_AMOUNT'
+        ? discountValue
+        : 0;
+
+  const savedAmount = Math.min(
+    Math.max(discountAmount, 0),
+    originalPrice,
+  );
+
+  const finalPrice = Math.max(originalPrice - savedAmount, 0);
+  const hasPromotion = Boolean(promotion && savedAmount > 0);
+
+  const discountLabel =
+    promotion?.discountType === 'PERCENTAGE'
+      ? `-${discountValue}%`
+      : `-${formatPrice(savedAmount)}`;
 
   const currentImages = selectedVariant?.images?.length
     ? selectedVariant.images
@@ -451,9 +521,7 @@ export default function TabletProductDetail({
           <span className="text-slate-300">/</span>
           <button
             type="button"
-            onClick={() =>
-              router.push('/customer/products?category=tablet')
-            }
+            onClick={() => router.push('/customer/products?category=tablet')}
             className="transition-colors hover:text-teal-700"
           >
             Máy tính bảng
@@ -470,6 +538,12 @@ export default function TabletProductDetail({
           <div className="lg:col-span-5">
             <div className="group h-full rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-teal-200 hover:shadow-xl sm:p-5">
               <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-teal-50 via-white to-cyan-50">
+                {hasPromotion && (
+                  <span className="absolute left-3 top-3 z-10 rounded-full bg-rose-600 px-3 py-1.5 text-xs font-bold text-white shadow-md">
+                    {discountLabel}
+                  </span>
+                )}
+
                 <img
                   src={`/product/tablet/${currentImage}`}
                   alt={`${product.name} ${selectedVariant.color}`}
@@ -549,9 +623,37 @@ export default function TabletProductDetail({
                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Giá bán
                 </p>
-                <p className="mt-2 text-3xl font-bold tracking-tight text-teal-800">
-                  {formatPrice(selectedVariant.price)}
-                </p>
+
+                {hasPromotion ? (
+                  <>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <p className="text-3xl font-bold tracking-tight text-teal-800">
+                        {formatPrice(finalPrice)}
+                      </p>
+                      <span className="rounded-full bg-rose-100 px-2.5 py-1 text-xs font-bold text-rose-700">
+                        {discountLabel}
+                      </span>
+                    </div>
+
+                    <p className="mt-1 text-sm text-slate-500 line-through">
+                      {formatPrice(originalPrice)}
+                    </p>
+
+                    <p className="mt-2 text-sm font-medium text-rose-700">
+                      Tiết kiệm {formatPrice(savedAmount)}
+                    </p>
+
+                    {promotion?.promotionName && (
+                      <p className="mt-2 text-xs text-slate-600">
+                        Khuyến mãi: {promotion.promotionName}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <p className="mt-2 text-3xl font-bold tracking-tight text-teal-800">
+                    {formatPrice(originalPrice)}
+                  </p>
+                )}
               </div>
 
               <div className="border-b border-slate-100 py-5">
