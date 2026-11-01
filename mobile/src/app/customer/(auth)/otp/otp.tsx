@@ -1,4 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
+import { isAxiosError } from 'axios';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -14,11 +15,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
-  AuthServiceError,
-  getRegisterDraft,
-  resendRegisterOtp,
-  verifyRegisterOtp,
-} from '@/services/auth.service';
+  customerUserService,
+} from '@/lib/axios/services/customer-services/user_service';
+import { getRegisterDraft } from '@/lib/storage/secure_storage';
 
 const OTP_LENGTH = 6;
 
@@ -77,14 +76,23 @@ export default function Otp() {
 
     setLoading(true);
     try {
-      await verifyRegisterOtp(email, otpCode, draft);
+      await customerUserService.verifyOtp({
+        user_email: email,
+        otp_code: otpCode,
+        user_name: draft.user_name,
+        user_phone: draft.user_phone,
+        user_password_hash: draft.user_password_hash,
+      });
       setVerified(true);
       setTimeout(() => router.push('/customer/login'), 1200);
     } catch (requestError) {
+      const message = isAxiosError(requestError)
+        ? requestError.response?.data?.message
+        : undefined;
       setError(
-        requestError instanceof AuthServiceError
-          ? requestError.message
-          : 'Xác thực OTP thất bại. Vui lòng thử lại.',
+        Array.isArray(message)
+          ? message[0]
+          : message || 'Xác thực OTP thất bại. Vui lòng thử lại.',
       );
     } finally {
       setLoading(false);
@@ -96,15 +104,18 @@ export default function Otp() {
     setResending(true);
     setError('');
     try {
-      const response = await resendRegisterOtp(email);
+      const response = await customerUserService.resendOtp({
+        user_email: email,
+      });
       if (response?.otp_expires_at) setExpiresAt(response.otp_expires_at);
       setOtp(Array(OTP_LENGTH).fill(''));
       inputRefs.current[0]?.focus();
     } catch (requestError) {
+      const message = isAxiosError(requestError)
+        ? requestError.response?.data?.message
+        : undefined;
       setError(
-        requestError instanceof AuthServiceError
-          ? requestError.message
-          : 'Gửi lại OTP thất bại.',
+        Array.isArray(message) ? message[0] : message || 'Gửi lại OTP thất bại.',
       );
     } finally {
       setResending(false);

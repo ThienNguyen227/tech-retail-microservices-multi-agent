@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import type { Href } from 'expo-router';
+import { isAxiosError } from 'axios';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -15,10 +16,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
-  AuthServiceError,
-  loginCustomer,
-  saveLoginSession,
-} from '@/services/auth.service';
+  customerUserService,
+  type LoginResponse,
+} from '@/lib/axios/services/customer-services/user_service';
+import { saveLoginSession } from '@/lib/storage/secure_storage';
 
 export default function Login() {
   const colorScheme = useColorScheme();
@@ -50,14 +51,21 @@ export default function Login() {
 
     setLoading(true);
     try {
-      const response = await loginCustomer(normalizedEmail, password);
-      await saveLoginSession(response, remember);
+      const response = await customerUserService.login({
+        user_email: normalizedEmail,
+        user_password: password,
+        device_info: 'mobile',
+      }) as LoginResponse;
+      await saveLoginSession({ ...response, remember });
       router.replace('/customer/home' as Href);
     } catch (requestError) {
+      const message = isAxiosError(requestError)
+        ? requestError.response?.data?.message
+        : undefined;
       setError(
-        requestError instanceof AuthServiceError
-          ? requestError.message
-          : 'Không thể kết nối đến server. Vui lòng thử lại.',
+        Array.isArray(message)
+          ? message[0]
+          : message || 'Không thể kết nối đến server. Vui lòng thử lại.',
       );
     } finally {
       setLoading(false);
