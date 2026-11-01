@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import type { Href } from 'expo-router';
+import { isAxiosError } from 'axios';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -15,10 +16,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
-  AuthServiceError,
-  saveForgotPasswordState,
-  sendForgotPasswordOtp,
-} from '@/services/auth.service';
+  customerUserService,
+} from '@/lib/axios/services/customer-services/user_service';
+import { saveForgotPasswordState } from '@/lib/storage/secure_storage';
 
 export default function ForgotPassword() {
   const colorScheme = useColorScheme();
@@ -37,7 +37,9 @@ export default function ForgotPassword() {
 
     setLoading(true);
     try {
-      const response = await sendForgotPasswordOtp(normalizedEmail);
+      const response = await customerUserService.sendOtpForgotPassword({
+        user_email: normalizedEmail,
+      });
       if (!response?.otp_expires_at) {
         setError('Phản hồi từ Server không hợp lệ.');
         return;
@@ -48,10 +50,13 @@ export default function ForgotPassword() {
         params: { email: normalizedEmail },
       } as Href);
     } catch (requestError) {
+      const message = isAxiosError(requestError)
+        ? requestError.response?.data?.message
+        : undefined;
       setError(
-        requestError instanceof AuthServiceError
-          ? requestError.message
-          : 'Đã xảy ra lỗi. Vui lòng thử lại.',
+        Array.isArray(message)
+          ? message[0]
+          : message || 'Đã xảy ra lỗi. Vui lòng thử lại.',
       );
     } finally {
       setLoading(false);

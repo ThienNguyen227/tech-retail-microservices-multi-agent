@@ -1,5 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import type { Href } from 'expo-router';
+import { isAxiosError } from 'axios';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -18,14 +19,12 @@ import {
   ErrorMessage,
   RecoverySteps,
 } from '../forgot-password/forgot-password';
+import { customerUserService } from '@/lib/axios/services/customer-services/user_service';
 import {
-  AuthServiceError,
   getForgotPasswordState,
-  resendForgotPasswordOtp,
-  saveForgotPasswordResetExpiry,
+  saveForgotPasswordResetState,
   saveForgotPasswordState,
-  verifyForgotPasswordOtp,
-} from '@/services/auth.service';
+} from '@/lib/storage/secure_storage';
 
 const OTP_LENGTH = 6;
 
@@ -73,18 +72,27 @@ export default function ForgotPasswordOtp() {
 
     setLoading(true);
     try {
-      const response = await verifyForgotPasswordOtp(email, code);
-      if (!response?.reset_expires_at) {
+      const response = await customerUserService.verifyOtpForgotPassword({
+        user_email: email,
+        otp_code: code,
+      });
+      if (!response?.reset_expires_at || !response.user_id) {
         setError('Phản hồi từ Server không hợp lệ.');
         return;
       }
-      await saveForgotPasswordResetExpiry(response.reset_expires_at);
+      await saveForgotPasswordResetState(
+        response.user_id,
+        response.reset_expires_at,
+      );
       router.push('/customer/forgot-password-change' as Href);
     } catch (requestError) {
+      const message = isAxiosError(requestError)
+        ? requestError.response?.data?.message
+        : undefined;
       setError(
-        requestError instanceof AuthServiceError
-          ? requestError.message
-          : 'Đã xảy ra lỗi. Vui lòng thử lại.',
+        Array.isArray(message)
+          ? message[0]
+          : message || 'Đã xảy ra lỗi. Vui lòng thử lại.',
       );
     } finally {
       setLoading(false);
@@ -96,7 +104,9 @@ export default function ForgotPasswordOtp() {
     setResending(true);
     setError('');
     try {
-      const response = await resendForgotPasswordOtp(email);
+      const response = await customerUserService.resendOtpForgotPassword({
+        user_email: email,
+      });
       if (!response?.otp_expires_at) {
         setError('Phản hồi từ Server không hợp lệ.');
         return;
@@ -106,10 +116,11 @@ export default function ForgotPasswordOtp() {
       setOtp(Array(OTP_LENGTH).fill(''));
       inputRefs.current[0]?.focus();
     } catch (requestError) {
+      const message = isAxiosError(requestError)
+        ? requestError.response?.data?.message
+        : undefined;
       setError(
-        requestError instanceof AuthServiceError
-          ? requestError.message
-          : 'Gửi lại OTP thất bại.',
+        Array.isArray(message) ? message[0] : message || 'Gửi lại OTP thất bại.',
       );
     } finally {
       setResending(false);

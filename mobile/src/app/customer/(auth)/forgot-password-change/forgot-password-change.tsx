@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import type { Href } from 'expo-router';
+import { isAxiosError } from 'axios';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -14,12 +15,11 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { customerUserService } from '@/lib/axios/services/customer-services/user_service';
 import {
-  AuthServiceError,
-  changeForgottenPassword,
   getForgotPasswordState,
   clearForgotPasswordState,
-} from '@/services/auth.service';
+} from '@/lib/storage/secure_storage';
 import { ErrorMessage, RecoverySteps } from '../forgot-password/forgot-password';
 
 export default function ForgotPasswordChange() {
@@ -37,7 +37,7 @@ export default function ForgotPasswordChange() {
 
   useEffect(() => {
     getForgotPasswordState().then((state) => {
-      if (!state.email || !state.resetExpiresAt) {
+      if (!state.email || !state.userId || !state.resetExpiresAt) {
         router.replace('/customer/forgot-password' as Href);
         return;
       }
@@ -68,15 +68,24 @@ export default function ForgotPasswordChange() {
 
     setLoading(true);
     try {
-      await changeForgottenPassword(newPassword);
+      const state = await getForgotPasswordState();
+      if (!state.userId) {
+        setError('Không tìm thấy thông tin phiên đổi mật khẩu.');
+        return;
+      }
+      await customerUserService.changePasswordForgotPassword({
+        new_password: newPassword,
+        user_id: state.userId,
+      });
       await clearForgotPasswordState();
       setSuccess('Đổi mật khẩu thành công. Đang chuyển đến trang đăng nhập...');
       setTimeout(() => router.replace('/customer/login'), 1200);
     } catch (requestError) {
+      const message = isAxiosError(requestError)
+        ? requestError.response?.data?.message
+        : undefined;
       setError(
-        requestError instanceof AuthServiceError
-          ? requestError.message
-          : 'Đổi mật khẩu thất bại.',
+        Array.isArray(message) ? message[0] : message || 'Đổi mật khẩu thất bại.',
       );
     } finally {
       setLoading(false);

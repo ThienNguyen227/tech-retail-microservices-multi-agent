@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { isAxiosError } from 'axios';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -14,10 +15,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
-  AuthServiceError,
-  saveRegisterDraft,
-  sendRegisterOtp,
-} from '@/services/auth.service';
+  customerUserService,
+} from '@/lib/axios/services/customer-services/user_service';
+import { saveRegisterDraft } from '@/lib/storage/secure_storage';
 
 export default function Register() {
   const colorScheme = useColorScheme();
@@ -78,10 +78,10 @@ export default function Register() {
     setLoading(true);
 
     try {
-      const sendOtpData = await sendRegisterOtp(
-        normalizedEmail,
-        normalizedPhone,
-      );
+      const sendOtpData = await customerUserService.sendOtp({
+        user_email: normalizedEmail,
+        user_phone: normalizedPhone,
+      });
 
       await saveRegisterDraft(
         {
@@ -97,11 +97,12 @@ export default function Register() {
         `/customer/otp?email=${encodeURIComponent(normalizedEmail)}`,
       );
     } catch (requestError) {
-      if (requestError instanceof AuthServiceError) {
-        setError(requestError.message);
-      } else {
-        setError('Đã xảy ra lỗi.');
-      }
+      const message = isAxiosError(requestError)
+        ? requestError.response?.data?.message
+        : undefined;
+      setError(
+        Array.isArray(message) ? message[0] : message || 'Đã xảy ra lỗi.',
+      );
     } finally {
       setLoading(false);
     }
