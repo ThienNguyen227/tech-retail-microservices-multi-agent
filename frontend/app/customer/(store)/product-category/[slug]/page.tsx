@@ -1,8 +1,22 @@
 import Link from 'next/link';
-import PhoneProductCard, { Phone } from '../../components/PhoneProductCard';
-import LaptopProductCard, { Laptop } from '../../components/LaptopProductCard';
-import TabletProductCard, { Tablet } from '../../components/TabletProductCard';
+
+import PhoneProductCard, {
+  type Phone,
+  type PromotionDiscount,
+} from '../../components/PhoneProductCard';
+
+import LaptopProductCard, {
+  type Laptop,
+} from '../../components/LaptopProductCard';
+
+import TabletProductCard, {
+  type Tablet,
+} from '../../components/TabletProductCard';
+
 import ProductFilter from '../../components/ProductFilter';
+
+import { customerPromotionService } from '@/lib/axios/services/customer-services/promotion_service';
+import { customerProductService } from '@/lib/axios/services/customer-services/product_service';
 
 type Brand = {
   _id: string;
@@ -12,46 +26,6 @@ type Brand = {
   slug: string;
   categoryId: string;
 };
-
-async function getProducts(categorySlug: string, brandSlug?: string) {
-  try {
-    const params = new URLSearchParams({ category: categorySlug });
-
-    if (brandSlug) {
-      params.set('brand', brandSlug);
-    }
-
-    const res = await fetch(
-      `http://localhost:3003/api/v1/customer-session/product-service/product-list?${params.toString()}`,
-      { cache: 'no-store' },
-    );
-
-    if (!res.ok) return null;
-
-    return await res.json();
-  } catch (error) {
-    console.error('Fetch products error:', error);
-    return null;
-  }
-}
-
-async function getBrandsByCategory(slug: string) {
-  try {
-    const params = new URLSearchParams({ category: slug });
-
-    const res = await fetch(
-      `http://localhost:3003/api/v1/customer-session/product-service/brand-list?${params.toString()}`,
-      { cache: 'no-store' },
-    );
-
-    if (!res.ok) return null;
-
-    return await res.json();
-  } catch (error) {
-    console.error('Fetch brands error:', error);
-    return null;
-  }
-}
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -66,17 +40,17 @@ export default async function ProductCategoryPage({
   const { brand } = await searchParams;
 
   const [productData, brandData] = await Promise.all([
-    getProducts(slug, brand),
-    getBrandsByCategory(slug),
+    customerProductService.getProductList(slug, brand),
+    customerProductService.getBrandList(slug),
   ]);
 
   const categoryName =
     productData?.category?.name || decodeURIComponent(slug);
 
   const products = productData?.products || [];
-  const brands: Brand[] = brandData?.brands || [];
   const categorySlug = productData?.category?.slug;
 
+  const brands: Brand[] = brandData?.brands || [];
   const selectedBrand = brands.find((item) => item.slug === brand);
 
   const breadcrumbItems = [
@@ -86,6 +60,41 @@ export default async function ProductCategoryPage({
   ];
 
   const allProductsHref = `/customer/product-category/${slug}`;
+
+  let promotions: PromotionDiscount[] = [];
+
+  const isPromotionCategory = [
+    'dien-thoai-di-dong',
+    'may-tinh-xach-tay',
+    'may-tinh-bang',
+  ].includes(categorySlug ?? '');
+
+  if (isPromotionCategory) {
+    type ProductWithSkuVariants = {
+      variants?: Array<{
+        sku: string;
+      }>;
+    };
+
+    const promotionProducts = products as ProductWithSkuVariants[];
+
+    const allSkus: string[] = [
+      ...new Set(
+        promotionProducts.flatMap((product) =>
+          (product.variants ?? []).map((variant) => variant.sku),
+        ),
+      ),
+    ];
+
+    if (allSkus.length > 0) {
+      try {
+        promotions =
+          await customerPromotionService.getDirectDiscounts(allSkus);
+      } catch (error) {
+        console.error('Không tải được danh sách khuyến mãi:', error);
+      }
+    }
+  }
 
   return (
     <main className="min-h-screen bg-[#F5F8FA]">
@@ -195,7 +204,9 @@ export default async function ProductCategoryPage({
           <div className="inline-flex w-fit items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-sm text-slate-600">
             <span className="h-2 w-2 rounded-full bg-teal-500" />
             Hiển thị
-            <span className="font-bold text-slate-900">{products.length}</span>
+            <span className="font-bold text-slate-900">
+              {products.length}
+            </span>
             sản phẩm
           </div>
         </div>
@@ -209,7 +220,10 @@ export default async function ProductCategoryPage({
                   key={phone._id}
                   className="group min-w-0 transition-all duration-300 ease-out hover:-translate-y-1.5 hover:drop-shadow-[0_12px_16px_rgba(15,23,42,0.10)]"
                 >
-                  <PhoneProductCard product={phone} />
+                  <PhoneProductCard
+                    product={phone}
+                    promotions={promotions}
+                  />
                 </div>
               ))}
 
@@ -219,7 +233,10 @@ export default async function ProductCategoryPage({
                   key={laptop._id}
                   className="group min-w-0 transition-all duration-300 ease-out hover:-translate-y-1.5 hover:drop-shadow-[0_12px_16px_rgba(15,23,42,0.10)]"
                 >
-                  <LaptopProductCard product={laptop} />
+                  <LaptopProductCard
+                    product={laptop}
+                    promotions={promotions}
+                  />
                 </div>
               ))}
 
@@ -229,7 +246,10 @@ export default async function ProductCategoryPage({
                   key={tablet._id}
                   className="group min-w-0 transition-all duration-300 ease-out hover:-translate-y-1.5 hover:drop-shadow-[0_12px_16px_rgba(15,23,42,0.10)]"
                 >
-                  <TabletProductCard product={tablet} />
+                  <TabletProductCard
+                    product={tablet}
+                    promotions={promotions}
+                  />
                 </div>
               ))}
           </div>
@@ -271,7 +291,10 @@ export default async function ProductCategoryPage({
                 className="mt-6 inline-flex items-center gap-2 rounded-xl bg-teal-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:bg-teal-700 hover:shadow-lg hover:shadow-teal-700/20"
               >
                 Xem tất cả sản phẩm
-                <span aria-hidden="true" className="transition-transform duration-300 group-hover:translate-x-1">
+                <span
+                  aria-hidden="true"
+                  className="transition-transform duration-300 group-hover:translate-x-1"
+                >
                   →
                 </span>
               </Link>

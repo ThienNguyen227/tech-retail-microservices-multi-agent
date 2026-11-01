@@ -1,7 +1,6 @@
 'use client';
 
-import { promotionApi } from '@/lib/axios/promotion-api';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 
 export type LaptopVariant = {
@@ -27,11 +26,7 @@ export type Laptop = {
   variants: LaptopVariant[];
 };
 
-type LaptopProductCardProps = {
-  product: Laptop;
-};
-
-type PromotionDiscount = {
+export type PromotionDiscount = {
   promotionId: number;
   promotionName: string;
   sku: string;
@@ -39,8 +34,14 @@ type PromotionDiscount = {
   discountValue: string;
 };
 
+type LaptopProductCardProps = {
+  product: Laptop;
+  promotions: PromotionDiscount[];
+};
+
 export default function LaptopProductCard({
   product,
+  promotions,
 }: LaptopProductCardProps) {
   const rams = useMemo(
     () => [...new Set((product.variants ?? []).map((variant) => variant.ram))],
@@ -76,8 +77,6 @@ export default function LaptopProductCard({
     product.variants?.[0]?.colorSlug ?? '',
   );
 
-  const [promotion, setPromotion] = useState<PromotionDiscount | null>(null);
-
   const selectedVariant = useMemo(
     () =>
       product.variants?.find(
@@ -95,6 +94,14 @@ export default function LaptopProductCard({
     [product.variants, selectedRam, selectedSsd, selectedColorSlug],
   );
 
+  const promotion = useMemo(
+    () =>
+      promotions.find(
+        (item) => item.sku === selectedVariant?.sku,
+      ) ?? null,
+    [promotions, selectedVariant?.sku],
+  );
+
   const currentPrice = selectedVariant?.price ?? 0;
   const currentSlug = selectedVariant?.slug ?? product.slug;
   const currentImage = selectedVariant?.images?.[0] ?? product.image;
@@ -108,42 +115,6 @@ export default function LaptopProductCard({
       currency: 'VND',
       maximumFractionDigits: 0,
     }).format(price);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    if (!selectedVariant?.sku) {
-      setPromotion(null);
-      return;
-    }
-
-    const fetchPromotion = async () => {
-      try {
-        const response = await promotionApi.get(
-          '/api/v1/promotion/direct-discount',
-          {
-            params: { sku: selectedVariant.sku },
-          },
-        );
-
-        if (!cancelled) {
-          setPromotion(response.data ?? null);
-        }
-      } catch (error) {
-        console.error('Fetch laptop promotion error:', error);
-
-        if (!cancelled) {
-          setPromotion(null);
-        }
-      }
-    };
-
-    fetchPromotion();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedVariant?.sku]);
 
   const discountValue = Number(promotion?.discountValue ?? 0);
 
@@ -284,7 +255,9 @@ export default function LaptopProductCard({
                     <button
                       key={colorVariant.colorSlug}
                       type="button"
-                      onClick={() => setSelectedColorSlug(colorVariant.colorSlug)}
+                      onClick={() =>
+                        setSelectedColorSlug(colorVariant.colorSlug)
+                      }
                       aria-pressed={isSelected}
                       className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
                         isSelected

@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { promotionApi } from '@/lib/axios/promotion-api';
+import { customerPromotionService } from '@/lib/axios/services/customer-services/promotion_service';
+
 import {
   ChevronDown,
   Check,
@@ -310,15 +311,12 @@ export default function PhoneProductDetail({
 
     const fetchPromotion = async () => {
       try {
-        const response = await promotionApi.get(
-          '/api/v1/promotion/direct-discount',
-          {
-            params: { sku: selectedVariant.sku },
-          },
+        const data = await customerPromotionService.getDirectDiscount(
+          selectedVariant.sku,
         );
 
         if (!cancelled) {
-          setPromotion(response.data ?? null);
+          setPromotion(data ?? null);
         }
       } catch (error) {
         console.error('Fetch promotion error:', error);

@@ -1,7 +1,9 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
+import { customerPromotionService } from '@/lib/axios/services/customer-services/promotion_service';
+
 import {
   ChevronDown,
   Check,
@@ -17,6 +19,14 @@ import {
   BatteryCharging,
   Laptop,
 } from 'lucide-react';
+
+type PromotionDiscount = {
+  promotionId: string;
+  promotionName: string;
+  sku: string;
+  discountType: 'PERCENTAGE' | 'FIXED_AMOUNT';
+  discountValue: number;
+};
 
 type LaptopVariant = {
   sku: string;
@@ -197,7 +207,6 @@ function InfoList({
   return (
     <div className="border-b border-slate-100 py-3 last:border-0">
       <p className="mb-2 text-sm text-slate-500">{label}</p>
-
       <div className="flex flex-wrap gap-2">
         {items.map((item, index) => (
           <span
@@ -241,6 +250,7 @@ export default function LaptopProductDetail({
   );
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [promotion, setPromotion] = useState<PromotionDiscount | null>(null);
 
   const ramOptions = useMemo(
     () => [...new Set(product.variants.map((variant) => variant.ram))],
@@ -276,12 +286,76 @@ export default function LaptopProductDetail({
         variant.colorSlug === selectedColorSlug,
     ) ?? initialVariant;
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPromotion() {
+      const sku = selectedVariant?.sku;
+
+      if (!sku) {
+        setPromotion(null);
+        return;
+      }
+
+      setPromotion(null);
+
+      try {
+        const response =
+          await customerPromotionService.getDirectDiscount(sku);
+
+        const result =
+          response?.promotion ??
+          response?.data?.promotion ??
+          response?.data ??
+          response;
+
+        if (!cancelled) {
+          setPromotion(
+            result?.discountType && result?.discountValue != null
+              ? result
+              : null,
+          );
+        }
+      } catch (error) {
+        console.error('Không thể tải khuyến mãi:', error);
+
+        if (!cancelled) {
+          setPromotion(null);
+        }
+      }
+    }
+
+    loadPromotion();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedVariant?.sku]);
+
   const currentImages = selectedVariant?.images?.length
     ? selectedVariant.images
     : [product.image];
 
   const currentImage =
     currentImages[selectedImageIndex] ?? currentImages[0] ?? product.image;
+
+  const currentPrice = selectedVariant?.price ?? 0;
+
+  const discountValue =
+    promotion?.discountType === 'PERCENTAGE'
+      ? (currentPrice * promotion.discountValue) / 100
+      : promotion?.discountType === 'FIXED_AMOUNT'
+        ? promotion.discountValue
+        : 0;
+
+  const finalPrice = Math.max(0, currentPrice - discountValue);
+  const hasPromotion = Boolean(promotion && discountValue > 0);
+  const savedAmount = currentPrice - finalPrice;
+
+  const discountLabel =
+    promotion?.discountType === 'PERCENTAGE'
+      ? `-${promotion.discountValue}%`
+      : `-${formatPrice(promotion?.discountValue ?? 0)}`;
 
   function changeVariant(variant: LaptopVariant) {
     setSelectedRam(variant.ram);
@@ -434,6 +508,12 @@ export default function LaptopProductDetail({
           <div className="lg:col-span-5">
             <div className="group h-full rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-teal-200 hover:shadow-xl sm:p-5">
               <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-teal-50 via-white to-cyan-50">
+                {hasPromotion && (
+                  <span className="absolute left-3 top-3 z-10 rounded-full bg-rose-600 px-3 py-1.5 text-xs font-bold text-white shadow-md">
+                    {discountLabel}
+                  </span>
+                )}
+
                 <img
                   src={`/product/laptop/${currentImage}`}
                   alt={`${product.name} ${selectedVariant?.color ?? ''}`}
@@ -501,11 +581,43 @@ export default function LaptopProductDetail({
                 <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                   Giá bán
                 </p>
-                <p className="mt-2 text-3xl font-bold tracking-tight text-teal-800">
-                  {selectedVariant
-                    ? formatPrice(selectedVariant.price)
-                    : 'Liên hệ'}
-                </p>
+
+                {selectedVariant ? (
+                  hasPromotion ? (
+                    <div className="mt-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="text-3xl font-bold tracking-tight text-teal-800">
+                          {formatPrice(finalPrice)}
+                        </p>
+                        <span className="rounded-full bg-red-100 px-2.5 py-1 text-xs font-bold text-red-700">
+                          {discountLabel}
+                        </span>
+                      </div>
+
+                      <p className="mt-1 text-sm text-slate-500 line-through">
+                        {formatPrice(currentPrice)}
+                      </p>
+
+                      <p className="mt-2 text-sm font-medium text-emerald-700">
+                        Tiết kiệm {formatPrice(savedAmount)}
+                      </p>
+
+                      {promotion?.promotionName && (
+                        <p className="mt-1 text-xs text-slate-600">
+                          Khuyến mãi: {promotion.promotionName}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="mt-2 text-3xl font-bold tracking-tight text-teal-800">
+                      {formatPrice(currentPrice)}
+                    </p>
+                  )
+                ) : (
+                  <p className="mt-2 text-3xl font-bold tracking-tight text-teal-800">
+                    Liên hệ
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-1 gap-4 border-b border-slate-100 py-5 sm:grid-cols-2">
@@ -598,7 +710,6 @@ export default function LaptopProductDetail({
                 </div>
               </div>
 
-              {/* Màu sắc: bỏ vòng tròn màu, chỉ hiển thị tên màu */}
               <div className="border-b border-slate-100 py-5">
                 <h3 className="text-sm font-semibold text-slate-800">
                   Màu sắc
@@ -750,24 +861,15 @@ export default function LaptopProductDetail({
                 label="Kết nối không dây"
                 items={product.connectivityAndExpansion?.wirelessConnectivity}
               />
-              <InfoRow
-                label="Khe đọc thẻ nhớ"
-                value={product.connectivityAndExpansion?.memoryCardSlot}
-              />
+              <InfoRow label="Khe đọc thẻ nhớ" value={product.connectivityAndExpansion?.memoryCardSlot} />
               <InfoRow label="Webcam" value={product.connectivityAndExpansion?.webcam} />
-              <InfoRow
-                label="Đèn bàn phím"
-                value={product.connectivityAndExpansion?.keyboardBacklight}
-              />
+              <InfoRow label="Đèn bàn phím" value={product.connectivityAndExpansion?.keyboardBacklight} />
               <InfoRow label="Bảo mật" value={product.connectivityAndExpansion?.security} />
               <InfoList
                 label="Công nghệ âm thanh"
                 items={product.connectivityAndExpansion?.audioTechnology}
               />
-              <InfoRow
-                label="Hệ thống tản nhiệt"
-                value={product.connectivityAndExpansion?.cooling}
-              />
+              <InfoRow label="Hệ thống tản nhiệt" value={product.connectivityAndExpansion?.cooling} />
             </DetailSection>
 
             <DetailSection
@@ -776,14 +878,8 @@ export default function LaptopProductDetail({
               icon={<BatteryCharging size={18} />}
             >
               <InfoRow label="Pin" value={product.dimensionsAndBattery?.battery} />
-              <InfoRow
-                label="Hệ điều hành"
-                value={product.dimensionsAndBattery?.operatingSystem}
-              />
-              <InfoRow
-                label="Năm ra mắt"
-                value={product.dimensionsAndBattery?.releaseYear}
-              />
+              <InfoRow label="Hệ điều hành" value={product.dimensionsAndBattery?.operatingSystem} />
+              <InfoRow label="Năm ra mắt" value={product.dimensionsAndBattery?.releaseYear} />
               <InfoRow label="Kích thước" value={product.dimensionsAndBattery?.dimensions} />
               <InfoRow label="Trọng lượng" value={product.dimensionsAndBattery?.weight} />
               <InfoRow label="Chất liệu" value={product.dimensionsAndBattery?.material} />
