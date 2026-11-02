@@ -1,108 +1,3 @@
-# import os
-# from dotenv import load_dotenv
-
-# from langchain_core.messages import SystemMessage
-# from langchain_core.messages import SystemMessage, trim_messages
-# from langchain_google_genai import ChatGoogleGenerativeAI
-# from langgraph.graph import StateGraph, MessagesState, START, END
-# from langgraph.prebuilt import ToolNode, tools_condition
-# from langchain_ollama import ChatOllama
-
-# from pymongo import MongoClient
-# from langgraph.checkpoint.mongodb import MongoDBSaver
-
-# from prompt import PRODUCT_AGENT_PROMPT
-
-# from tools.product_tools import (get_phone_detail, get_laptop_detail, get_tablet_detail, compare_phones, compare_laptops, compare_tablets)
-
-# load_dotenv()
-
-# llm = ChatGoogleGenerativeAI(
-#     model="gemini-3.1-flash-lite",
-#     google_api_key=os.getenv("GOOGLE_API_KEY"),
-#     max_tokens=1024,
-#     timeout=60,
-#     max_retries=1,
-# )
-
-# summarizer_llm = ChatGoogleGenerativeAI(
-#     model="gemini-3.1-flash-lite",
-#     google_api_key=os.getenv("GOOGLE_SUMMARIZE_API_KEY"),
-#     max_tokens=500,
-#     timeout=60,
-#     max_retries=1,
-# )
-
-# # llm = ChatOllama(
-# #     model="qwen3:4b",
-# #     temperature=0,
-# # )
-
-# tools = [
-#     get_phone_detail, 
-#     get_laptop_detail, 
-#     get_tablet_detail,
-#     compare_phones,
-#     compare_laptops,
-#     compare_tablets,
-# ]
-
-# llm_with_tools = llm.bind_tools(tools)
-
-
-# MAX_HISTORY_TOKENS = 5000
-
-# async def call_model(state: MessagesState):
-#     # Cắt bớt lịch sử trước khi gửi vào LLM
-#     trimmed_messages = trim_messages(
-#         state["messages"],
-#         strategy="last",
-#         token_counter=llm,
-#         max_tokens=MAX_HISTORY_TOKENS,
-#         start_on="human",
-#         include_system=False,
-#     )
-
-#     messages = [
-#         SystemMessage(content=PRODUCT_AGENT_PROMPT),
-#         *trimmed_messages,
-#     ]
-
-#     response = await llm_with_tools.ainvoke(messages)
-
-#     return {"messages": [response]}
-
-
-# builder = StateGraph(MessagesState)
-
-# builder.add_node("llm", call_model)
-# builder.add_node("tools", ToolNode(tools))
-
-# builder.add_edge(START, "llm")
-
-# builder.add_conditional_edges(
-#     "llm",
-#     tools_condition,
-#     {
-#         "tools": "tools",
-#         END: END,
-#     },
-# )
-
-# builder.add_edge("tools", "llm")
-
-# # product_agent = builder.compile()
-
-# # Kết nối MongoDB
-# mongo_client = MongoClient(os.getenv("MONGODB_URI"))
-
-# # Khởi tạo Checkpointer
-# checkpointer = MongoDBSaver(mongo_client, db_name="ai_service")
-
-# # Compile graph có lưu trạng thái
-# product_agent = builder.compile(checkpointer=checkpointer)
-
-
 import os
 from typing import TypedDict
 
@@ -118,7 +13,7 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from langgraph.checkpoint.mongodb import MongoDBSaver
 from langchain_ollama import ChatOllama
 
-from prompt import PRODUCT_AGENT_PROMPT
+from .single_agent_prompt import SINGLE_AGENT_PROMPT
 
 from tools.product_tools import (
     get_phone_detail,
@@ -128,6 +23,15 @@ from tools.product_tools import (
     compare_laptops,
     compare_tablets,
     search_products,
+)
+
+from tools.user_tools import (
+    search_user,
+)
+
+from tools.customer_tools import (
+    search_customer,
+    get_customer_addresses,
 )
 
 load_dotenv()
@@ -169,6 +73,7 @@ summarizer_llm = ChatGoogleGenerativeAI(
 # ==================== TOOLS ====================
 
 tools = [
+    # Product tools
     get_phone_detail,
     get_laptop_detail,
     get_tablet_detail,
@@ -176,6 +81,13 @@ tools = [
     compare_laptops,
     compare_tablets,
     search_products,
+
+    # User tools
+    search_user,
+
+    # Customer tools
+    search_customer,
+    get_customer_addresses,
 ]
 
 llm_with_tools = llm.bind_tools(tools)
@@ -194,7 +106,7 @@ KEEP_RECENT_TOKENS = 1500
 
 # ==================== STATE ====================
 
-class ProductState(MessagesState):
+class SingleAgentState(MessagesState):
     summary: str
     summarized_message_count: int
 
@@ -227,8 +139,7 @@ def find_recent_start(messages, max_tokens):
 
 
 # ==================== SUMMARIZE NODE ====================
-
-async def summarize_node(state: ProductState):
+async def summarize_node(state: SingleAgentState):
     messages = state["messages"]
 
     summary = state.get("summary", "")
@@ -305,7 +216,7 @@ LỊCH SỬ CẦN TÓM TẮT:
 
 # ==================== LLM NODE ====================
 
-async def call_model(state: ProductState):
+async def call_model(state: SingleAgentState):
     summary = state.get("summary", "")
     summarized_count = state.get("summarized_message_count", 0)
 
@@ -323,7 +234,7 @@ async def call_model(state: ProductState):
     )
 
     messages = [
-        SystemMessage(content=PRODUCT_AGENT_PROMPT),
+        SystemMessage(content=SINGLE_AGENT_PROMPT),
     ]
 
     if summary:
@@ -346,7 +257,7 @@ async def call_model(state: ProductState):
 
 # ==================== BUILD GRAPH ====================
 
-builder = StateGraph(ProductState)
+builder = StateGraph(SingleAgentState)
 
 builder.add_node("summarize", summarize_node)
 builder.add_node("llm", call_model)
@@ -376,6 +287,6 @@ checkpointer = MongoDBSaver(
     db_name="ai_service",
 )
 
-product_agent = builder.compile(
+single_agent = builder.compile(
     checkpointer=checkpointer,
 )
