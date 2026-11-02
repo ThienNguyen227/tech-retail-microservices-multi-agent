@@ -69,13 +69,14 @@ export default function ForgotPasswordChange() {
     setLoading(true);
     try {
       const state = await getForgotPasswordState();
-      if (!state.userId) {
+      if (!state.userId || !state.resetToken) {
         setError('Không tìm thấy thông tin phiên đổi mật khẩu.');
         return;
       }
       await customerUserService.changePasswordForgotPassword({
         new_password: newPassword,
         user_id: state.userId,
+        reset_token: state.resetToken,
       });
       await clearForgotPasswordState();
       setSuccess('Đổi mật khẩu thành công. Đang chuyển đến trang đăng nhập...');

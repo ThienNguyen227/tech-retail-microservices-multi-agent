@@ -21,6 +21,7 @@ export type LoginRequest = {
 
 export type LoginResponse = {
   access_token: string;
+  refresh_token: string;
   user_name: string;
   user_id: string;
   session_id: string;
@@ -28,14 +29,26 @@ export type LoginResponse = {
   expires_in: number;
 };
 
+export type AccountInformation = {
+  user_id: string;
+  user_name: string;
+  user_email: string;
+  user_phone: string;
+  user_status: string;
+  user_created_at: string;
+  user_updated_at: string;
+};
+
 export type ForgotPasswordVerifyRequest = {
   user_email: string;
   otp_code: string;
+  device_info?: string;
 };
 
 export type ForgotPasswordChangeRequest = {
   user_id: string;
   new_password: string;
+  reset_token: string;
 };
 
 export const customerUserService = {
@@ -88,6 +101,27 @@ export const customerUserService = {
 
   async login(data: LoginRequest) {
     const response = await customerAxios.post('/login', data);
+    return response.data;
+  },
+
+  async logout(data: {
+    session_id: string | null;
+    refresh_token: string | null;
+  }) {
+    const response = await customerAxios.post('/logout', data);
+    return response.data;
+  },
+
+  async getAccountInformation() {
+    const response = await customerAxios.get('/account-information');
+    return response.data;
+  },
+
+  async updateAccountInformation(data: {
+    user_name?: string;
+    user_phone?: string;
+  }) {
+    const response = await customerAxios.patch('/account-information', data);
     return response.data;
   },
 };

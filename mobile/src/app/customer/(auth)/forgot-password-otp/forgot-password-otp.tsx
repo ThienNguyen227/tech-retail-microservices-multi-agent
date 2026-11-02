@@ -75,14 +75,16 @@ export default function ForgotPasswordOtp() {
       const response = await customerUserService.verifyOtpForgotPassword({
         user_email: email,
         otp_code: code,
+        device_info: 'mobile',
       });
-      if (!response?.reset_expires_at || !response.user_id) {
+      if (!response?.reset_expires_at || !response.user_id || !response.reset_token) {
         setError('Phản hồi từ Server không hợp lệ.');
         return;
       }
       await saveForgotPasswordResetState(
         response.user_id,
         response.reset_expires_at,
+        response.reset_token,
       );
       router.push('/customer/forgot-password-change' as Href);
     } catch (requestError) {
