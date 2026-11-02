@@ -16,7 +16,8 @@ export class RefreshAccessTokenController {
     }
 
     const cookieName = `customer_refresh_${sessionId}`;
-    const refreshToken = request.cookies?.[cookieName];
+    const refreshToken =
+      request.cookies?.[cookieName] ?? request.body?.refresh_token;
 
     if (!refreshToken) {
       throw new UnauthorizedException('Không tìm thấy Refresh Token!');

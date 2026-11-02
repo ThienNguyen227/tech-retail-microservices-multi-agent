@@ -35,6 +35,11 @@ export class LoginController {
         response.cookie(cookieName, result.refresh_token, refreshCookieOptions);
 
         const { refresh_token, ...loginResponse } = result;
+
+        if (dto.device_info === 'mobile') {
+            return { ...loginResponse, refresh_token };
+        }
+
         return loginResponse;
     }
 }

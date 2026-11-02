@@ -44,6 +44,9 @@ export class ForgotPasswordController {
             message: 'Xác thực OTP thành công!',
             user_id: result.user_id,
             reset_expires_at: result.reset_expires_at,
+            ...(dto.device_info === 'mobile'
+                ? { reset_token: result.resetToken }
+                : {}),
         };
     }
 
@@ -57,7 +60,8 @@ export class ForgotPasswordController {
         }
 
         const cookieName = `reset_token_${userId}`;
-        const resetToken = req.cookies?.[cookieName];
+        const resetToken =
+            req.cookies?.[cookieName] ?? req.body?.reset_token;
 
         if (!resetToken) {
             throw new UnauthorizedException('Phiên đổi mật khẩu không tồn tại hoặc đã hết hạn!');
