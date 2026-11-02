@@ -1,5 +1,6 @@
 import {
   IsNotEmpty,
+  IsOptional,
   IsString,
   MinLength,
 } from "class-validator";
@@ -15,4 +16,8 @@ export class ChangePasswordForgotPasswordDto {
   @IsString({ message: "User ID phải là chuỗi ký tự!" })
   @IsNotEmpty({ message: "User ID không được để trống!" })
   user_id: string;
+
+  @IsOptional()
+  @IsString({ message: "Reset token phải là chuỗi ký tự!" })
+  reset_token?: string;
 }

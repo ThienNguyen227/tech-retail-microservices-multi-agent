@@ -23,7 +23,8 @@ export class LogoutCustomerController {
     }
 
     const cookieName = `customer_refresh_${sessionId}`;
-    const refreshToken = request.cookies?.[cookieName];
+    const refreshToken =
+      request.cookies?.[cookieName] ?? request.body?.refresh_token;
 
     try {
       if (refreshToken) {
