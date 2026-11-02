@@ -15,12 +15,43 @@ export async function getAccessToken() {
   return SecureStore.getItemAsync('accessToken');
 }
 
+export async function saveRefreshToken(token: string) {
+  await SecureStore.setItemAsync('refreshToken', token);
+}
+
+export async function getRefreshToken() {
+  return SecureStore.getItemAsync('refreshToken');
+}
+
 export async function getCustomerSessionId() {
   return SecureStore.getItemAsync('customerSessionId');
 }
 
+export async function getStoredUser() {
+  const [userName, userId, sessionId] = await Promise.all([
+    SecureStore.getItemAsync('userName'),
+    SecureStore.getItemAsync('userId'),
+    SecureStore.getItemAsync('customerSessionId'),
+  ]);
+
+  return { userName, userId, sessionId };
+}
+
+export async function clearCustomerSession() {
+  await Promise.all([
+    SecureStore.deleteItemAsync('accessToken'),
+    SecureStore.deleteItemAsync('refreshToken'),
+    SecureStore.deleteItemAsync('customerSessionId'),
+    SecureStore.deleteItemAsync('userType'),
+    SecureStore.deleteItemAsync('userName'),
+    SecureStore.deleteItemAsync('userId'),
+    SecureStore.deleteItemAsync('rememberLogin'),
+  ]);
+}
+
 export async function saveLoginSession(data: {
   access_token: string;
+  refresh_token: string;
   session_id: string;
   user_id: string;
   user_name: string;
@@ -28,6 +59,7 @@ export async function saveLoginSession(data: {
 }) {
   await Promise.all([
     saveAccessToken(data.access_token),
+    saveRefreshToken(data.refresh_token),
     SecureStore.setItemAsync('customerSessionId', data.session_id),
     SecureStore.setItemAsync('userType', 'CUSTOMER'),
     SecureStore.setItemAsync('userName', data.user_name),
@@ -78,22 +110,25 @@ export async function saveForgotPasswordState(
 export async function saveForgotPasswordResetState(
   userId: string,
   resetExpiresAt: string,
+  resetToken: string,
 ) {
   await Promise.all([
     SecureStore.setItemAsync('forgotPasswordUserId', userId),
     SecureStore.setItemAsync('forgotPasswordResetExpiresAt', resetExpiresAt),
+    SecureStore.setItemAsync('forgotPasswordResetToken', resetToken),
   ]);
 }
 
 export async function getForgotPasswordState() {
-  const [email, otpExpiresAt, userId, resetExpiresAt] = await Promise.all([
+  const [email, otpExpiresAt, userId, resetExpiresAt, resetToken] = await Promise.all([
     SecureStore.getItemAsync('forgotPasswordEmail'),
     SecureStore.getItemAsync('forgotPasswordOtpExpiresAt'),
     SecureStore.getItemAsync('forgotPasswordUserId'),
     SecureStore.getItemAsync('forgotPasswordResetExpiresAt'),
+    SecureStore.getItemAsync('forgotPasswordResetToken'),
   ]);
 
-  return { email, otpExpiresAt, userId, resetExpiresAt };
+  return { email, otpExpiresAt, userId, resetExpiresAt, resetToken };
 }
 
 export async function clearForgotPasswordState() {
@@ -102,5 +137,6 @@ export async function clearForgotPasswordState() {
     SecureStore.deleteItemAsync('forgotPasswordOtpExpiresAt'),
     SecureStore.deleteItemAsync('forgotPasswordUserId'),
     SecureStore.deleteItemAsync('forgotPasswordResetExpiresAt'),
+    SecureStore.deleteItemAsync('forgotPasswordResetToken'),
   ]);
 }
