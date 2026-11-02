@@ -173,7 +173,9 @@ model InventoryTransactionItem {
   @@map("inventory_transaction_item")
 }
 
-
+// ========================================
+// 9. ProcessedEvent
+// ========================================
 model ProcessedEvent {
   processed_event_id         Int      @id @default(autoincrement())
   processed_event_event_id   Int      @unique
