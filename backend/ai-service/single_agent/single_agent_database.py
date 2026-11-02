@@ -7,7 +7,7 @@ load_dotenv()
 
 mongo_client = MongoClient(os.getenv("MONGODB_URI"))
 
-db = mongo_client["ai_service"]
+db = mongo_client["single_agent_service"]
 
 conversations_collection = db["conversations"]
 messages_collection = db["messages"]
