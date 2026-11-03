@@ -4,6 +4,7 @@ import type { Href } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Modal,
   Pressable,
   ScrollView,
   Text,
@@ -149,35 +150,78 @@ export default function AccountInformationScreen() {
                 </View>
                 <Text className="text-xs font-medium text-white">Mã tài khoản: {profile.user_id}</Text>
               </View>
-              <Pressable className="mt-5 self-start rounded-xl bg-white px-4 py-3" onPress={startEditing} disabled={editing}>
-                <Text className="font-bold text-[#116b68]">{editing ? 'Đang chỉnh sửa' : 'Chỉnh sửa'}</Text>
+              <Pressable className="mt-5 self-start rounded-xl bg-white px-4 py-3" onPress={startEditing}>
+                <Text className="font-bold text-[#116b68]">Chỉnh sửa</Text>
               </Pressable>
             </View>
 
             {success ? <Notice message={success} /> : null}
-            {editing ? (
-              <EditAccountPanel
-                profile={profile}
-                name={formName}
-                phone={formPhone}
-                error={formError}
-                saving={saving}
-                onNameChange={setFormName}
-                onPhoneChange={setFormPhone}
-                onCancel={() => { if (!saving) { setEditing(false); setFormError(''); } }}
-                onSave={() => void saveProfile()}
+
+            <View className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+              <SectionHeader
+                title="Chi tiết tài khoản"
+                subtitle="Thông tin đăng ký tài khoản và liên hệ của bạn."
+                badge="Thông tin cá nhân"
               />
-            ) : (
-              <View className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                <SectionHeader title="Chi tiết tài khoản" subtitle="Thông tin đăng ký tài khoản và liên hệ của bạn." badge="Thông tin cá nhân" />
-                <InfoRow label="Tên tài khoản" value={profile.user_name} symbol="U" />
-                <InfoRow label="Địa chỉ email" value={profile.user_email} symbol="@" />
-                <InfoRow label="Số điện thoại" value={profile.user_phone} symbol="P" />
-                <InfoRow label="Mã tài khoản" value={profile.user_id} symbol="#" />
-                <InfoRow label="Ngày tạo tài khoản" value={formatDate(profile.user_created_at)} symbol="C" />
-                <InfoRow label="Cập nhật lần cuối" value={formatDate(profile.user_updated_at)} symbol="↻" last />
+
+              <InfoRow label="Tên tài khoản" value={profile.user_name} symbol="U" />
+              <InfoRow label="Địa chỉ email" value={profile.user_email} symbol="@" />
+              <InfoRow label="Số điện thoại" value={profile.user_phone} symbol="P" />
+              <InfoRow label="Mã tài khoản" value={profile.user_id} symbol="#" />
+
+              <InfoRow
+                label="Ngày tạo tài khoản"
+                value={formatDate(profile.user_created_at)}
+                symbol="C"
+              />
+
+              <InfoRow
+                label="Cập nhật lần cuối"
+                value={formatDate(profile.user_updated_at)}
+                symbol="↻"
+                last
+              />
+            </View>
+
+            <Modal
+              visible={editing}
+              transparent
+              animationType="fade"
+              statusBarTranslucent
+              onRequestClose={() => {
+                if (!saving) {
+                  setEditing(false);
+                  setFormError('');
+                }
+              }}
+            >
+              <View className="flex-1 justify-center bg-black/50 px-4 py-6">
+                <View className="max-h-[90%]">
+                  <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                    contentContainerStyle={{ flexGrow: 1 }}
+                  >
+                    <EditAccountPanel
+                      profile={profile}
+                      name={formName}
+                      phone={formPhone}
+                      error={formError}
+                      saving={saving}
+                      onNameChange={setFormName}
+                      onPhoneChange={setFormPhone}
+                      onCancel={() => {
+                        if (!saving) {
+                          setEditing(false);
+                          setFormError('');
+                        }
+                      }}
+                      onSave={() => void saveProfile()}
+                    />
+                  </ScrollView>
+                </View>
               </View>
-            )}
+            </Modal>
           </View>
         ) : null}
       </ScrollView>

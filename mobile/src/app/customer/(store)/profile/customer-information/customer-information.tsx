@@ -4,6 +4,7 @@ import type { Href } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Modal,
   Alert,
   Pressable,
   ScrollView,
@@ -12,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 import { clearAccessToken } from '@/lib/access_token/customer_access_token';
 import {
@@ -203,10 +205,13 @@ export default function CustomerInformationScreen() {
               <Pressable className="mt-5 self-start rounded-xl bg-white px-4 py-3" onPress={startEditing} disabled={editing}><Text className="font-bold text-[#116b68]">{editing ? 'Đang chỉnh sửa' : 'Chỉnh sửa'}</Text></Pressable>
             </View>
             {success ? <Notice message={success} /> : null}
-            {editing ? <CustomerEditPanel name={fullName} dateOfBirth={dateOfBirth} gender={gender} error={formError} saving={saving} code={profile.customer_code} onNameChange={setFullName} onDateChange={setDateOfBirth} onGenderChange={setGender} onCancel={() => { if (!saving) { setEditing(false); setFormError(''); } }} onSave={() => void saveProfile()} /> : null}
             {!editing ? (
               <View className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                <SectionHeader title="Chi tiết khách hàng" subtitle="Thông tin cá nhân trong hồ sơ khách hàng của bạn." badge="Hồ sơ cá nhân" />
+                <SectionHeader
+                  title="Chi tiết khách hàng"
+                  subtitle="Thông tin cá nhân trong hồ sơ khách hàng của bạn."
+                  badge="Hồ sơ cá nhân"
+                />
                 <InfoRow label="Mã khách hàng" value={profile.customer_code} symbol="#" />
                 <InfoRow label="Họ và tên khách hàng" value={profile.customer_full_name || ''} symbol="U" />
                 <InfoRow label="Ngày sinh" value={formatDate(profile.customer_date_of_birth)} symbol="D" />
@@ -240,22 +245,380 @@ export default function CustomerInformationScreen() {
                     </View>
                   </View>
                 ))}
-                {addressForm ? <AddressPanel form={addressForm} saving={addressSaving} onChange={setAddressForm} onCancel={() => setAddressForm(null)} onSave={() => void saveAddress()} /> : null}
               </View>
             </View>
           </View>
         ) : null}
       </ScrollView>
+
+      {/* POPUP CHỈNH SỬA THÔNG TIN KHÁCH HÀNG */}
+      <Modal
+        visible={editing && !!profile}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => {
+          if (!saving) {
+            setEditing(false);
+            setFormError('');
+          }
+        }}
+      >
+        <View className="flex-1 justify-center bg-black/50 px-4 py-8">
+          <Pressable
+            className="absolute inset-0"
+            onPress={() => {
+              if (!saving) {
+                setEditing(false);
+                setFormError('');
+              }
+            }}
+          />
+
+          <View className="max-h-[85%] overflow-hidden rounded-2xl bg-white">
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {profile ? (
+                <CustomerEditPanel
+                  code={profile.customer_code}
+                  name={fullName}
+                  dateOfBirth={dateOfBirth}
+                  gender={gender}
+                  error={formError}
+                  saving={saving}
+                  onNameChange={setFullName}
+                  onDateChange={setDateOfBirth}
+                  onGenderChange={setGender}
+                  onCancel={() => {
+                    if (!saving) {
+                      setEditing(false);
+                      setFormError('');
+                    }
+                  }}
+                  onSave={() => void saveProfile()}
+                />
+              ) : null}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* POPUP THÊM / CHỈNH SỬA ĐỊA CHỈ */}
+      <Modal
+        visible={addressForm !== null}
+        transparent
+        animationType="fade"
+        statusBarTranslucent
+        onRequestClose={() => {
+          if (!addressSaving) setAddressForm(null);
+        }}
+      >
+        <View className="flex-1 justify-center bg-black/50 px-4 py-8">
+          <Pressable
+            className="absolute inset-0"
+            onPress={() => {
+              if (!addressSaving) setAddressForm(null);
+            }}
+          />
+
+          <View className="max-h-[85%] overflow-hidden rounded-2xl bg-white">
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {addressForm ? (
+                <AddressPanel
+                  form={addressForm}
+                  saving={addressSaving}
+                  onChange={setAddressForm}
+                  onCancel={() => {
+                    if (!addressSaving) setAddressForm(null);
+                  }}
+                  onSave={() => void saveAddress()}
+                />
+              ) : null}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
 
-function CustomerEditPanel({ code, name, dateOfBirth, gender, error, saving, onNameChange, onDateChange, onGenderChange, onCancel, onSave }: { code: string; name: string; dateOfBirth: string; gender: string; error: string; saving: boolean; onNameChange: (value: string) => void; onDateChange: (value: string) => void; onGenderChange: (value: string) => void; onCancel: () => void; onSave: () => void }) {
-  return <View className="overflow-hidden rounded-2xl border border-slate-200 bg-white"><View className="bg-[#073b4c] p-5"><Text className="text-xs font-bold uppercase tracking-widest text-teal-200">Hồ sơ cá nhân</Text><Text className="mt-1 text-xl font-bold text-white">Chỉnh sửa thông tin</Text><Text className="mt-1 text-sm text-teal-50">Cập nhật hồ sơ khách hàng của bạn.</Text></View><View className="gap-4 p-5"><View className="rounded-2xl border border-teal-100 bg-teal-50 p-4"><Text className="text-xs text-slate-500">Mã khách hàng</Text><Text className="mt-1 font-semibold text-slate-800">{code}</Text></View><Field label="Họ và tên *" value={name} onChangeText={onNameChange} placeholder="Nhập họ và tên" maxLength={100} /><Field label="Ngày sinh *" value={dateOfBirth} onChangeText={onDateChange} placeholder="YYYY-MM-DD" /><Text className="text-sm font-semibold text-slate-700">Giới tính *</Text><View className="flex-row gap-2">{['MALE', 'FEMALE', 'OTHER'].map((value) => <Pressable key={value} className={`flex-1 items-center rounded-xl border py-3 ${gender === value ? 'border-[#168b87] bg-[#e6f5f4]' : 'border-slate-200'}`} onPress={() => onGenderChange(value)}><Text className={`text-xs font-bold ${gender === value ? 'text-[#168b87]' : 'text-slate-500'}`}>{genderLabel(value)}</Text></Pressable>)}</View>{error ? <Text className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</Text> : null}<ActionButtons saving={saving} saveLabel="Lưu thay đổi" onCancel={onCancel} onSave={onSave} /></View></View>;
+function CustomerEditPanel({
+  code,
+  name,
+  dateOfBirth,
+  gender,
+  error,
+  saving,
+  onNameChange,
+  onDateChange,
+  onGenderChange,
+  onCancel,
+  onSave,
+}: {
+  code: string;
+  name: string;
+  dateOfBirth: string;
+  gender: string;
+  error: string;
+  saving: boolean;
+  onNameChange: (value: string) => void;
+  onDateChange: (value: string) => void;
+  onGenderChange: (value: string) => void;
+  onCancel: () => void;
+  onSave: () => void;
+}) {
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  const selectedDate = dateOfBirth
+    ? new Date(`${dateOfBirth}T00:00:00`)
+    : new Date();
+
+  const displayDate = dateOfBirth
+    ? new Intl.DateTimeFormat('vi-VN', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      }).format(selectedDate)
+    : 'Chọn ngày sinh';
+
+  return (
+    <View className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      {/* Header */}
+      <View className="bg-[#073b4c] p-5">
+        <Text className="text-xs font-bold uppercase tracking-widest text-teal-200">
+          Hồ sơ khách hàng
+        </Text>
+        <Text className="mt-1 text-xl font-bold text-white">
+          Chỉnh sửa thông tin
+        </Text>
+        <Text className="mt-1 text-sm text-teal-50">
+          Cập nhật hồ sơ khách hàng của bạn.
+        </Text>
+      </View>
+
+      {/* Form */}
+      <View className="gap-4 p-5">
+        <View className="rounded-2xl border border-teal-100 bg-teal-50 p-4">
+          <Text className="text-xs text-slate-500">Mã khách hàng</Text>
+          <Text className="mt-1 font-semibold text-slate-800">
+            {code}
+          </Text>
+        </View>
+
+        <Field
+          label="Họ và tên *"
+          value={name}
+          onChangeText={onNameChange}
+          placeholder="Nhập họ và tên"
+          maxLength={100}
+        />
+
+        {/* Ngày sinh */}
+        <View>
+          <Text className="mb-2 text-sm font-semibold text-slate-700">
+            Ngày sinh *
+          </Text>
+
+          <Pressable
+            className="h-12 flex-row items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4"
+            onPress={() => setShowDatePicker(true)}
+            disabled={saving}
+          >
+            <Text
+              className={
+                dateOfBirth
+                  ? 'text-sm text-slate-800'
+                  : 'text-sm text-slate-400'
+              }
+            >
+              {displayDate}
+            </Text>
+
+            <Text className="text-lg text-[#168b87]">▦</Text>
+          </Pressable>
+
+          {showDatePicker ? (
+            <DateTimePicker
+              value={
+                Number.isNaN(selectedDate.getTime())
+                  ? new Date()
+                  : selectedDate
+              }
+              mode="date"
+              display="default"
+              maximumDate={new Date()}
+              onChange={(event, selectedDateValue) => {
+                setShowDatePicker(false);
+
+                if (event.type === 'set' && selectedDateValue) {
+                  const year = selectedDateValue.getFullYear();
+                  const month = String(
+                    selectedDateValue.getMonth() + 1,
+                  ).padStart(2, '0');
+                  const day = String(
+                    selectedDateValue.getDate(),
+                  ).padStart(2, '0');
+
+                  onDateChange(`${year}-${month}-${day}`);
+                }
+              }}
+            />
+          ) : null}
+        </View>
+
+        {/* Giới tính */}
+        <Text className="text-sm font-semibold text-slate-700">
+          Giới tính *
+        </Text>
+
+        <View className="flex-row gap-2">
+          {['MALE', 'FEMALE', 'OTHER'].map((value) => (
+            <Pressable
+              key={value}
+              className={`flex-1 items-center rounded-xl border py-3 ${
+                gender === value
+                  ? 'border-[#168b87] bg-[#e6f5f4]'
+                  : 'border-slate-200'
+              }`}
+              onPress={() => onGenderChange(value)}
+            >
+              <Text
+                className={`text-xs font-bold ${
+                  gender === value
+                    ? 'text-[#168b87]'
+                    : 'text-slate-500'
+                }`}
+              >
+                {genderLabel(value)}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+
+        {error ? (
+          <Text className="rounded-xl bg-red-50 p-3 text-sm text-red-700">
+            {error}
+          </Text>
+        ) : null}
+
+        <ActionButtons
+          saving={saving}
+          saveLabel="Lưu thay đổi"
+          onCancel={onCancel}
+          onSave={onSave}
+        />
+      </View>
+    </View>
+  );
 }
 
-function AddressPanel({ form, saving, onChange, onCancel, onSave }: { form: { id?: string; line: string; ward: string; province: string; isDefault: boolean }; saving: boolean; onChange: (form: { id?: string; line: string; ward: string; province: string; isDefault: boolean }) => void; onCancel: () => void; onSave: () => void }) {
-  return <View className="rounded-2xl border border-teal-100 bg-teal-50 p-4"><Text className="text-lg font-bold text-[#073b4c]">{form.id ? 'Chỉnh sửa địa chỉ' : 'Thêm địa chỉ nhận hàng'}</Text><Text className="mt-1 text-sm text-slate-500">Cập nhật thông tin để giao hàng chính xác.</Text><Field label="Địa chỉ *" value={form.line} onChangeText={(value) => onChange({ ...form, line: value })} placeholder="Số nhà, tên đường..." maxLength={255} /><Field label="Phường / Xã *" value={form.ward} onChangeText={(value) => onChange({ ...form, ward: value })} placeholder="Nhập phường / xã" maxLength={100} /><Field label="Tỉnh / Thành phố *" value={form.province} onChangeText={(value) => onChange({ ...form, province: value })} placeholder="Nhập tỉnh / thành phố" maxLength={100} /><Pressable className="flex-row items-center gap-3" onPress={() => onChange({ ...form, isDefault: !form.isDefault })}><View className={`h-5 w-5 items-center justify-center rounded border ${form.isDefault ? 'border-[#168b87] bg-[#168b87]' : 'border-slate-300 bg-white'}`}>{form.isDefault ? <Text className="text-xs font-bold text-white">✓</Text> : null}</View><Text className="flex-1 text-sm text-slate-600">Đặt làm địa chỉ mặc định</Text></Pressable><ActionButtons saving={saving} saveLabel={form.id ? 'Lưu thay đổi' : 'Thêm địa chỉ'} onCancel={onCancel} onSave={onSave} /></View>;
+function AddressPanel({
+  form,
+  saving,
+  onChange,
+  onCancel,
+  onSave,
+}: {
+  form: {
+    id?: string;
+    line: string;
+    ward: string;
+    province: string;
+    isDefault: boolean;
+  };
+  saving: boolean;
+  onChange: (form: {
+    id?: string;
+    line: string;
+    ward: string;
+    province: string;
+    isDefault: boolean;
+  }) => void;
+  onCancel: () => void;
+  onSave: () => void;
+}) {
+  return (
+    <View className="overflow-hidden bg-white">
+      {/* Header */}
+      <View className="bg-[#073b4c] p-5">
+        <Text className="text-xs font-bold uppercase tracking-widest text-teal-200">
+          Quản lý địa chỉ
+        </Text>
+
+        <Text className="mt-1 text-xl font-bold text-white">
+          {form.id ? 'Chỉnh sửa địa chỉ' : 'Thêm địa chỉ nhận hàng'}
+        </Text>
+
+        <Text className="mt-1 text-sm leading-5 text-teal-50">
+          {form.id
+            ? 'Cập nhật thông tin địa chỉ nhận hàng của bạn.'
+            : 'Thêm địa chỉ mới để thuận tiện hơn khi đặt mua sản phẩm.'}
+        </Text>
+      </View>
+
+      {/* Form */}
+      <View className="gap-4 p-5">
+        <Field
+          label="Địa chỉ *"
+          value={form.line}
+          onChangeText={(value) => onChange({ ...form, line: value })}
+          placeholder="Số nhà, tên đường..."
+          maxLength={255}
+        />
+
+        <Field
+          label="Phường / Xã *"
+          value={form.ward}
+          onChangeText={(value) => onChange({ ...form, ward: value })}
+          placeholder="Nhập phường / xã"
+          maxLength={100}
+        />
+
+        <Field
+          label="Tỉnh / Thành phố *"
+          value={form.province}
+          onChangeText={(value) => onChange({ ...form, province: value })}
+          placeholder="Nhập tỉnh / thành phố"
+          maxLength={100}
+        />
+
+        <Pressable
+          className="flex-row items-center gap-3 rounded-xl bg-teal-50 p-3"
+          onPress={() =>
+            onChange({ ...form, isDefault: !form.isDefault })
+          }
+        >
+          <View
+            className={`h-5 w-5 items-center justify-center rounded border ${
+              form.isDefault
+                ? 'border-[#168b87] bg-[#168b87]'
+                : 'border-slate-300 bg-white'
+            }`}
+          >
+            {form.isDefault ? (
+              <Text className="text-xs font-bold text-white">✓</Text>
+            ) : null}
+          </View>
+
+          <Text className="flex-1 text-sm font-semibold text-slate-700">
+            Đặt làm địa chỉ mặc định
+          </Text>
+        </Pressable>
+
+        <ActionButtons
+          saving={saving}
+          saveLabel={form.id ? 'Lưu thay đổi' : 'Thêm địa chỉ'}
+          onCancel={onCancel}
+          onSave={onSave}
+        />
+      </View>
+    </View>
+  );
 }
 
 function ActionButtons({ saving, saveLabel, onCancel, onSave }: { saving: boolean; saveLabel: string; onCancel: () => void; onSave: () => void }) {

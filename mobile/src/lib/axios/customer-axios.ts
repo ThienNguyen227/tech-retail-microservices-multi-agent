@@ -13,12 +13,12 @@ import {
   saveAccessToken,
   getCustomerSessionId,
 } from '@/lib/storage/secure_storage';
+import { CUSTOMER_URLS } from '@/constants/api';
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
-const AUTH_URL = `${API_BASE_URL}/api/v1/customer-session/user-service`;
+const AUTH_URL = CUSTOMER_URLS.user;
 
 export const customerAxios = create({
-  baseURL: API_BASE_URL,
+  baseURL: AUTH_URL,
   withCredentials: true,
   timeout: 10_000,
 });
