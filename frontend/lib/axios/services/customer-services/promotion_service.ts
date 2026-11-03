@@ -30,4 +30,13 @@ export const customerPromotionService = {
 
     return response.data;
   },
+
+  // 3. (GET) GET ALL COUPONS
+  async getAllCoupons() {
+    const response = await customerAxios.get(
+      `${PROMOTION_SERVICE_URL}/coupons`,
+    );
+
+    return response.data;
+  },
 };

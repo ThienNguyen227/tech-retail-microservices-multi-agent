@@ -5,6 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class CouponService {
     constructor(private readonly prisma: PrismaService) {}
 
+    // 1. (GET) COUPON LIST
     async getAllCoupons() {
         const coupons = await this.prisma.promotionCoupon.findMany({
             select: {
