@@ -38,7 +38,8 @@
           "image": "./assets/images/smarthub-splash.png",
           "imageWidth": 220
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,

@@ -1,7 +1,5 @@
 import { customerAxios } from '../../customer-axios';
-
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL;
-const CUSTOMER_SERVICE_URL = `${API_BASE_URL}/api/v1/customer-session/customer-service`;
+import { CUSTOMER_URLS } from '@/constants/api';
 
 export type CustomerInformationPayload = {
   customer_full_name: string;
@@ -18,17 +16,17 @@ export type CustomerAddressPayload = {
 
 export const customerCustomerService = {
   async getCustomerInformation() {
-    const response = await customerAxios.get(`${CUSTOMER_SERVICE_URL}/customer-information`);
+    const response = await customerAxios.get(`${CUSTOMER_URLS.customer}/customer-information`);
     return response.data;
   },
 
   async updateCustomerInformation(data: CustomerInformationPayload) {
-    const response = await customerAxios.patch(`${CUSTOMER_SERVICE_URL}/customer-information`, data);
+    const response = await customerAxios.patch(`${CUSTOMER_URLS.customer}/customer-information`, data);
     return response.data;
   },
 
   async createCustomerAddress(data: CustomerAddressPayload) {
-    const response = await customerAxios.post(`${CUSTOMER_SERVICE_URL}/customer-address`, data);
+    const response = await customerAxios.post(`${CUSTOMER_URLS.customer}/customer-address`, data);
     return response.data; 
   },
 
@@ -37,14 +35,14 @@ export const customerCustomerService = {
     data: CustomerAddressPayload,
   ) {
     const response = await customerAxios.patch(
-      `${CUSTOMER_SERVICE_URL}/customer-address/${addressId}`,
+      `${CUSTOMER_URLS.customer}/customer-address/${addressId}`,
       data,
     );
     return response.data;
   },
 
   async deleteCustomerAddress(addressId: string) {
-    const response = await customerAxios.delete(`${CUSTOMER_SERVICE_URL}/customer-address/${addressId}`);
+    const response = await customerAxios.delete(`${CUSTOMER_URLS.customer}/customer-address/${addressId}`);
     return response.data;
   },
 };
