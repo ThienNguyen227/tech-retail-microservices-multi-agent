@@ -11,11 +11,11 @@ import {
 import { BranchStatus } from '@prisma/client';
 import { BranchService } from './branch.service';
 
-@Controller('api/v1/branches')
+@Controller('api/v1/customer-session/branch-service/branch-list')
 export class BranchController {
   constructor(private readonly branchService: BranchService) {}
 
-  // http://localhost:3005/api/v1/branches?status=ACTIVE
+  // 1. (GET) BRANCH-LIST
   @Get()
   findAll(@Query('status') status?: BranchStatus) {
     return this.branchService.findAll(status);

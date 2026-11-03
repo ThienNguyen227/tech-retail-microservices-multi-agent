@@ -1770,6 +1770,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { customerCustomerService } from "@/lib/axios/services/customer-services/customer_service";
 import { customerCartService } from "@/lib/axios/services/customer-services/cart_service";
+import { customerBranchService } from "@/lib/axios/services/customer-services/branch_service";
 import { customerPromotionService } from "@/lib/axios/services/customer-services/promotion_service";
 import {
   ArrowLeft,
@@ -2247,13 +2248,8 @@ export default function CartPage() {
       setLoadingBranches(true);
       setBranchError("");
 
-      const response = await fetch(
-        "http://localhost:3005/api/v1/branches?status=ACTIVE",
-      );
-
-      if (!response.ok) throw new Error("Không thể tải danh sách cửa hàng");
-
-      setBranches(await response.json());
+      const data = await customerBranchService.getBranchList("ACTIVE");
+      setBranches(data);
     } catch (err) {
       setBranchError(
         err instanceof Error
