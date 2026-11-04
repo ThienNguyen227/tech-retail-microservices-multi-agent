@@ -16,10 +16,12 @@ import {
   Tablet,
   Home,
   FileTextIcon,
+  ShoppingBag,
 } from "lucide-react";
 import { clearAccessToken } from "@/lib/access_token/customer_access_token";
 import { customerUserService } from "@/lib/axios/services/customer-services/user_service";
 import { customerCartService } from "@/lib/axios/services/customer-services/cart_service";
+import { customerOrderService } from "@/lib/axios/services/customer-services/order_service";
 
 export default function CustomerHeader() {
   const router = useRouter();
@@ -128,20 +130,11 @@ export default function CustomerHeader() {
       }
 
       try {
-        const res = await fetch(
-          `http://localhost:3007/api/v1/orders?userId=${userId}`,
-        );
-
-        if (!res.ok) return;
-
-        const data = await res.json();
+        const data = await customerOrderService.getOrderList();
 
         setOrderCount(Array.isArray(data) ? data.length : 0);
       } catch (err) {
-        console.error(
-          "Lỗi lấy số lượng đơn hàng:",
-          err,
-        );
+        console.error("Lỗi lấy số lượng đơn hàng:", err);
       }
     }
 
@@ -236,25 +229,6 @@ export default function CustomerHeader() {
 
         {/* Actions */}
         <div className="flex shrink-0 items-center gap-1">
-          {/* Orders */}
-          <Link
-            href="/customer/order"
-            aria-label="Đơn hàng"
-            title="Đơn hàng của tôi"
-            className="relative flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100 hover:text-[#168b87]"
-          >
-            <ClipboardList
-              size={21}
-              strokeWidth={1.9}
-            />
-
-            {orderCount > 0 && (
-              <span className="absolute right-1 top-0.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-[#168b87] px-1 text-[10px] font-bold text-white">
-                {orderCount > 99 ? "99+" : orderCount}
-              </span>
-            )}
-          </Link>
-
           {/* Cart */}
           <Link
             href="/customer/cart"
@@ -270,6 +244,25 @@ export default function CustomerHeader() {
             {cartCount > 0 && (
               <span className="absolute right-1 top-0.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-[#168b87] px-1 text-[10px] font-bold text-white">
                 {cartCount > 99 ? "99+" : cartCount}
+              </span>
+            )}
+          </Link>
+
+          {/* Orders */}
+          <Link
+            href="/customer/order"
+            aria-label="Đơn hàng"
+            title="Đơn hàng của tôi"
+            className="relative flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100 hover:text-[#168b87]"
+          >
+            <ShoppingBag 
+              size={21}
+              strokeWidth={1.9}
+            />
+
+            {orderCount > 0 && (
+              <span className="absolute right-1 top-0.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-[#168b87] px-1 text-[10px] font-bold text-white">
+                {orderCount > 99 ? "99+" : orderCount}
               </span>
             )}
           </Link>

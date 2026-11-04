@@ -1175,9 +1175,9 @@ const deliveryMethodMap: Record<number, string> = {
 };
 
 const paymentMethodMap: Record<number, string> = {
-  1: "COD",
-  2: "MoMo",
-  3: "VNPay",
+  1: "COD (Thanh toán khi nhận hàng)",
+  2: "MOMO (Thanh toán qua ví điện tử MOMO)",
+  3: "VNPay (Thanh toán qua cổng VNPay)",
 };
 
 const formatPrice = (price: string | number) =>
@@ -1377,9 +1377,9 @@ export default function OrdersPage() {
         {/* Header */}
         <div className="mb-7">
           <div className="mb-3 flex items-center gap-2 text-sm text-slate-500">
-            <span>Tài khoản</span>
+            <span>Trang chủ</span>
             <ChevronRight className="h-4 w-4" />
-            <span className="font-medium text-teal-700">Đơn hàng của tôi</span>
+            <span className="font-medium text-teal-700">Đơn hàng</span>
           </div>
 
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -1536,9 +1536,9 @@ export default function OrdersPage() {
                         {paymentMethodMap[order.order_order_payment_method_id]}
                       </span>
                     </div>
-                    <span className="hidden text-slate-300 sm:inline">|</span>
+
                     <span
-                      className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${getPaymentStatusClass(
+                      className={`ml-auto rounded-full border px-2.5 py-1 text-xs font-semibold ${getPaymentStatusClass(
                         order.order_order_payment_status_id,
                       )}`}
                     >
