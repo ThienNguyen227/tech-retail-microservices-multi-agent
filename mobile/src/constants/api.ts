@@ -10,6 +10,8 @@ export const CUSTOMER_URLS = {
   product: `${API_HOST}:3003/api/v1/customer-session/product-service`,
   order: `${API_HOST}:3004/api/v1/customer-session/order-service`,
   cart: `${API_HOST}:3005/api/v1/customer-session/cart-service`,
+  promotion: `${API_HOST}:3008/api/v1/customer-session/promotion-service`,
 } as const;
 
 export const AI_SERVICE_URL = `${API_HOST}:8000/api/v1/ai-service`;
+export const FRONTEND_ASSET_URL = `${API_HOST}:3000`;
