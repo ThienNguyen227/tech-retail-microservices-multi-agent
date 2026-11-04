@@ -17,6 +17,8 @@ import {
   Loader2,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { customerOrderService } from "@/lib/axios/services/customer-services/order_service";
+
 // ============================================================
 // Types
 // ============================================================
@@ -246,6 +248,9 @@ export default function OrdersPage() {
 
   const router = useRouter();
 
+  // ============================================================
+  // (CHECK) USER-LOGIN
+  // ============================================================
   useEffect(() => {
     const userId = sessionStorage.getItem("userId");
 
@@ -255,9 +260,8 @@ export default function OrdersPage() {
   }, [router]);
 
   // ============================================================
-  // Fetch Orders
+  // 1. (GET) ORDER-LIST
   // ============================================================
-
   useEffect(() => {
     const fetchOrders = async () => {
       try {
@@ -271,21 +275,7 @@ export default function OrdersPage() {
           return;
         }
 
-        const response = await fetch(
-          `http://localhost:3007/api/v1/order?userId=${userId}`,
-          {
-            method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-            },
-          },
-        );
-
-        if (!response.ok) {
-          throw new Error("Không thể lấy danh sách đơn hàng");
-        }
-
-        const data: Order[] = await response.json();
+        const data: Order[] = await customerOrderService.getOrderList();
 
         setOrders(data);
       } catch (error) {
