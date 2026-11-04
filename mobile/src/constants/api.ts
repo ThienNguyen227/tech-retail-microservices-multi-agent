@@ -11,3 +11,5 @@ export const CUSTOMER_URLS = {
   order: `${API_HOST}:3004/api/v1/customer-session/order-service`,
   cart: `${API_HOST}:3005/api/v1/customer-session/cart-service`,
 } as const;
+
+export const AI_SERVICE_URL = `${API_HOST}:8000/api/v1/ai-service`;
