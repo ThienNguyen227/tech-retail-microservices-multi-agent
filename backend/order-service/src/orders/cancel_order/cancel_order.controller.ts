@@ -1,16 +1,25 @@
-import { Controller, Param, ParseIntPipe, Patch } from '@nestjs/common';
+import { Controller, Param, ParseIntPipe, Patch, Req, UseGuards } from '@nestjs/common';
 import { CancelOrderService } from './cancel_order.service';
+import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
+import type { JwtPayload } from "jsonwebtoken";
 
-@Controller('api/v1/order')
+@Controller('api/v1/customer-session/order-service')
 export class CancelOrderController {
   constructor(
     private readonly cancelOrderService: CancelOrderService,
   ) {}
-
+  
+  @UseGuards(JwtAuthGuard)
   @Patch(':orderId/cancel')
   async cancelOrder(
-    @Param('orderId', ParseIntPipe) orderId: number,
+    @Param('orderId') orderId: string,
+    @Req() req: { user: JwtPayload },
   ) {
-    return this.cancelOrderService.cancelOrder(orderId);
+    const userId = req.user.sub as string;
+
+    return this.cancelOrderService.cancelOrder(
+      userId,
+      Number(orderId),
+    );
   }
 }

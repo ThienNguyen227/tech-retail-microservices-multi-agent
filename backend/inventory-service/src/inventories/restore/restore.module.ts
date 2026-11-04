@@ -1,9 +1,8 @@
 import { Module } from '@nestjs/common';
-import { PrismaModule } from '../../prisma/prisma.module';
 import { RestoreService } from './restore.service';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [],
   controllers: [],
   providers: [RestoreService],
   exports: [RestoreService],
