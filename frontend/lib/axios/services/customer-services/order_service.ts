@@ -14,4 +14,13 @@ export const customerOrderService = {
     const response = await customerAxios.get(`${ORDER_SERVICE_URL}/order-list`);
     return response.data;
   },
+
+  // 2. (PATCH) CANCEL ORDER
+  async cancelOrder(orderId: number) {
+    const response = await customerAxios.patch(
+      `${ORDER_SERVICE_URL}/${orderId}/cancel`,
+    );
+
+    return response.data;
+  },
 };
