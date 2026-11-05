@@ -2478,12 +2478,31 @@ export default function CartPage() {
       items: orderItems,
       subtotal,
       shippingFee: 0,
-      directDiscountAmount: directDiscountTotal,
-      couponId: selectedCoupon?.couponId ?? null,
+      // directDiscountAmount: directDiscountTotal,
+      // couponId: selectedCoupon?.couponId ?? null,
       discountAmount: couponDiscount,
       totalAmount,
       paymentMethod,
     };
+
+//       orderData = {
+//         userId,
+//         fulfillmentType: "STORE_PICKUP",
+//         recipientName: deliveryInfo.fullName.trim(),
+//         recipientPhone: deliveryInfo.phone.trim(),
+//         addressLine: branch.address.branch_address_address_line,
+//         ward: branch.address.branch_address_ward,
+//         province: branch.address.branch_address_province,
+
+//         items,
+
+//         subtotal: cart.totalPrice,
+//         shippingFee: 0,
+//         discountAmount,
+//         totalAmount,
+//         paymentMethod,
+//       };
+//     }
 
     try {
       setCheckingOut(true);

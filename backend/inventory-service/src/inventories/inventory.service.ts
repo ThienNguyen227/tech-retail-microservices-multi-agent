@@ -15,15 +15,6 @@ export interface ReservedSerial {
 export class InventoryService {
   constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * Kiểm tra và TRỪ TỒN KHO + RESERVE SERIAL trong cùng Transaction.
-   *
-   * Chống Race Condition:
-   * - UPDATE stock với điều kiện gte
-   * - PostgreSQL tự xử lý row-level lock khi UPDATE
-   * - Nếu không đủ stock -> count = 0
-   * - Nếu lỗi -> toàn bộ transaction ROLLBACK
-   */
   async checkStock(branchId: number, items: CheckStockItem[]) {
     const targetBranchId = branchId > 0 ? branchId : 1;
 
