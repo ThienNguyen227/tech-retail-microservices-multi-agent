@@ -9,7 +9,7 @@ export const CUSTOMER_URLS = {
   customer: `${API_HOST}:3002/api/v1/customer-session/customer-service`,
   product: `${API_HOST}:3003/api/v1/customer-session/product-service`,
   order: `${API_HOST}:3004/api/v1/customer-session/order-service`,
-  cart: `${API_HOST}:3005/api/v1/customer-session/cart-service`,
+  cart: `${API_HOST}:3004/api/v1/customer-session/cart-service`,
   promotion: `${API_HOST}:3008/api/v1/customer-session/promotion-service`,
 } as const;
 
