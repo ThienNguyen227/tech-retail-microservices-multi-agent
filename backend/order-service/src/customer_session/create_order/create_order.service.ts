@@ -8,7 +8,7 @@ import {
 import type { ClientGrpc } from '@nestjs/microservices';
 import { firstValueFrom, Observable } from 'rxjs';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CreateOrderDto } from '../dto/create_order/create_order.dto';
+import { CreateOrderDto } from '../../orders/dto/create_order/create_order.dto';
 
 interface InventoryGrpcService {
   checkStock(data: {
@@ -34,36 +34,35 @@ export class CreateOrderService implements OnModuleInit {
   ) {}
 
   onModuleInit() {
-    // Khởi tạo gRPC Service client từ INVENTORY_PACKAGE
-    this.inventoryGrpcService =
-      this.client.getService<InventoryGrpcService>('InventoryService');
+    this.inventoryGrpcService = this.client.getService<InventoryGrpcService>('InventoryService');
   }
 
-  async createOrder(dto: CreateOrderDto) {
+  // 1. (POST) CREATE-ORDER
+  async createOrder(userId: string, dto: CreateOrderDto) {
     // ==========================================
     // 1. KIỂM TRA DANH SÁCH SẢN PHẨM
     // ==========================================
     if (!dto.items || dto.items.length === 0) {
-      throw new BadRequestException('Đơn hàng phải có ít nhất 1 sản phẩm');
+      throw new BadRequestException('Đơn hàng phải có ít nhất 1 sản phẩm!');
     }
 
-    // ==========================================
-    // 2. GỌI gRPC SANG INVENTORY
-    //    - Kiểm tra tồn kho
-    //    - Trừ tồn kho
-    //    - Reserve serial
-    // ==========================================
     let reservedSerials: {
       sku: string;
       serial_numbers: string[];
     }[] = [];
 
     try {
-      const branchId =
-        dto.fulfillmentType === 'STORE_PICKUP' ? 2 : 1;
+      // Lấy branchId từ payload Frontend
+      const branchId = Number(dto.branchId);
+
+      if (!Number.isInteger(branchId) || branchId <= 0) {
+        throw new BadRequestException(
+          'Chi nhánh/kho xử lý đơn hàng không hợp lệ',
+        );
+      }
 
       console.log(
-        '[gRPC] Gọi sang Inventory Service để kiểm tra, trừ kho và reserve serial...',
+        `[gRPC] Kiểm tra tồn kho tại branchId=${branchId}`,
       );
 
       const checkStockRes = await firstValueFrom(
@@ -77,8 +76,6 @@ export class CreateOrderService implements OnModuleInit {
       );
 
       console.log('[gRPC] Kết quả từ Inventory:', checkStockRes);
-      console.log('is_valid:', checkStockRes.is_valid);
-      console.log('reserved_serials:', checkStockRes.reserved_serials);
 
       if (!checkStockRes.is_valid) {
         throw new BadRequestException(
@@ -86,7 +83,6 @@ export class CreateOrderService implements OnModuleInit {
         );
       }
 
-      // Lưu danh sách serial Inventory đã RESERVED
       reservedSerials = checkStockRes.reserved_serials || [];
 
       console.log(
@@ -98,10 +94,7 @@ export class CreateOrderService implements OnModuleInit {
         throw error;
       }
 
-      console.error(
-        'Lỗi khi gọi gRPC Inventory Service:',
-        error,
-      );
+      console.error('Lỗi khi gọi gRPC Inventory Service:', error);
 
       throw new InternalServerErrorException(
         'Không thể kiểm tra tồn kho lúc này, vui lòng thử lại sau',
@@ -147,21 +140,13 @@ export class CreateOrderService implements OnModuleInit {
       return sum + price * qty;
     }, 0);
 
-    const subtotal =
-      Number(dto.subtotal) || calculatedSubtotal;
+    const subtotal = Number(dto.subtotal) || calculatedSubtotal;
 
-    const shippingFee =
-      Number(dto.shippingFee) || 0;
+    const shippingFee = Number(dto.shippingFee) || 0;
 
-    const discountAmount =
-      Number(dto.discountAmount) || 0;
+    const discountAmount = Number(dto.discountAmount) || 0;
 
-    const totalAmount =
-      Number(dto.totalAmount) ||
-      Math.max(
-        0,
-        subtotal + shippingFee - discountAmount,
-      );
+    const totalAmount = Number(dto.totalAmount) || Math.max(0, subtotal + shippingFee - discountAmount);
 
     // ==========================================
     // 6. SINH MÃ ĐƠN HÀNG DUY NHẤT
@@ -180,38 +165,40 @@ export class CreateOrderService implements OnModuleInit {
       newOrder = await this.prisma.order.create({
         data: {
           order_code: orderCode,
-          order_user_id: Number(dto.userId) || 1,
+          order_user_id: Number(userId),
 
           // Trạng thái khởi tạo:
           // Processing = 1
           // Payment = 1 (UNPAID)
           order_order_processing_status_id: 1,
+
           order_order_payment_status_id: 1,
 
-          order_order_delivery_method_id:
-            deliveryMethodId,
+          order_order_delivery_method_id: deliveryMethodId,
 
-          order_order_payment_method_id:
-            paymentMethodId,
+          order_order_payment_method_id: paymentMethodId,
 
-          order_recipient_name:
-            (dto.recipientName || 'Khách hàng').trim(),
+          order_recipient_name: (dto.recipientName || 'Khách hàng').trim(),
 
-          order_recipient_phone:
-            (dto.recipientPhone || '').trim(),
+          order_recipient_phone: (dto.recipientPhone || '').trim(),
 
-          order_address_line:
-            (dto.addressLine || 'Tại cửa hàng').trim(),
+          order_address_line: (dto.addressLine || 'Tại cửa hàng').trim(),
 
-          order_ward:
-            (dto.ward || '').trim(),
+          order_ward: (dto.ward || '').trim(),
 
-          order_province:
-            (dto.province || '').trim(),
+          order_province: (dto.province || '').trim(),
 
           order_subtotal: subtotal,
+
           order_shipping_fee: shippingFee,
+
+          // Coupon áp dụng cho toàn đơn hàng
+          order_coupon_id: dto.couponId ?? null,
+          order_coupon_name: dto.couponName ?? null,
+          order_coupon_discount_amount: Number(dto.couponDiscountAmount) || 0,
+
           order_discount_amount: discountAmount,
+
           order_total_amount: totalAmount,
 
           // ==========================================
@@ -219,55 +206,40 @@ export class CreateOrderService implements OnModuleInit {
           // ==========================================
           order_item: {
             create: dto.items.map((item) => {
-              const unitPrice =
-                Number(item.price) || 0;
+              const unitPrice = Number(item.price) || 0;
 
-              const quantity =
-                Number(item.quantity) || 1;
+              const quantity = Number(item.quantity) || 1;
 
-              const itemSubtotal =
-                Number(item.subtotal) ||
-                unitPrice * quantity;
+              const itemSubtotal = Number(item.subtotal) || unitPrice * quantity;
 
               // Tìm serial mà Inventory đã RESERVED
-              const reservedItem =
-                reservedSerials.find(
-                  (reserved) =>
-                    reserved.sku === item.sku,
-                );
+              const reservedItem = reservedSerials.find((reserved) => reserved.sku === item.sku);
 
               // Với thiết kế hiện tại:
               // OrderItem chỉ lưu 1 serial_number
-              const serialNumber =
-                reservedItem?.serial_numbers?.[0] ??
-                null;
+              const serialNumber = reservedItem?.serial_numbers?.[0] ?? null;
 
-              console.log(
-                `[ORDER ITEM] SKU=${item.sku}, Serial=${serialNumber}`,
-              );
+              console.log(`[ORDER ITEM] SKU=${item.sku}, Serial=${serialNumber}`);
 
               return {
                 order_item_sku: item.sku,
 
-                order_item_product_name:
-                  item.productName || item.sku,
+                order_item_product_name: item.productName || item.sku,
 
-                order_item_product_image:
-                  item.imageUrl || '',
+                order_item_product_image: item.imageUrl || '',
 
-                order_item_unit_price:
-                  unitPrice,
+                order_item_unit_price: unitPrice,
 
-                order_item_quantity:
-                  quantity,
+                order_item_quantity: quantity,
 
-                order_item_subtotal:
-                  itemSubtotal,
+                order_item_subtotal: itemSubtotal,
 
-                // KHÔNG lấy serial từ frontend nữa
-                // Lấy serial do Inventory RESERVED
-                order_item_serial_number:
-                  serialNumber,
+                order_item_serial_number: serialNumber,
+
+                // Khuyến mãi trực tiếp theo SKU
+                order_item_promotion_id: item.promotionId ?? null,
+                order_item_promotion_name: item.promotionName ?? null,
+                order_item_direct_discount_amount: Number(item.directDiscountAmount) || 0,
               };
             }),
           },
