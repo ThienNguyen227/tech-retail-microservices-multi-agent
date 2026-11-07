@@ -9,16 +9,26 @@ const ORDER_SERVICE_URL = "http://localhost:3007/api/v1/customer-session/order-s
 export const customerOrderService = {
   // CUSTOMR-SESSION
   
-  // 1. (GET) ORDER LIST
+  // 1. (GET) ORDER-LIST
   async getOrderList() {
     const response = await customerAxios.get(`${ORDER_SERVICE_URL}/order-list`);
     return response.data;
   },
 
-  // 2. (PATCH) CANCEL ORDER
+  // 2. (PATCH) CANCEL-ORDER
   async cancelOrder(orderId: number) {
     const response = await customerAxios.patch(
       `${ORDER_SERVICE_URL}/${orderId}/cancel`,
+    );
+
+    return response.data;
+  },
+
+  // 3. (POST) CREATE-ORDER
+  async createOrder(orderData: any) {
+    const response = await customerAxios.post(
+      `${ORDER_SERVICE_URL}/order`,
+      orderData,
     );
 
     return response.data;
