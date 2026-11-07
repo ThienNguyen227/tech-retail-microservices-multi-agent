@@ -85,15 +85,15 @@ export class InventoryService {
           // ------------------------------------------
           // TEST RACE CONDITION
           // ------------------------------------------
-          console.log(
-            `[${item.sku}] Đã check SKU, chuẩn bị delay...`,
-          );
+          // console.log(
+          //   `[${item.sku}] Đã check SKU, chuẩn bị delay...`,
+          // );
 
-          await new Promise((resolve) => setTimeout(resolve, 3000));
+          // await new Promise((resolve) => setTimeout(resolve, 3000));
 
-          console.log(
-            `[${item.sku}] Hết delay, bắt đầu UPDATE`,
-          );
+          // console.log(
+          //   `[${item.sku}] Hết delay, bắt đầu UPDATE`,
+          // );
 
           // ==========================================
           // 3.2. TRỪ INVENTORY STOCK ATOMIC
