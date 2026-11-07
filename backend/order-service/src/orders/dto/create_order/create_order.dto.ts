@@ -39,6 +39,20 @@ export class CreateOrderItemDto {
   @IsOptional()
   @IsString()
   serialNumber?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  promotionId?: number;
+
+  @IsOptional()
+  @IsString()
+  promotionName?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  directDiscountAmount?: number;
 }
 
 export class CreateOrderDto {
@@ -48,6 +62,11 @@ export class CreateOrderDto {
   @IsOptional()
   @IsString()
   fulfillmentType?: string; // 'HOME_DELIVERY' | 'STORE_PICKUP'
+
+  @IsOptional()
+  @IsNumber({}, { message: 'branchId phải là số' })
+  @Type(() => Number)
+  branchId?: number;
 
   @IsNotEmpty({ message: 'Tên người nhận không được để trống' })
   @IsString()
@@ -83,6 +102,20 @@ export class CreateOrderDto {
   @IsNumber()
   @Type(() => Number)
   shippingFee?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  couponId?: number;
+
+  @IsOptional()
+  @IsString()
+  couponName?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  couponDiscountAmount?: number;
 
   @IsOptional()
   @IsNumber()

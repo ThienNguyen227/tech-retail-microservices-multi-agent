@@ -18,7 +18,14 @@ export class CouponService {
                     select: {
                         promotion_discount_type_code: true,
                     },
-                } ,
+                },
+
+                // Lấy tên chương trình khuyến mãi
+                promotion: {
+                    select: {
+                        promotion_name: true,
+                    },
+                },
             },
             where: {
                 promotion: {
@@ -37,6 +44,7 @@ export class CouponService {
 
         return coupons.map((coupon) => ({
             couponId: coupon.promotion_coupon_id,
+            couponName: coupon.promotion.promotion_name,
             discountValue: coupon.promotion_coupon_value,
             minOrderValue: coupon.promotion_coupon_min_order_value,
             maxDiscountValue: coupon.promotion_coupon_max_discount_value,

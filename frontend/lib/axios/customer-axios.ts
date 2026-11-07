@@ -74,22 +74,81 @@ async function refreshCustomerToken(): Promise<string> {
 }
 
 // Nếu nhận 401, refresh token rồi thử lại request ban đầu
+// customerAxios.interceptors.response.use(
+//   (response) => response,
+
+//   async (error: AxiosError) => {
+//     const originalRequest = error.config as RetryConfig | undefined;
+
+//     if (
+//       error.response?.status !== 401 ||
+//       !originalRequest ||
+//       originalRequest._retry
+//     ) {
+//       return Promise.reject(error);
+//     }
+
+//     // Không refresh nếu chính request refresh bị lỗi
+//     if (originalRequest.url?.includes("/refresh")) {
+//       return Promise.reject(error);
+//     }
+
+//     originalRequest._retry = true;
+
+//     try {
+//       const newToken = await refreshCustomerToken();
+
+//       originalRequest.headers.set(
+//         "Authorization",
+//         `Bearer ${newToken}`,
+//       );
+
+//       return customerAxios(originalRequest);
+//     } catch (refreshError) {
+//       return Promise.reject(refreshError);
+//     }
+//   },
+// );
+
+const PUBLIC_ENDPOINTS = [
+  // REGISTER
+  "/register/otp-sending",
+  "/register/otp-resending",
+  "/register/otp-verifying",
+
+  // FORGOT PASSWORD
+  "/forgot-password/otp-sending",
+  "/forgot-password/otp-resending",
+  "/forgot-password/otp-verifying",
+  "/forgot-password/password-change",
+
+  // LOGIN
+  "/login",
+];
+
 customerAxios.interceptors.response.use(
   (response) => response,
 
   async (error: AxiosError) => {
     const originalRequest = error.config as RetryConfig | undefined;
 
-    if (
-      error.response?.status !== 401 ||
-      !originalRequest ||
-      originalRequest._retry
-    ) {
+    if (!originalRequest) {
       return Promise.reject(error);
     }
 
-    // Không refresh nếu chính request refresh bị lỗi
-    if (originalRequest.url?.includes("/refresh")) {
+    const isAuthEndpoint = PUBLIC_ENDPOINTS.some((endpoint) =>
+      originalRequest.url?.includes(endpoint),
+    );
+
+    if (isAuthEndpoint) {
+      return Promise.reject(error);
+    }
+
+    // Chỉ refresh khi nhận 401
+    if (
+      error.response?.status !== 401 ||
+      originalRequest._retry
+    ) {
       return Promise.reject(error);
     }
 

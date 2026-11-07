@@ -9,6 +9,7 @@ export class CancelOrderController {
     private readonly cancelOrderService: CancelOrderService,
   ) {}
   
+  // 1. (PATCH) CANCEL-ORDER
   @UseGuards(JwtAuthGuard)
   @Patch(':orderId/cancel')
   async cancelOrder(
