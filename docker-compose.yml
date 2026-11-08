@@ -192,6 +192,24 @@ services:
     depends_on:
       postgresdb:
         condition: service_healthy
+  
+  promotion-service:
+    image: promotion-service:v1
+    build:
+      context: ./backend/promotion-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: promotion-service
+    restart: unless-stopped
+    ports:
+      - "3008:3008"
+    env_file:
+      - ./backend/promotion-service/.env
+    environment:
+      DATABASE_URL: "postgresql://postgres:password@postgresdb:5432/promotion_service"
+    depends_on:
+      postgresdb:
+        condition: service_healthy
       
   nginx:
     image: nginx:alpine
