@@ -35,7 +35,8 @@ export class RabbitMQService
   // CONFIG
   // ======================================================
 
-  private readonly rabbitmqUrl = 'amqp://admin:password@localhost:5672';
+  // private readonly rabbitmqUrl = 'amqp://admin:password@localhost:5672';
+  private readonly rabbitmqUrl = process.env.RABBITMQ_URL || 'amqp://admin:password@localhost:5672';
 
   private readonly exchangeName = 'order.events';
 
