@@ -10,6 +10,12 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: password
     volumes:
       - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   postgresdb:
     image: postgres:16
@@ -89,6 +95,24 @@ services:
       DATABASE_URL: "postgresql://postgres:password@postgresdb:5432/customer_service"
     depends_on:
       postgresdb:
+        condition: service_healthy
+
+  product-service:
+    image: product-service:v1
+    build:
+      context: ./backend/product-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: product-service
+    restart: unless-stopped
+    ports:
+      - "3003:3003"
+    env_file:
+      - ./backend/product-service/.env
+    environment:
+      DATABASE_URL: "mongodb://root:password@mongodb:27017/product_service?authSource=admin"
+    depends_on:
+      mongodb:
         condition: service_healthy
 
   nginx:
