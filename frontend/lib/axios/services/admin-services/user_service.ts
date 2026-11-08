@@ -1,10 +1,10 @@
 import { adminAxios } from "../../admin-axios";
 
 // CALL DIRECT API
-const USER_SERVICE_URL = "http://localhost:3001/api/v1/admin-session/user-service";
+// const USER_SERVICE_URL = "http://localhost:3001/api/v1/admin-session/user-service";
 
 // CALL THROUGH API GATEWAY (NGINX)
-// const USER_SERVICE_URL = "http://localhost/api/v1/admin-session/user-service";
+const USER_SERVICE_URL = "http://localhost/api/v1/admin-session/user-service";
 
 export const adminUserService = {
     // 1. GET PROFILE

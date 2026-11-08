@@ -1,10 +1,10 @@
 import { adminAxios } from "../../admin-axios";
 
 // CALL DIRECT API
-const CUSTOMER_SERVICE_URL = "http://localhost:3002/api/v1/admin-session/customer-service";
+// const CUSTOMER_SERVICE_URL = "http://localhost:3002/api/v1/admin-session/customer-service";
 
 // CALL THROUGH API GATEWAY (NGINX)
-// const CUSTOMER_SERVICE_URL = "http://localhost/api/v1/admin-session/customer-service";
+const CUSTOMER_SERVICE_URL = "http://localhost/api/v1/admin-session/customer-service";
 
 interface UpdateCustomerListDto {
     customer_code?: string;
