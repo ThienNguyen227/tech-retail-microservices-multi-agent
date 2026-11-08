@@ -78,7 +78,6 @@ services:
       redisdb:
         condition: service_started
 
-
   customer-service:
     image: customer-service:v1
     build:
@@ -114,6 +113,7 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
+  
   cart-service:
     image: cart-service:v1
     build:
@@ -132,6 +132,67 @@ services:
       mongodb:
         condition: service_healthy
 
+  branch-service:
+    image: branch-service:v1
+    build:
+      context: ./backend/branch-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: branch-service
+    restart: unless-stopped
+    ports:
+      - "3005:3005"
+    env_file:
+      - ./backend/branch-service/.env
+    environment:
+      DATABASE_URL: "postgresql://postgres:password@postgresdb:5432/branch_service"
+    depends_on:
+      postgresdb:
+        condition: service_healthy
+
+  inventory-service:
+    image: inventory-service:v1
+    build:
+      context: ./backend/inventory-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: inventory-service
+    restart: unless-stopped
+    ports:
+      - "3006:3006"
+      - "50051:50051"
+    env_file:
+      - ./backend/inventory-service/.env
+    environment:
+      PORT: 3006
+      DATABASE_URL: "postgresql://postgres:password@postgresdb:5432/inventory_service?schema=public"
+      RABBITMQ_URL: "amqp://admin:password@rabbitmq:5672"
+    depends_on:
+      postgresdb:
+        condition: service_healthy
+
+  order-service:
+    image: order-service:v1
+    build:
+      context: ./backend/order-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: order-service
+    restart: unless-stopped
+    ports:
+      - "3007:3007"
+    env_file:
+      - ./backend/order-service/.env
+    environment:
+      PORT: 3007
+      DATABASE_URL: "postgresql://postgres:password@postgresdb:5432/order_service?schema=public"
+      RABBITMQ_URL: "amqp://admin:password@rabbitmq:5672"
+      INVENTORY_GRPC_URL: "inventory-service:50051"
+      CART_SERVICE_URL: "http://cart-service:3004"
+    depends_on:
+      postgresdb:
+        condition: service_healthy
+      
   nginx:
     image: nginx:alpine
     container_name: api-gateway
