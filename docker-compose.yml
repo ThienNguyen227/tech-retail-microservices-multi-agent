@@ -210,6 +210,26 @@ services:
     depends_on:
       postgresdb:
         condition: service_healthy
+
+  warranty-service:
+    image: warranty-service:v1
+    build:
+      context: ./backend/warranty-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: warranty-service
+    restart: unless-stopped
+    ports:
+      - "3010:3010"
+    env_file:
+      - ./backend/warranty-service/.env
+    environment:
+      PORT: 3010
+      DATABASE_URL: "postgresql://postgres:password@postgresdb:5432/warranty_service?schema=public"
+      RABBITMQ_URL: "amqp://admin:password@rabbitmq:5672"
+    depends_on:
+      postgresdb:
+        condition: service_healthy
       
   nginx:
     image: nginx:alpine
