@@ -1,10 +1,10 @@
 import { customerAxios } from "../../customer-axios";
 
 // CALL DIRECT API
-const CART_API_URL = 'http://localhost:3004/api/v1/customer-session/cart-service';
+// const CART_API_URL = 'http://localhost:3004/api/v1/customer-session/cart-service';
 
 // CALL THROUGH API GATEWAY (NGINX)
-// const CART_API_URL = "http://localhost/api/v1/customer-session/customer-service";
+const CART_API_URL = "http://localhost/api/v1/customer-session/cart-service";
 
 export type AddCartItemPayload = {
   userId: string;
