@@ -33,7 +33,8 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy{
   // CONFIG
   // ======================================================
 
-  private readonly rabbitmqUrl = 'amqp://admin:password@localhost:5672';
+  // private readonly rabbitmqUrl = 'amqp://admin:password@localhost:5672';
+  private readonly rabbitmqUrl = process.env.RABBITMQ_URL || 'amqp://admin:password@localhost:5672';
 
   // Order -> Inventory
   // Order -> Warranty

@@ -16,7 +16,8 @@ import { CreateOrderService } from './create_order.service';
         options: {
           package: 'inventory',
           protoPath: join(__dirname, '../../proto/inventory.proto'),
-          url: 'localhost:50051',
+          // url: 'localhost:50051',
+          url: process.env.INVENTORY_GRPC_URL || 'localhost:50051',
           loader: {
             keepCase: true,
           },

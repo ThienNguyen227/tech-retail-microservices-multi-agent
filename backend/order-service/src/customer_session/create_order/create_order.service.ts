@@ -276,7 +276,8 @@ export class CreateOrderService implements OnModuleInit {
     // ==========================================
     try {
       const clearRes = await fetch(
-        `http://localhost:3004/api/v1/carts/clear?userId=${dto.userId}`,
+        // `http://localhost:3004/api/v1/carts/clear?userId=${dto.userId}`,
+        `${process.env.CART_SERVICE_URL || 'http://localhost:3004'}/api/v1/carts/clear?userId=${dto.userId}`,
         {
           method: 'DELETE',
         },
