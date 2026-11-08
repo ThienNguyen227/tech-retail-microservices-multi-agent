@@ -78,7 +78,6 @@ services:
       redisdb:
         condition: service_started
 
-
   customer-service:
     image: customer-service:v1
     build:
@@ -114,6 +113,7 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
+  
   cart-service:
     image: cart-service:v1
     build:
@@ -132,6 +132,24 @@ services:
       mongodb:
         condition: service_healthy
 
+  branch-service:
+    image: branch-service:v1
+    build:
+      context: ./backend/branch-service
+      dockerfile: Dockerfile
+      target: production
+    container_name: branch-service
+    restart: unless-stopped
+    ports:
+      - "3005:3005"
+    env_file:
+      - ./backend/branch-service/.env
+    environment:
+      DATABASE_URL: "postgresql://postgres:password@postgresdb:5432/branch_service"
+    depends_on:
+      postgresdb:
+        condition: service_healthy
+      
   nginx:
     image: nginx:alpine
     container_name: api-gateway
