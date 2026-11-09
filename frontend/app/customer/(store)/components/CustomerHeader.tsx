@@ -8,20 +8,21 @@ import {
   ShoppingCart,
   User,
   LogOut,
-  ClipboardList,
   ChevronDown,
   Store,
   Smartphone,
   Laptop,
   Tablet,
   Home,
-  FileTextIcon,
   ShoppingBag,
+  ShieldCheck,
+  List,
 } from "lucide-react";
 import { clearAccessToken } from "@/lib/access_token/customer_access_token";
 import { customerUserService } from "@/lib/axios/services/customer-services/user_service";
 import { customerCartService } from "@/lib/axios/services/customer-services/cart_service";
 import { customerOrderService } from "@/lib/axios/services/customer-services/order_service";
+import { customerCustomerService } from "@/lib/axios/services/customer-services/warranty_service";
 
 export default function CustomerHeader() {
   const router = useRouter();
@@ -31,6 +32,26 @@ export default function CustomerHeader() {
   const [userName, setUserName] = useState("");
   const [cartCount, setCartCount] = useState<number>(0);
   const [orderCount, setOrderCount] = useState<number>(0);
+  const [isCategoryOpen, setIsCategoryOpen] = useState(false);
+
+  const [warrantyCount, setWarrantyCount] = useState<number>(0);
+
+  async function fetchWarrantyCount() {
+    const userId = sessionStorage.getItem("userId");
+
+    if (!userId) {
+      setWarrantyCount(0);
+      return;
+    }
+
+    try {
+      const data = await customerCustomerService.getWarranty();
+
+      setWarrantyCount(data.total ?? 0);
+    } catch (err) {
+      console.error("Lỗi lấy số lượng bảo hành:", err);
+    }
+  }
 
   // =========================
   // USER NAME
@@ -140,6 +161,7 @@ export default function CustomerHeader() {
 
     fetchCartCount();
     fetchOrderCount();
+    fetchWarrantyCount();
 
     window.addEventListener(
       "cart-updated",
@@ -234,18 +256,36 @@ export default function CustomerHeader() {
             href="/customer/cart"
             aria-label="Giỏ hàng"
             title="Giỏ hàng của tôi"
-            className="relative flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100 hover:text-[#168b87]"
+            className={`group relative flex h-11 w-11 items-center justify-center rounded-2xl
+              transition-all duration-300 ease-out
+              ${
+                pathname.startsWith("/customer/cart")
+                  ? "bg-gradient-to-br from-[#168b87] to-[#08645f] text-white shadow-lg shadow-[#168b87]/30"
+                  : "bg-transparent text-slate-500 hover:bg-[#e6f5f4] hover:text-[#168b87] hover:shadow-md hover:shadow-[#168b87]/10"
+              }
+              hover:-translate-y-1 active:translate-y-0 active:scale-95`}
           >
             <ShoppingCart
-              size={21}
-              strokeWidth={1.9}
+              size={27}
+              strokeWidth={2}
+              className="transition-transform duration-300 group-hover:scale-110 group-hover:rotate-[-6deg]"
             />
 
             {cartCount > 0 && (
-              <span className="absolute right-1 top-0.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-[#168b87] px-1 text-[10px] font-bold text-white">
+              <span className="absolute -right-1 -top-1 flex h-[19px] min-w-[19px] items-center justify-center rounded-full border-2 border-white bg-[#168b87] px-1 text-[10px] font-bold text-white shadow-sm transition-transform duration-300 group-hover:scale-110">
                 {cartCount > 99 ? "99+" : cartCount}
               </span>
             )}
+
+            <span
+              className="pointer-events-none absolute left-1/2 top-[calc(100%+12px)] z-50
+                -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-lg
+                bg-slate-800 px-3 py-1.5 text-xs font-medium text-white opacity-0
+                shadow-lg transition-all duration-200
+                group-hover:translate-y-0 group-hover:opacity-100"
+            >
+              Giỏ hàng của tôi
+            </span>
           </Link>
 
           {/* Orders */}
@@ -253,18 +293,36 @@ export default function CustomerHeader() {
             href="/customer/order"
             aria-label="Đơn hàng"
             title="Đơn hàng của tôi"
-            className="relative flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100 hover:text-[#168b87]"
+            className={`group relative flex h-11 w-11 items-center justify-center rounded-2xl
+              transition-all duration-300 ease-out
+              ${
+                pathname.startsWith("/customer/order")
+                  ? "bg-gradient-to-br from-[#168b87] to-[#08645f] text-white shadow-lg shadow-[#168b87]/30"
+                  : "bg-transparent text-slate-500 hover:bg-[#e6f5f4] hover:text-[#168b87] hover:shadow-md hover:shadow-[#168b87]/10"
+              }
+              hover:-translate-y-1 active:translate-y-0 active:scale-95`}
           >
-            <ShoppingBag 
-              size={21}
-              strokeWidth={1.9}
+            <ShoppingBag
+              size={27}
+              strokeWidth={2}
+              className="transition-transform duration-300 group-hover:scale-110 group-hover:rotate-[-6deg]"
             />
 
             {orderCount > 0 && (
-              <span className="absolute right-1 top-0.5 flex h-[17px] min-w-[17px] items-center justify-center rounded-full bg-[#168b87] px-1 text-[10px] font-bold text-white">
+              <span className="absolute -right-1 -top-1 flex h-[19px] min-w-[19px] items-center justify-center rounded-full border-2 border-white bg-[#168b87] px-1 text-[10px] font-bold text-white shadow-sm transition-transform duration-300 group-hover:scale-110">
                 {orderCount > 99 ? "99+" : orderCount}
               </span>
             )}
+
+            <span
+              className="pointer-events-none absolute left-1/2 top-[calc(100%+12px)] z-50
+                -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-lg
+                bg-slate-800 px-3 py-1.5 text-xs font-medium text-white opacity-0
+                shadow-lg transition-all duration-200
+                group-hover:translate-y-0 group-hover:opacity-100"
+            >
+              Đơn hàng của tôi
+            </span>
           </Link>
 
           {/* Warranty */}
@@ -272,9 +330,39 @@ export default function CustomerHeader() {
             href="/customer/warranty"
             aria-label="Bảo hành của tôi"
             title="Bảo hành của tôi"
-            className="flex h-10 w-10 items-center justify-center rounded-xl text-slate-600 transition hover:bg-slate-100 hover:text-[#168b87]"
+            className={`group relative flex h-11 w-11 items-center justify-center rounded-2xl
+              transition-all duration-300 ease-out
+              ${
+                pathname.startsWith("/customer/warranty")
+                  ? "bg-gradient-to-br from-[#168b87] to-[#08645f] text-white shadow-lg shadow-[#168b87]/30"
+                  : "bg-transparent text-slate-500 hover:bg-[#e6f5f4] hover:text-[#168b87] hover:shadow-md hover:shadow-[#168b87]/10"
+              }
+              hover:-translate-y-1 active:translate-y-0 active:scale-95`}
           >
-            <FileTextIcon size={21} strokeWidth={1.9} />
+            <ShieldCheck
+              size={30}
+              strokeWidth={2}
+              className="transition-transform duration-300 group-hover:scale-110 group-hover:rotate-[-6deg]"
+            />
+
+            {warrantyCount > 0 && (
+              <span
+            className="absolute -right-1 -top-1 flex h-[19px] min-w-[19px] items-center justify-center rounded-full border-2 border-white bg-[#168b87] px-1 text-[10px] font-bold text-white shadow-sm transition-transform duration-300 group-hover:scale-110"
+          >
+            {warrantyCount > 99 ? "99+" : warrantyCount}
+          </span>
+            )}
+
+            {/* Tooltip */}
+            <span
+              className="pointer-events-none absolute left-1/2 top-[calc(100%+12px)] z-50
+                -translate-x-1/2 translate-y-1 whitespace-nowrap rounded-lg
+                bg-slate-800 px-3 py-1.5 text-xs font-medium text-white opacity-0
+                shadow-lg transition-all duration-200
+                group-hover:translate-y-0 group-hover:opacity-100"
+            >
+              Bảo hành của tôi
+            </span>
           </Link>
 
           {/* Divider */}
@@ -340,80 +428,132 @@ export default function CustomerHeader() {
       {/* =========================
           NAVIGATION
       ========================== */}
-      <div className="hidden border-t border-slate-100 bg-white md:block">
-        <div className="mx-auto flex h-11 max-w-7xl items-center gap-7 px-4 sm:px-6 lg:px-8">
-          {/* Trang chủ */}
-          <Link
-            href="/customer/home"
-            className={`relative flex h-full items-center gap-2 text-sm transition ${
-              pathname === "/customer/home"
-                ? "font-semibold text-[#168b87] after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:rounded-full after:bg-[#168b87]"
-                : "font-medium text-slate-600 hover:text-[#168b87]"
-            }`}
-          >
-            <Home
-              size={17}
-              strokeWidth={2}
-            />
+      <div className="border-t border-slate-100 bg-white">
+  {/* Desktop */}
+  <div className="mx-auto hidden h-[58px] max-w-7xl items-center gap-2 px-4 sm:px-6 lg:flex">
+    {[
+      {
+        label: "Trang chủ",
+        href: "/customer/home",
+        icon: Home,
+        active: pathname === "/customer/home",
+      },
+      {
+        label: "Điện thoại",
+        href: "/customer/product-category/dien-thoai-di-dong",
+        icon: Smartphone,
+        active: pathname.startsWith("/customer/product-category/dien-thoai-di-dong"),
+      },
+      {
+        label: "Laptop",
+        href: "/customer/product-category/may-tinh-xach-tay",
+        icon: Laptop,
+        active: pathname.startsWith("/customer/product-category/may-tinh-xach-tay"),
+      },
+      {
+        label: "Máy tính bảng",
+        href: "/customer/product-category/may-tinh-bang",
+        icon: Tablet,
+        active: pathname.startsWith("/customer/product-category/may-tinh-bang"),
+      },
+    ].map((item) => {
+      const Icon = item.icon;
 
-            <span>Trang chủ</span>
-          </Link>
+      return (
+        <Link
+          key={item.href}
+          href={item.href}
+          className={`group flex h-10 items-center gap-2 rounded-xl px-4 text-sm transition-all duration-300 ${
+            item.active
+              ? "bg-gradient-to-r from-[#168b87] to-[#08645f] font-semibold text-white shadow-md shadow-[#168b87]/20"
+              : "font-medium text-slate-600 hover:bg-[#e6f5f4] hover:text-[#168b87]"
+          }`}
+        >
+          <Icon
+            size={19}
+            strokeWidth={2}
+            className="transition-transform duration-300 group-hover:scale-110"
+          />
+          <span>{item.label}</span>
+        </Link>
+      );
+    })}
+  </div>
 
-          {/* Điện thoại */}
-          <Link
-            href="/customer/product-category/dien-thoai-di-dong"
-            className={`relative flex h-full items-center gap-2 text-sm transition ${
-              pathname ===
-              "/customer/product-category/dien-thoai-di-dong"
-                ? "font-semibold text-[#168b87] after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:rounded-full after:bg-[#168b87]"
-                : "font-medium text-slate-600 hover:text-[#168b87]"
-            }`}
-          >
-            <Smartphone
-              size={17}
-              strokeWidth={2}
-            />
+  {/* Mobile dropdown */}
+  <div className="relative px-4 py-2 lg:hidden">
+    <button
+      type="button"
+      onClick={() => setIsCategoryOpen((prev) => !prev)}
+      className="flex h-11 w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm transition-all duration-200 hover:border-[#168b87] hover:bg-[#e6f5f4] hover:text-[#168b87]"
+    >
+      <span className="flex items-center gap-2">
+        <List />
+        Danh mục
+      </span>
 
-            <span>Điện thoại</span>
-          </Link>
+      <ChevronDown
+        size={19}
+        className={`transition-transform duration-300 ${
+          isCategoryOpen ? "rotate-180 text-[#168b87]" : ""
+        }`}
+      />
+    </button>
 
-          {/* Laptop */}
-          <Link
-            href="/customer/product-category/may-tinh-xach-tay"
-            className={`relative flex h-full items-center gap-2 text-sm transition ${
-              pathname ===
-              "/customer/product-category/may-tinh-xach-tay"
-                ? "font-semibold text-[#168b87] after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:rounded-full after:bg-[#168b87]"
-                : "font-medium text-slate-600 hover:text-[#168b87]"
-            }`}
-          >
-            <Laptop
-              size={17}
-              strokeWidth={2}
-            />
+    {isCategoryOpen && (
+      <div className="absolute left-4 right-4 top-full z-50 mt-2 overflow-hidden rounded-xl border border-slate-100 bg-white p-2 shadow-xl shadow-slate-900/10">
+        {[
+          {
+            label: "Trang chủ",
+            href: "/customer/home",
+            icon: Home,
+            active: pathname === "/customer/home",
+          },
+          {
+            label: "Điện thoại",
+            href: "/customer/product-category/dien-thoai-di-dong",
+            icon: Smartphone,
+            active: pathname.startsWith("/customer/product-category/dien-thoai-di-dong"),
+          },
+          {
+            label: "Laptop",
+            href: "/customer/product-category/may-tinh-xach-tay",
+            icon: Laptop,
+            active: pathname.startsWith("/customer/product-category/may-tinh-xach-tay"),
+          },
+          {
+            label: "Máy tính bảng",
+            href: "/customer/product-category/may-tinh-bang",
+            icon: Tablet,
+            active: pathname.startsWith("/customer/product-category/may-tinh-bang"),
+          },
+        ].map((item) => {
+          const Icon = item.icon;
 
-            <span>Laptop</span>
-          </Link>
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={() => setIsCategoryOpen(false)}
+              className={`flex items-center gap-3 rounded-lg px-3 py-3 text-sm transition-all duration-200 ${
+                item.active
+                  ? "bg-[#e6f5f4] font-semibold text-[#168b87]"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-[#168b87]"
+              }`}
+            >
+              <Icon size={19} strokeWidth={2} />
+              <span>{item.label}</span>
 
-          {/* Máy tính bảng */}
-          <Link
-            href="/customer/product-category/may-tinh-bang"
-            className={`relative flex h-full items-center gap-2 text-sm transition ${
-              pathname ===
-              "/customer/product-category/may-tinh-bang"
-                ? "font-semibold text-[#168b87] after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:rounded-full after:bg-[#168b87]"
-                : "font-medium text-slate-600 hover:text-[#168b87]"
-            }`}
-          >
-            <Tablet
-              size={17}
-              strokeWidth={2}
-            />
-
-            <span>Máy tính bảng</span>
-          </Link>
-        </div>
+              {item.active && (
+                <span className="ml-auto h-2 w-2 rounded-full bg-[#168b87]" />
+              )}
+            </Link>
+          );
+        })}
       </div>
+    )}
+  </div>
+</div>
     </header>
   );
 }

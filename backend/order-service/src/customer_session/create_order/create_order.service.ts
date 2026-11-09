@@ -204,43 +204,104 @@ export class CreateOrderService implements OnModuleInit {
           // ==========================================
           // ORDER ITEMS
           // ==========================================
+          // order_item: {
+          //   create: dto.items.map((item) => {
+          //     const unitPrice = Number(item.price) || 0;
+
+          //     const quantity = Number(item.quantity) || 1;
+
+          //     const itemSubtotal = Number(item.subtotal) || unitPrice * quantity;
+
+          //     // Tìm serial mà Inventory đã RESERVED
+          //     const reservedItem = reservedSerials.find((reserved) => reserved.sku === item.sku);
+
+          //     // Với thiết kế hiện tại:
+          //     // OrderItem chỉ lưu 1 serial_number
+          //     const serialNumber = reservedItem?.serial_numbers?.[0] ?? null;
+
+          //     console.log(`[ORDER ITEM] SKU=${item.sku}, Serial=${serialNumber}`);
+
+          //     return {
+          //       order_item_sku: item.sku,
+
+          //       order_item_product_name: item.productName || item.sku,
+
+          //       order_item_product_image: item.imageUrl || '',
+
+          //       order_item_unit_price: unitPrice,
+
+          //       order_item_quantity: quantity,
+
+          //       order_item_subtotal: itemSubtotal,
+
+          //       order_item_serial_number: serialNumber,
+
+          //       // Khuyến mãi trực tiếp theo SKU
+          //       order_item_promotion_id: item.promotionId ?? null,
+          //       order_item_promotion_name: item.promotionName ?? null,
+          //       order_item_direct_discount_amount: Number(item.directDiscountAmount) || 0,
+          //     };
+          //   }),
+          // },
+
           order_item: {
-            create: dto.items.map((item) => {
+            create: dto.items.flatMap((item) => {
               const unitPrice = Number(item.price) || 0;
+              const quantity = Math.max(1, Number(item.quantity) || 1);
 
-              const quantity = Number(item.quantity) || 1;
+              const itemSubtotal =
+                Number(item.subtotal) || unitPrice * quantity;
 
-              const itemSubtotal = Number(item.subtotal) || unitPrice * quantity;
+              const totalDirectDiscount =
+                Number(item.directDiscountAmount) || 0;
 
-              // Tìm serial mà Inventory đã RESERVED
-              const reservedItem = reservedSerials.find((reserved) => reserved.sku === item.sku);
+              // Lấy danh sách serial đã được Inventory RESERVED
+              const reservedItem = reservedSerials.find(
+                (reserved) => reserved.sku === item.sku,
+              );
 
-              // Với thiết kế hiện tại:
-              // OrderItem chỉ lưu 1 serial_number
-              const serialNumber = reservedItem?.serial_numbers?.[0] ?? null;
+              const serialNumbers = reservedItem?.serial_numbers ?? [];
 
-              console.log(`[ORDER ITEM] SKU=${item.sku}, Serial=${serialNumber}`);
+              // Mỗi sản phẩm vật lý phải có một serial riêng
+              if (serialNumbers.length < quantity) {
+                throw new BadRequestException(
+                  `Không đủ serial number cho sản phẩm ${item.sku}`,
+                );
+              }
 
-              return {
-                order_item_sku: item.sku,
+              return Array.from({ length: quantity }, (_, index) => {
+                const serialNumber = serialNumbers[index];
 
-                order_item_product_name: item.productName || item.sku,
+                console.log(
+                  `[ORDER ITEM] SKU=${item.sku}, Serial=${serialNumber}`,
+                );
 
-                order_item_product_image: item.imageUrl || '',
+                return {
+                  order_item_sku: item.sku,
 
-                order_item_unit_price: unitPrice,
+                  order_item_product_name: item.productName || item.sku,
 
-                order_item_quantity: quantity,
+                  order_item_product_image: item.imageUrl || '',
 
-                order_item_subtotal: itemSubtotal,
+                  order_item_unit_price: unitPrice,
 
-                order_item_serial_number: serialNumber,
+                  // Mỗi OrderItem đại diện cho một sản phẩm
+                  order_item_quantity: 1,
 
-                // Khuyến mãi trực tiếp theo SKU
-                order_item_promotion_id: item.promotionId ?? null,
-                order_item_promotion_name: item.promotionName ?? null,
-                order_item_direct_discount_amount: Number(item.directDiscountAmount) || 0,
-              };
+                  order_item_subtotal: itemSubtotal / quantity,
+
+                  // Mỗi OrderItem lưu một serial riêng
+                  order_item_serial_number: serialNumber,
+
+                  order_item_promotion_id: item.promotionId ?? null,
+
+                  order_item_promotion_name: item.promotionName ?? null,
+
+                  // Phân bổ discount cho từng sản phẩm
+                  order_item_direct_discount_amount:
+                    totalDirectDiscount / quantity,
+                };
+              });
             }),
           },
         },
