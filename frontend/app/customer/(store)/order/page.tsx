@@ -240,7 +240,7 @@ export default function OrdersPage() {
         return;
       }
 
-      const response = await fetch("http://localhost:3009/api/v1/payment", {
+      const response = await fetch("http://localhost:3009/api/v1/customer-sesion/payment-service/payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
