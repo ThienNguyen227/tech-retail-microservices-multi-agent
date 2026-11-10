@@ -1,6 +1,7 @@
+
 "use client";
 
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode, type FormEvent } from "react";
 import {
   Search,
   ShoppingBag,
@@ -22,12 +23,14 @@ import {
   MapPin,
   CreditCard,
   WalletCards,
-  Banknote,
   AlertCircle,
   Tag,
   ReceiptText,
   Store,
   ClipboardList,
+  Pencil,
+  Save,
+  CircleAlert,
 } from "lucide-react";
 
 import axios from "axios";
@@ -127,6 +130,45 @@ interface OrderListResponse {
 const PAGE_SIZE = 8;
 
 // ======================================================
+// PROCESSING STATUS OPTIONS
+// ======================================================
+
+const PROCESSING_STATUS_OPTIONS = [
+  {
+    code: "PENDING",
+    label: "Chờ xác nhận",
+  },
+  {
+    code: "CONFIRMED",
+    label: "Đã xác nhận",
+  },
+  {
+    code: "PROCESSING",
+    label: "Đang xử lý",
+  },
+  {
+    code: "READY_FOR_PICKUP",
+    label: "Sẵn sàng nhận hàng",
+  },
+  {
+    code: "SHIPPING",
+    label: "Đang giao hàng",
+  },
+  {
+    code: "DELIVERED",
+    label: "Đã giao hàng",
+  },
+  {
+    code: "COMPLETED",
+    label: "Hoàn thành",
+  },
+  {
+    code: "CANCELLED",
+    label: "Đã hủy",
+  },
+] as const;
+
+// ======================================================
 // HELPERS
 // ======================================================
 
@@ -181,24 +223,6 @@ function formatCurrency(value?: DecimalValue) {
   }
 
   return `${amount.toLocaleString("vi-VN")} ₫`;
-}
-
-// Định dạng ngày
-
-function formatDate(date?: string | null) {
-  if (!date) return "—";
-
-  const parsedDate = new Date(date);
-
-  if (Number.isNaN(parsedDate.getTime())) {
-    return "—";
-  }
-
-  return parsedDate.toLocaleDateString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  });
 }
 
 // Định dạng ngày giờ
@@ -454,6 +478,7 @@ function getFullAddress(order: Order) {
 // ======================================================
 
 export default function ManageOrderPage() {
+
   // ======================================================
   // DATA
   // ======================================================
@@ -485,6 +510,30 @@ export default function ManageOrderPage() {
   );
 
   // ======================================================
+  // UPDATE PROCESSING STATUS MODAL
+  // ======================================================
+
+  const [showUpdateStatusModal, setShowUpdateStatusModal] =
+    useState(false);
+
+  const [updatingOrder, setUpdatingOrder] = useState<Order | null>(
+    null,
+  );
+
+  const [selectedProcessingStatus, setSelectedProcessingStatus] =
+    useState("");
+
+  const [statusFormError, setStatusFormError] = useState("");
+
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  // ======================================================
+  // SUCCESS TOAST
+  // ======================================================
+
+  const [successMessage, setSuccessMessage] = useState("");
+
+  // ======================================================
   // LOADING AND ERROR
   // ======================================================
 
@@ -497,6 +546,20 @@ export default function ManageOrderPage() {
   const [statsError, setStatsError] = useState("");
 
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // ======================================================
+  // SUCCESS TOAST TIMER
+  // ======================================================
+
+  useEffect(() => {
+    if (!successMessage) return;
+
+    const timer = setTimeout(() => {
+      setSuccessMessage("");
+    }, 5000);
+
+    return () => clearTimeout(timer);
+  }, [successMessage]);
 
   // ======================================================
   // LOAD STATISTICS
@@ -608,10 +671,16 @@ export default function ManageOrderPage() {
   // ======================================================
 
   useEffect(() => {
-    if (!selectedOrder) return;
+    if (!selectedOrder && !showUpdateStatusModal) return;
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
+      if (event.key !== "Escape") return;
+
+      if (showUpdateStatusModal) {
+        if (!isUpdating) {
+          handleCloseUpdateStatus();
+        }
+      } else {
         setSelectedOrder(null);
       }
     }
@@ -621,7 +690,7 @@ export default function ManageOrderPage() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [selectedOrder]);
+  }, [selectedOrder, showUpdateStatusModal, isUpdating]);
 
   // ======================================================
   // PAGINATION
@@ -678,8 +747,145 @@ export default function ManageOrderPage() {
     setRefreshKey((key) => key + 1);
   }
 
+  // Mở modal chi tiết
+
   function handleOpenDetail(order: Order) {
     setSelectedOrder(order);
+  }
+
+  // ======================================================
+  // UPDATE ORDER STATUS ACTIONS
+  // ======================================================
+
+  function handleOpenUpdateStatus(order: Order) {
+    setUpdatingOrder(order);
+
+    setSelectedProcessingStatus(
+      order.order_processing_status
+        ?.order_processing_status_code ?? "",
+    );
+
+    setStatusFormError("");
+
+    setShowUpdateStatusModal(true);
+  }
+
+  function handleCloseUpdateStatus() {
+    if (isUpdating) return;
+
+    setShowUpdateStatusModal(false);
+    setUpdatingOrder(null);
+    setSelectedProcessingStatus("");
+    setStatusFormError("");
+  }
+
+  // ======================================================
+  // SUBMIT UPDATE ORDER STATUS
+  // ======================================================
+
+  async function handleUpdateStatusSubmit(
+    event: FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    setStatusFormError("");
+    setSuccessMessage("");
+
+    if (!updatingOrder) {
+      setStatusFormError("Không tìm thấy thông tin đơn hàng.");
+      return;
+    }
+
+    if (!selectedProcessingStatus) {
+      setStatusFormError("Vui lòng chọn trạng thái đơn hàng.");
+      return;
+    }
+
+    const currentStatus =
+      updatingOrder.order_processing_status
+        ?.order_processing_status_code ?? "";
+
+    if (selectedProcessingStatus === currentStatus) {
+      setStatusFormError(
+        "Trạng thái mới phải khác trạng thái hiện tại.",
+      );
+      return;
+    }
+
+    try {
+      setIsUpdating(true);
+
+      // Gọi API cập nhật trạng thái đơn hàng
+
+      const response =
+        await adminOrderService.updateOrderProcessingStatus(
+          updatingOrder.order_id,
+          selectedProcessingStatus,
+        );
+
+      // Lấy thông tin đơn hàng sau khi cập nhật
+
+      const updatedOrder = response?.data as Order | undefined;
+
+      // Cập nhật dữ liệu trực tiếp nếu backend trả về đơn hàng
+
+      if (
+        updatedOrder &&
+        updatedOrder.order_id === updatingOrder.order_id
+      ) {
+        setOrders((currentOrders) =>
+          currentOrders.map((order) =>
+            order.order_id === updatedOrder.order_id
+              ? updatedOrder
+              : order,
+          ),
+        );
+
+        setStatsOrders((currentOrders) =>
+          currentOrders.map((order) =>
+            order.order_id === updatedOrder.order_id
+              ? updatedOrder
+              : order,
+          ),
+        );
+
+        setSelectedOrder((currentOrder) =>
+          currentOrder?.order_id === updatedOrder.order_id
+            ? updatedOrder
+            : currentOrder,
+        );
+      }
+
+      // Đóng modal cập nhật
+
+      setShowUpdateStatusModal(false);
+      setUpdatingOrder(null);
+      setSelectedProcessingStatus("");
+      setStatusFormError("");
+
+      // Thông báo thành công
+
+      setSuccessMessage(
+        response?.message ||
+          "Cập nhật trạng thái đơn hàng thành công!",
+      );
+
+      // Tải lại danh sách và thống kê từ backend
+
+      setRefreshKey((prev) => prev + 1);
+
+    } catch (err: unknown) {
+      console.error("Update order processing status error:", err);
+
+      setStatusFormError(
+        extractErrorMessage(
+          err,
+          "Không thể cập nhật trạng thái đơn hàng. Vui lòng thử lại.",
+        ),
+      );
+    } finally {
+      setIsUpdating(false);
+    }
   }
 
   // ======================================================
@@ -688,6 +894,38 @@ export default function ManageOrderPage() {
 
   return (
     <>
+      {/* ================================================== */}
+      {/* SUCCESS TOAST */}
+      {/* ================================================== */}
+
+      {successMessage && (
+        <div className="fixed right-5 top-5 z-[100] flex w-[calc(100%-40px)] max-w-md items-start gap-3 rounded-xl border border-emerald-200 bg-white p-4 shadow-xl">
+
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+            <CheckCircle2 size={22} />
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold text-emerald-700">
+              Thành công
+            </p>
+
+            <p className="mt-1 text-sm text-slate-600">
+              {successMessage}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setSuccessMessage("")}
+            className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+          >
+            <X size={18} />
+          </button>
+
+        </div>
+      )}
+
       <div className="min-h-full space-y-6">
 
         {/* ================================================== */}
@@ -695,6 +933,7 @@ export default function ManageOrderPage() {
         {/* ================================================== */}
 
         <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+
           <div>
             <div className="flex items-center gap-2 text-sm text-slate-500">
               <span>Quản trị hệ thống</span>
@@ -727,6 +966,7 @@ export default function ManageOrderPage() {
             <RefreshCw size={16} />
             Đặt lại bộ lọc
           </button>
+
         </div>
 
         {/* ================================================== */}
@@ -779,6 +1019,7 @@ export default function ManageOrderPage() {
 
         {statsError && (
           <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+
             <AlertCircle
               size={20}
               className="mt-0.5 shrink-0 text-amber-600"
@@ -801,6 +1042,7 @@ export default function ManageOrderPage() {
             >
               Thử lại
             </button>
+
           </div>
         )}
 
@@ -810,11 +1052,10 @@ export default function ManageOrderPage() {
 
         <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
 
-          {/* ================================================== */}
           {/* SEARCH AND FILTER */}
-          {/* ================================================== */}
 
           <div className="border-b border-slate-100 p-5">
+
             <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
 
               <div>
@@ -823,7 +1064,7 @@ export default function ManageOrderPage() {
                 </h2>
 
                 <p className="mt-1 text-sm text-slate-500">
-                  Tìm kiếm, lọc và xem thông tin chi tiết đơn hàng.
+                  Tìm kiếm, lọc và quản lý thông tin đơn hàng.
                 </p>
               </div>
 
@@ -832,6 +1073,7 @@ export default function ManageOrderPage() {
                 {/* SEARCH */}
 
                 <div className="relative sm:w-72">
+
                   <Search
                     size={18}
                     className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-900"
@@ -845,6 +1087,7 @@ export default function ManageOrderPage() {
                     placeholder="Mã đơn, người nhận, SĐT, SKU..."
                     className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
                   />
+
                 </div>
 
                 {/* PROCESSING STATUS */}
@@ -856,27 +1099,18 @@ export default function ManageOrderPage() {
                   }
                   className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-600 outline-none transition focus:border-blue-500"
                 >
-                  <option value="ALL">Tất cả trạng thái đơn hàng</option>
-
-                  <option value="PENDING">Chờ xác nhận</option>
-
-                  <option value="CONFIRMED">Đã xác nhận</option>
-
-                  <option value="PROCESSING">Đang xử lý</option>
-
-                  <option value="READY_FOR_PICKUP">
-                    Sẵn sàng nhận hàng
+                  <option value="ALL">
+                    Tất cả trạng thái đơn hàng
                   </option>
 
-                  <option value="SHIPPING">Đang giao hàng</option>
-
-                  <option value="DELIVERED">Đã giao hàng</option>
-
-                  <option value="COMPLETED">Hoàn thành</option>
-
-                  <option value="CANCELLED">Đã hủy</option>
-
-                  <option value="FAILED">Thất bại</option>
+                  {PROCESSING_STATUS_OPTIONS.map((status) => (
+                    <option
+                      key={status.code}
+                      value={status.code}
+                    >
+                      {status.label}
+                    </option>
+                  ))}
                 </select>
 
                 {/* PAYMENT STATUS */}
@@ -888,15 +1122,25 @@ export default function ManageOrderPage() {
                   }
                   className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-600 outline-none transition focus:border-blue-500"
                 >
-                  <option value="ALL">Tất cả thanh toán</option>
+                  <option value="ALL">
+                    Tất cả thanh toán
+                  </option>
 
-                  <option value="PENDING">Chưa thanh toán</option>
+                  <option value="PENDING">
+                    Chưa thanh toán
+                  </option>
 
-                  <option value="PAID">Đã thanh toán</option>
+                  <option value="PAID">
+                    Đã thanh toán
+                  </option>
 
-                  <option value="FAILED">Thanh toán thất bại</option>
+                  <option value="FAILED">
+                    Thanh toán thất bại
+                  </option>
 
-                  <option value="REFUNDED">Đã hoàn tiền</option>
+                  <option value="REFUNDED">
+                    Đã hoàn tiền
+                  </option>
                 </select>
 
               </div>
@@ -908,7 +1152,8 @@ export default function ManageOrderPage() {
           {/* ================================================== */}
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1150px] text-left">
+
+            <table className="w-full min-w-[1100px] text-left">
 
               <thead className="bg-slate-50">
                 <tr className="text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -944,7 +1189,7 @@ export default function ManageOrderPage() {
 
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="px-5 py-16 text-center">
+                    <td colSpan={6} className="px-5 py-16 text-center">
 
                       <LoaderCircle
                         className="mx-auto animate-spin text-blue-600"
@@ -959,7 +1204,7 @@ export default function ManageOrderPage() {
                   </tr>
                 ) : error ? (
                   <tr>
-                    <td colSpan={7} className="px-5 py-16 text-center">
+                    <td colSpan={6} className="px-5 py-16 text-center">
 
                       <AlertCircle
                         size={26}
@@ -982,7 +1227,7 @@ export default function ManageOrderPage() {
                   </tr>
                 ) : paginatedOrders.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-5 py-16 text-center">
+                    <td colSpan={6} className="px-5 py-16 text-center">
 
                       <Search
                         size={26}
@@ -1001,6 +1246,7 @@ export default function ManageOrderPage() {
                   </tr>
                 ) : (
                   paginatedOrders.map((order) => {
+
                     const processingStatus =
                       order.order_processing_status
                         ?.order_processing_status_code ?? "";
@@ -1008,8 +1254,6 @@ export default function ManageOrderPage() {
                     const paymentStatus =
                       order.order_payment_status
                         ?.order_payment_status_code ?? "";
-
-                    const firstItem = order.order_item?.[0];
 
                     return (
                       <tr
@@ -1020,6 +1264,7 @@ export default function ManageOrderPage() {
                         {/* ORDER CODE */}
 
                         <td className="px-5 py-4">
+
                           <p className="text-sm font-semibold text-slate-800">
                             {order.order_code}
                           </p>
@@ -1031,11 +1276,13 @@ export default function ManageOrderPage() {
                           <p className="mt-1 text-xs text-slate-400">
                             {formatDateTime(order.order_created_at)}
                           </p>
+
                         </td>
 
                         {/* RECIPIENT */}
 
                         <td className="px-5 py-4">
+
                           <p className="max-w-[180px] truncate text-sm font-semibold text-slate-800">
                             {order.order_recipient_name}
                           </p>
@@ -1049,11 +1296,13 @@ export default function ManageOrderPage() {
                           <p className="mt-1 text-xs text-slate-400">
                             Khách hàng ID: {order.order_user_id}
                           </p>
+
                         </td>
 
                         {/* TOTAL AMOUNT */}
 
                         <td className="px-5 py-4">
+
                           <p className="text-sm font-bold text-slate-800">
                             {formatCurrency(order.order_total_amount)}
                           </p>
@@ -1061,14 +1310,17 @@ export default function ManageOrderPage() {
                           <p className="mt-1 text-xs text-slate-400">
                             {order.order_item?.length ?? 0} loại sản phẩm
                           </p>
+
                         </td>
 
                         {/* PROCESSING STATUS */}
 
                         <td className="px-5 py-4">
+
                           <span
                             className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${getOrderStatusStyle(processingStatus)}`}
                           >
+
                             <span
                               className={`h-1.5 w-1.5 rounded-full ${getOrderStatusDot(processingStatus)}`}
                             />
@@ -1078,12 +1330,15 @@ export default function ManageOrderPage() {
                               order.order_processing_status
                                 ?.order_processing_status_name,
                             )}
+
                           </span>
+
                         </td>
 
                         {/* PAYMENT STATUS */}
 
                         <td className="px-5 py-4">
+
                           <span
                             className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${getPaymentStatusStyle(paymentStatus)}`}
                           >
@@ -1098,20 +1353,43 @@ export default function ManageOrderPage() {
                             {order.order_payment_method
                               ?.payment_method_name ?? "—"}
                           </p>
+
                         </td>
 
-                        {/* ACTION */}
+                        {/* ACTIONS */}
 
-                        <td className="px-5 py-4 text-center">
-                          <button
-                            type="button"
-                            title="Xem chi tiết đơn hàng"
-                            aria-label={`Xem chi tiết ${order.order_code}`}
-                            onClick={() => handleOpenDetail(order)}
-                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-blue-50 hover:text-blue-600"
-                          >
-                            <Eye size={18} />
-                          </button>
+                        <td className="px-5 py-4">
+
+                          <div className="flex items-center justify-center gap-1.5">
+
+                            {/* VIEW DETAIL */}
+
+                            <button
+                              type="button"
+                              title="Xem chi tiết đơn hàng"
+                              aria-label={`Xem chi tiết ${order.order_code}`}
+                              onClick={() => handleOpenDetail(order)}
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-blue-50 hover:text-blue-600"
+                            >
+                              <Eye size={18} />
+                            </button>
+
+                            {/* UPDATE STATUS */}
+
+                            <button
+                              type="button"
+                              title="Cập nhật trạng thái đơn hàng"
+                              aria-label={`Cập nhật trạng thái ${order.order_code}`}
+                              onClick={() =>
+                                handleOpenUpdateStatus(order)
+                              }
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-amber-50 hover:text-amber-600"
+                            >
+                              <Pencil size={17} />
+                            </button>
+
+                          </div>
+
                         </td>
 
                       </tr>
@@ -1121,6 +1399,7 @@ export default function ManageOrderPage() {
 
               </tbody>
             </table>
+
           </div>
 
           {/* ================================================== */}
@@ -1130,9 +1409,11 @@ export default function ManageOrderPage() {
           <div className="flex flex-col justify-between gap-3 border-t border-slate-100 px-5 py-4 sm:flex-row sm:items-center">
 
             <p className="text-sm text-slate-500">
+
               Hiển thị{" "}
 
               <span className="font-semibold text-slate-700">
+
                 {orders.length === 0
                   ? 0
                   : (safePage - 1) * PAGE_SIZE + 1}
@@ -1143,6 +1424,7 @@ export default function ManageOrderPage() {
                   safePage * PAGE_SIZE,
                   orders.length,
                 )}
+
               </span>
 
               {" "}trên{" "}
@@ -1152,6 +1434,7 @@ export default function ManageOrderPage() {
               </span>
 
               {" "}đơn hàng
+
             </p>
 
             <div className="flex items-center gap-2">
@@ -1201,6 +1484,7 @@ export default function ManageOrderPage() {
             }
           }}
         >
+
           <section
             role="dialog"
             aria-modal="true"
@@ -1208,13 +1492,12 @@ export default function ManageOrderPage() {
             className="w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl"
           >
 
-            {/* ================================================== */}
             {/* MODAL HEADER */}
-            {/* ================================================== */}
 
             <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
 
               <div>
+
                 <div className="flex flex-wrap items-center gap-2">
 
                   <h2
@@ -1233,6 +1516,7 @@ export default function ManageOrderPage() {
                 <p className="mt-1 text-sm text-slate-500">
                   Thông tin đơn hàng, sản phẩm và thanh toán.
                 </p>
+
               </div>
 
               <button
@@ -1246,9 +1530,7 @@ export default function ManageOrderPage() {
 
             </div>
 
-            {/* ================================================== */}
             {/* MODAL CONTENT */}
-            {/* ================================================== */}
 
             <div className="max-h-[70vh] space-y-6 overflow-y-auto p-6">
 
@@ -1259,6 +1541,7 @@ export default function ManageOrderPage() {
                 <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
 
                   <div>
+
                     <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
                       Mã đơn hàng
                     </p>
@@ -1270,25 +1553,23 @@ export default function ManageOrderPage() {
                     <p className="mt-1 text-xs text-slate-400">
                       Order ID: {selectedOrder.order_id}
                     </p>
+
                   </div>
 
                   <div className="flex flex-col items-start gap-2 sm:items-end">
 
                     <span
-                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${
-                        getOrderStatusStyle(
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${getOrderStatusStyle(
+                        selectedOrder.order_processing_status
+                          ?.order_processing_status_code ?? "",
+                      )}`}
+                    >
+
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${getOrderStatusDot(
                           selectedOrder.order_processing_status
                             ?.order_processing_status_code ?? "",
-                        )
-                      }`}
-                    >
-                      <span
-                        className={`h-1.5 w-1.5 rounded-full ${
-                          getOrderStatusDot(
-                            selectedOrder.order_processing_status
-                              ?.order_processing_status_code ?? "",
-                          )
-                        }`}
+                        )}`}
                       />
 
                       {getOrderStatusLabel(
@@ -1297,6 +1578,7 @@ export default function ManageOrderPage() {
                         selectedOrder.order_processing_status
                           ?.order_processing_status_name,
                       )}
+
                     </span>
 
                     <span
@@ -1318,11 +1600,10 @@ export default function ManageOrderPage() {
                 </div>
               </div>
 
-              {/* ================================================== */}
               {/* RECIPIENT INFORMATION */}
-              {/* ================================================== */}
 
               <section>
+
                 <h3 className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-2 text-sm font-bold text-slate-700">
                   <UserRound size={18} className="text-blue-600" />
                   Thông tin người nhận
@@ -1357,11 +1638,10 @@ export default function ManageOrderPage() {
                 </div>
               </section>
 
-              {/* ================================================== */}
               {/* ORDER INFORMATION */}
-              {/* ================================================== */}
 
               <section>
+
                 <h3 className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-2 text-sm font-bold text-slate-700">
                   <ClipboardList size={18} className="text-blue-600" />
                   Thông tin đơn hàng
@@ -1440,9 +1720,7 @@ export default function ManageOrderPage() {
                 </div>
               </section>
 
-              {/* ================================================== */}
               {/* PRODUCT LIST */}
-              {/* ================================================== */}
 
               <section>
 
@@ -1461,6 +1739,7 @@ export default function ManageOrderPage() {
 
                 {!selectedOrder.order_item ||
                 selectedOrder.order_item.length === 0 ? (
+
                   <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center">
 
                     <Package
@@ -1473,10 +1752,13 @@ export default function ManageOrderPage() {
                     </p>
 
                   </div>
+
                 ) : (
+
                   <div className="space-y-3">
 
                     {selectedOrder.order_item.map((item, index) => (
+
                       <div
                         key={item.order_item_id}
                         className="rounded-xl border border-slate-200 bg-white p-4"
@@ -1510,6 +1792,7 @@ export default function ManageOrderPage() {
                             <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
 
                               <div className="min-w-0">
+
                                 <p className="text-xs font-semibold text-slate-400">
                                   Sản phẩm #{index + 1}
                                 </p>
@@ -1527,6 +1810,7 @@ export default function ManageOrderPage() {
                                     Serial Number: {item.order_item_serial_number}
                                   </p>
                                 )}
+
                               </div>
 
                               <p className="shrink-0 text-sm font-bold text-slate-800">
@@ -1601,19 +1885,20 @@ export default function ManageOrderPage() {
                             )}
 
                           </div>
+
                         </div>
 
                       </div>
+
                     ))}
 
                   </div>
+
                 )}
 
               </section>
 
-              {/* ================================================== */}
               {/* PAYMENT INFORMATION */}
-              {/* ================================================== */}
 
               <section>
 
@@ -1629,6 +1914,7 @@ export default function ManageOrderPage() {
                     {/* SUBTOTAL */}
 
                     <div className="flex items-center justify-between gap-3">
+
                       <p className="text-sm text-slate-500">
                         Tổng tiền sản phẩm
                       </p>
@@ -1638,11 +1924,13 @@ export default function ManageOrderPage() {
                           selectedOrder.order_subtotal,
                         )}
                       </p>
+
                     </div>
 
                     {/* SHIPPING FEE */}
 
                     <div className="flex items-center justify-between gap-3">
+
                       <p className="text-sm text-slate-500">
                         Phí vận chuyển
                       </p>
@@ -1652,11 +1940,13 @@ export default function ManageOrderPage() {
                           selectedOrder.order_shipping_fee,
                         )}
                       </p>
+
                     </div>
 
-                    {/* DIRECT DISCOUNT */}
+                    {/* TOTAL DISCOUNT */}
 
                     <div className="flex items-center justify-between gap-3">
+
                       <p className="text-sm text-slate-500">
                         Tổng giảm giá
                       </p>
@@ -1666,11 +1956,13 @@ export default function ManageOrderPage() {
                           selectedOrder.order_discount_amount,
                         )}
                       </p>
+
                     </div>
 
                     {/* COUPON */}
 
                     <div className="flex items-center justify-between gap-3">
+
                       <p className="text-sm text-slate-500">
                         Coupon áp dụng
                       </p>
@@ -1678,12 +1970,14 @@ export default function ManageOrderPage() {
                       <p className="text-right text-sm font-medium text-slate-700">
                         {selectedOrder.order_coupon_name || "Không áp dụng"}
                       </p>
+
                     </div>
 
                     {/* COUPON DISCOUNT */}
 
                     {selectedOrder.order_coupon_discount_amount !== null && (
                       <div className="flex items-center justify-between gap-3">
+
                         <p className="text-sm text-slate-500">
                           Giảm giá Coupon
                         </p>
@@ -1693,8 +1987,11 @@ export default function ManageOrderPage() {
                             selectedOrder.order_coupon_discount_amount,
                           )}
                         </p>
+
                       </div>
                     )}
+
+                    {/* TOTAL */}
 
                     <div className="border-t border-dashed border-slate-300 pt-3">
 
@@ -1721,9 +2018,7 @@ export default function ManageOrderPage() {
 
             </div>
 
-            {/* ================================================== */}
             {/* MODAL FOOTER */}
-            {/* ================================================== */}
 
             <div className="flex justify-end border-t border-slate-100 bg-slate-50 px-6 py-4">
 
@@ -1740,6 +2035,310 @@ export default function ManageOrderPage() {
           </section>
         </div>
       )}
+
+      {/* ================================================== */}
+      {/* UPDATE ORDER PROCESSING STATUS MODAL */}
+      {/* ================================================== */}
+
+      {showUpdateStatusModal && updatingOrder && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (
+              event.target === event.currentTarget &&
+              !isUpdating
+            ) {
+              handleCloseUpdateStatus();
+            }
+          }}
+        >
+
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="update-order-status-title"
+            className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+          >
+
+            {/* MODAL HEADER */}
+
+            <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
+
+              <div>
+
+                <div className="mb-2 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600">
+                  <RefreshCw size={20} />
+                </div>
+
+                <h2
+                  id="update-order-status-title"
+                  className="text-lg font-bold text-slate-800"
+                >
+                  Cập nhật trạng thái đơn hàng
+                </h2>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Thay đổi trạng thái xử lý của đơn hàng.
+                </p>
+
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCloseUpdateStatus}
+                disabled={isUpdating}
+                aria-label="Đóng cửa sổ"
+                className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <X size={20} />
+              </button>
+
+            </div>
+
+            <form onSubmit={handleUpdateStatusSubmit}>
+
+              <div className="space-y-5 p-6">
+
+                {/* ORDER SUMMARY */}
+
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+
+                  <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">
+                    Thông tin đơn hàng
+                  </p>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+
+                    <div>
+
+                      <p className="text-xs text-slate-400">
+                        Mã đơn hàng
+                      </p>
+
+                      <p className="mt-1 break-all text-sm font-semibold text-slate-800">
+                        {updatingOrder.order_code}
+                      </p>
+
+                    </div>
+
+                    <div>
+
+                      <p className="text-xs text-slate-400">
+                        Người nhận
+                      </p>
+
+                      <p className="mt-1 text-sm font-semibold text-slate-800">
+                        {updatingOrder.order_recipient_name}
+                      </p>
+
+                    </div>
+
+                    <div>
+
+                      <p className="text-xs text-slate-400">
+                        Tổng thanh toán
+                      </p>
+
+                      <p className="mt-1 text-sm font-semibold text-slate-800">
+                        {formatCurrency(
+                          updatingOrder.order_total_amount,
+                        )}
+                      </p>
+
+                    </div>
+
+                    <div>
+
+                      <p className="text-xs text-slate-400">
+                        Trạng thái hiện tại
+                      </p>
+
+                      <span
+                        className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getOrderStatusStyle(
+                          updatingOrder.order_processing_status
+                            ?.order_processing_status_code ?? "",
+                        )}`}
+                      >
+                        {getOrderStatusLabel(
+                          updatingOrder.order_processing_status
+                            ?.order_processing_status_code ?? "",
+                          updatingOrder.order_processing_status
+                            ?.order_processing_status_name,
+                        )}
+                      </span>
+
+                    </div>
+
+                  </div>
+
+                </div>
+
+                {/* NEW STATUS */}
+
+                <div>
+
+                  <label
+                    htmlFor="order-processing-status"
+                    className="mb-2 block text-sm font-semibold text-slate-700"
+                  >
+                    Trạng thái mới{" "}
+                    <span className="text-rose-500">*</span>
+                  </label>
+
+                  <select
+                    id="order-processing-status"
+                    value={selectedProcessingStatus}
+                    onChange={(event) => {
+                      setSelectedProcessingStatus(event.target.value);
+
+                      if (statusFormError) {
+                        setStatusFormError("");
+                      }
+                    }}
+                    disabled={isUpdating}
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-50"
+                  >
+
+                    <option value="" disabled>
+                      -- Chọn trạng thái đơn hàng --
+                    </option>
+
+                    {PROCESSING_STATUS_OPTIONS.map((status) => (
+
+                      <option
+                        key={status.code}
+                        value={status.code}
+                      >
+                        {status.label}
+                      </option>
+
+                    ))}
+
+                  </select>
+
+                  <p className="mt-2 text-xs text-slate-400">
+                    Chọn trạng thái xử lý mới cho đơn hàng.
+                  </p>
+
+                </div>
+
+                {/* NEW STATUS PREVIEW */}
+
+                {selectedProcessingStatus && (
+                  <div className="rounded-xl border border-blue-100 bg-blue-50/60 p-4">
+
+                    <p className="mb-2 text-xs font-semibold text-blue-700">
+                      Trạng thái sau khi cập nhật
+                    </p>
+
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${getOrderStatusStyle(
+                        selectedProcessingStatus,
+                      )}`}
+                    >
+
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${getOrderStatusDot(
+                          selectedProcessingStatus,
+                        )}`}
+                      />
+
+                      {getOrderStatusLabel(selectedProcessingStatus)}
+
+                    </span>
+
+                  </div>
+                )}
+
+                {/* BUSINESS WARNING */}
+
+                {(selectedProcessingStatus === "CANCELLED" ||
+                  selectedProcessingStatus === "FAILED") && (
+                  <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
+
+                    <CircleAlert
+                      size={18}
+                      className="mt-0.5 shrink-0 text-amber-600"
+                    />
+
+                    <p className="text-xs leading-5 text-amber-800">
+                      Bạn đang chọn trạng thái{" "}
+                      <strong>
+                        {getOrderStatusLabel(selectedProcessingStatus)}
+                      </strong>
+                      . Hãy kiểm tra kỹ đơn hàng trước khi xác nhận.
+                    </p>
+
+                  </div>
+                )}
+
+                {/* FORM ERROR */}
+
+                {statusFormError && (
+                  <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+
+                    <AlertCircle
+                      size={18}
+                      className="mt-0.5 shrink-0"
+                    />
+
+                    <p>{statusFormError}</p>
+
+                  </div>
+                )}
+
+              </div>
+
+              {/* MODAL FOOTER */}
+
+              <div className="flex flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4 sm:flex-row sm:justify-end">
+
+                <button
+                  type="button"
+                  onClick={handleCloseUpdateStatus}
+                  disabled={isUpdating}
+                  className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Hủy
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={
+                    isUpdating ||
+                    !selectedProcessingStatus ||
+                    selectedProcessingStatus ===
+                      updatingOrder.order_processing_status
+                        ?.order_processing_status_code
+                  }
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+
+                  {isUpdating ? (
+                    <>
+                      <LoaderCircle
+                        size={16}
+                        className="animate-spin"
+                      />
+                      Đang cập nhật...
+                    </>
+                  ) : (
+                    <>
+                      <Save size={16} />
+                      Cập nhật trạng thái
+                    </>
+                  )}
+
+                </button>
+
+              </div>
+
+            </form>
+
+          </section>
+        </div>
+      )}
+
     </>
   );
 }
@@ -1827,6 +2426,7 @@ function StatCard({
       <div className="flex items-center justify-between gap-3">
 
         <div>
+
           <p className="text-sm font-medium text-slate-500">
             {title}
           </p>
@@ -1841,6 +2441,7 @@ function StatCard({
               {value.toLocaleString("vi-VN")}
             </p>
           )}
+
         </div>
 
         <div

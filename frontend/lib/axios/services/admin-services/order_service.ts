@@ -29,4 +29,19 @@ export const adminOrderService = {
 
     return response.data;
   },
+
+  // 2. (PATCH) UPDATE ORDER PROCESSING STATUS
+  async updateOrderProcessingStatus(
+    orderId: number,
+    processingStatus: string,
+  ) {
+    const response = await adminAxios.patch(
+      `${ORDER_SERVICE_URL}/order/${orderId}/processing-status`,
+      {
+        processing_status: processingStatus,
+      },
+    );
+
+    return response.data;
+  },
 };
