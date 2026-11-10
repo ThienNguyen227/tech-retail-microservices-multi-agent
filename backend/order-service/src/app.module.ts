@@ -14,6 +14,7 @@ import { CancelOrderModule } from './customer_session/cancel_order/cancel_order.
 
 // ADMIN-SESSION
 import { OrderListModule } from './admin_session/order_list/order_list.module';
+import { OrderProcessingStatusModule } from './admin_session/order_processing_status/order_processing_status.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { OrderListModule } from './admin_session/order_list/order_list.module';
 
     // ADMIN-SESSIO
     OrderListModule,
+    OrderProcessingStatusModule,
 
   ],
 
