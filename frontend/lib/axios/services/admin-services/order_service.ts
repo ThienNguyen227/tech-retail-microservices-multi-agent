@@ -30,7 +30,7 @@ export const adminOrderService = {
     return response.data;
   },
 
-  // 2. (PATCH) UPDATE ORDER PROCESSING STATUS
+  // 2. (PATCH) ORDER-PROCESSING-STATUS
   async updateOrderProcessingStatus(
     orderId: number,
     processingStatus: string,
@@ -40,6 +40,37 @@ export const adminOrderService = {
       {
         processing_status: processingStatus,
       },
+    );
+
+    return response.data;
+  },
+
+  // 3. (PATCH) ORDER-LIST
+  async updateOrder(
+    orderId: number,
+    payload: {
+      order_recipient_name?: string;
+      order_recipient_phone?: string;
+      order_address_line?: string;
+      order_ward?: string;
+      order_province?: string;
+
+      order_order_delivery_method_id?: number;
+      order_order_payment_method_id?: number;
+
+      order_coupon_id?: number | null;
+      order_coupon_name?: string | null;
+      order_coupon_discount_amount?: number | null;
+
+      order_subtotal?: number;
+      order_shipping_fee?: number;
+      order_discount_amount?: number;
+      order_total_amount?: number;
+    },
+  ) {
+    const response = await adminAxios.patch(
+      `${ORDER_SERVICE_URL}/order/${orderId}`,
+      payload,
     );
 
     return response.data;
