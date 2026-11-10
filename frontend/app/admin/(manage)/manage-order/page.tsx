@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useCallback, useEffect, useState, type ReactNode, type FormEvent } from "react";
@@ -31,6 +30,7 @@ import {
   Pencil,
   Save,
   CircleAlert,
+  FilePenLine,
 } from "lucide-react";
 
 import axios from "axios";
@@ -127,6 +127,23 @@ interface OrderListResponse {
   data?: Order[];
 }
 
+interface EditOrderForm {
+  order_recipient_name: string;
+  order_recipient_phone: string;
+  order_address_line: string;
+  order_ward: string;
+  order_province: string;
+  order_order_delivery_method_id: string;
+  order_order_payment_method_id: string;
+  order_coupon_id: string;
+  order_coupon_name: string;
+  order_coupon_discount_amount: string;
+  order_subtotal: string;
+  order_shipping_fee: string;
+  order_discount_amount: string;
+  order_total_amount: string;
+}
+
 const PAGE_SIZE = 8;
 
 // ======================================================
@@ -165,6 +182,10 @@ const PROCESSING_STATUS_OPTIONS = [
   {
     code: "CANCELLED",
     label: "Đã hủy",
+  },
+  {
+    code: "FAILED",
+    label: "Thất bại",
   },
 ] as const;
 
@@ -528,6 +549,35 @@ export default function ManageOrderPage() {
   const [isUpdating, setIsUpdating] = useState(false);
 
   // ======================================================
+  // EDIT ORDER INFORMATION MODAL
+  // ======================================================
+
+  const [showEditOrderModal, setShowEditOrderModal] = useState(false);
+
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+
+  const [editOrderForm, setEditOrderForm] = useState<EditOrderForm>({
+    order_recipient_name: "",
+    order_recipient_phone: "",
+    order_address_line: "",
+    order_ward: "",
+    order_province: "",
+    order_order_delivery_method_id: "1",
+    order_order_payment_method_id: "1",
+    order_coupon_id: "",
+    order_coupon_name: "",
+    order_coupon_discount_amount: "",
+    order_subtotal: "",
+    order_shipping_fee: "",
+    order_discount_amount: "",
+    order_total_amount: "",
+  });
+
+  const [editOrderError, setEditOrderError] = useState("");
+
+  const [isSavingOrder, setIsSavingOrder] = useState(false);
+
+  // ======================================================
   // SUCCESS TOAST
   // ======================================================
 
@@ -671,12 +721,20 @@ export default function ManageOrderPage() {
   // ======================================================
 
   useEffect(() => {
-    if (!selectedOrder && !showUpdateStatusModal) return;
+    if (
+      !selectedOrder &&
+      !showUpdateStatusModal &&
+      !showEditOrderModal
+    ) return;
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
 
-      if (showUpdateStatusModal) {
+      if (showEditOrderModal) {
+        if (!isSavingOrder) {
+          handleCloseEditOrder();
+        }
+      } else if (showUpdateStatusModal) {
         if (!isUpdating) {
           handleCloseUpdateStatus();
         }
@@ -690,7 +748,13 @@ export default function ManageOrderPage() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [selectedOrder, showUpdateStatusModal, isUpdating]);
+  }, [
+    selectedOrder,
+    showUpdateStatusModal,
+    isUpdating,
+    showEditOrderModal,
+    isSavingOrder,
+  ]);
 
   // ======================================================
   // PAGINATION
@@ -885,6 +949,224 @@ export default function ManageOrderPage() {
       );
     } finally {
       setIsUpdating(false);
+    }
+  }
+
+  // ======================================================
+  // EDIT ORDER ACTIONS
+  // ======================================================
+
+  function handleOpenEditOrder(order: Order) {
+    setEditingOrder(order);
+
+    setEditOrderForm({
+      order_recipient_name: order.order_recipient_name ?? "",
+      order_recipient_phone: order.order_recipient_phone ?? "",
+      order_address_line: order.order_address_line ?? "",
+      order_ward: order.order_ward ?? "",
+      order_province: order.order_province ?? "",
+      order_order_delivery_method_id: String(
+        order.order_order_delivery_method_id ?? "",
+      ),
+      order_order_payment_method_id: String(
+        order.order_order_payment_method_id ?? "",
+      ),
+      order_coupon_id:
+        order.order_coupon_id === null
+          ? ""
+          : String(order.order_coupon_id),
+      order_coupon_name: order.order_coupon_name ?? "",
+      order_coupon_discount_amount:
+        order.order_coupon_discount_amount === null
+          ? ""
+          : String(order.order_coupon_discount_amount),
+      order_subtotal: String(order.order_subtotal ?? ""),
+      order_shipping_fee: String(order.order_shipping_fee ?? ""),
+      order_discount_amount: String(order.order_discount_amount ?? ""),
+      order_total_amount: String(order.order_total_amount ?? ""),
+    });
+
+    setEditOrderError("");
+    setShowEditOrderModal(true);
+  }
+
+  function handleCloseEditOrder() {
+    if (isSavingOrder) return;
+
+    setShowEditOrderModal(false);
+    setEditingOrder(null);
+    setEditOrderError("");
+  }
+
+  function handleEditOrderFieldChange(
+    field: keyof EditOrderForm,
+    value: string,
+  ) {
+    setEditOrderForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+
+    if (editOrderError) {
+      setEditOrderError("");
+    }
+  }
+
+  // ======================================================
+  // SUBMIT EDIT ORDER
+  // ======================================================
+
+  async function handleEditOrderSubmit(
+    event: FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+    setEditOrderError("");
+    setSuccessMessage("");
+
+    if (!editingOrder) {
+      setEditOrderError("Không tìm thấy thông tin đơn hàng.");
+      return;
+    }
+
+    const requiredTextFields = [
+      editOrderForm.order_recipient_name,
+      editOrderForm.order_recipient_phone,
+      editOrderForm.order_address_line,
+      editOrderForm.order_ward,
+      editOrderForm.order_province,
+    ];
+
+    if (requiredTextFields.some((value) => !value.trim())) {
+      setEditOrderError("Vui lòng nhập đầy đủ thông tin người nhận và địa chỉ.");
+      return;
+    }
+
+    const numericFields = [
+      { label: "Phương thức giao hàng", value: editOrderForm.order_order_delivery_method_id },
+      { label: "Phương thức thanh toán", value: editOrderForm.order_order_payment_method_id },
+      { label: "Tổng tiền sản phẩm", value: editOrderForm.order_subtotal },
+      { label: "Phí vận chuyển", value: editOrderForm.order_shipping_fee },
+      { label: "Tổng giảm giá", value: editOrderForm.order_discount_amount },
+      { label: "Tổng thanh toán", value: editOrderForm.order_total_amount },
+    ];
+
+    for (const field of numericFields) {
+      if (field.value.trim() === "" || !Number.isFinite(Number(field.value))) {
+        setEditOrderError(`${field.label} không hợp lệ.`);
+        return;
+      }
+    }
+
+    const amountFields = [
+      { label: "Tổng tiền sản phẩm", value: editOrderForm.order_subtotal },
+      { label: "Phí vận chuyển", value: editOrderForm.order_shipping_fee },
+      { label: "Tổng giảm giá", value: editOrderForm.order_discount_amount },
+      { label: "Tổng thanh toán", value: editOrderForm.order_total_amount },
+    ];
+
+    for (const field of amountFields) {
+      if (Number(field.value) < 0) {
+        setEditOrderError(`${field.label} không được nhỏ hơn 0.`);
+        return;
+      }
+    }
+
+    const couponId = editOrderForm.order_coupon_id.trim();
+    const couponDiscount = editOrderForm.order_coupon_discount_amount.trim();
+
+    if (couponId && (!Number.isInteger(Number(couponId)) || Number(couponId) <= 0)) {
+      setEditOrderError("Coupon ID phải là số nguyên dương.");
+      return;
+    }
+
+    if (
+      couponDiscount &&
+      (!Number.isFinite(Number(couponDiscount)) || Number(couponDiscount) < 0)
+    ) {
+      setEditOrderError("Số tiền giảm từ coupon không hợp lệ.");
+      return;
+    }
+
+    const payload = {
+      order_recipient_name: editOrderForm.order_recipient_name.trim(),
+      order_recipient_phone: editOrderForm.order_recipient_phone.trim(),
+      order_address_line: editOrderForm.order_address_line.trim(),
+      order_ward: editOrderForm.order_ward.trim(),
+      order_province: editOrderForm.order_province.trim(),
+
+      order_order_delivery_method_id: Number(
+        editOrderForm.order_order_delivery_method_id,
+      ),
+      order_order_payment_method_id: Number(
+        editOrderForm.order_order_payment_method_id,
+      ),
+
+      order_coupon_id: couponId ? Number(couponId) : null,
+      order_coupon_name: editOrderForm.order_coupon_name.trim() || null,
+      order_coupon_discount_amount: couponDiscount
+        ? Number(couponDiscount)
+        : null,
+
+      order_subtotal: Number(editOrderForm.order_subtotal),
+      order_shipping_fee: Number(editOrderForm.order_shipping_fee),
+      order_discount_amount: Number(editOrderForm.order_discount_amount),
+      order_total_amount: Number(editOrderForm.order_total_amount),
+    };
+
+    try {
+      setIsSavingOrder(true);
+
+      const response = await adminOrderService.updateOrder(
+        editingOrder.order_id,
+        payload,
+      );
+
+      const updatedOrder = response?.data as Order | undefined;
+
+      if (updatedOrder && updatedOrder.order_id === editingOrder.order_id) {
+        setOrders((currentOrders) =>
+          currentOrders.map((order) =>
+            order.order_id === updatedOrder.order_id
+              ? updatedOrder
+              : order,
+          ),
+        );
+
+        setStatsOrders((currentOrders) =>
+          currentOrders.map((order) =>
+            order.order_id === updatedOrder.order_id
+              ? updatedOrder
+              : order,
+          ),
+        );
+
+        setSelectedOrder((currentOrder) =>
+          currentOrder?.order_id === updatedOrder.order_id
+            ? updatedOrder
+            : currentOrder,
+        );
+      }
+
+      setShowEditOrderModal(false);
+      setEditingOrder(null);
+      setEditOrderError("");
+
+      setSuccessMessage(
+        response?.message || "Cập nhật thông tin đơn hàng thành công!",
+      );
+
+      setRefreshKey((prev) => prev + 1);
+    } catch (err: unknown) {
+      console.error("Update order error:", err);
+
+      setEditOrderError(
+        extractErrorMessage(
+          err,
+          "Không thể cập nhật thông tin đơn hàng. Vui lòng thử lại.",
+        ),
+      );
+    } finally {
+      setIsSavingOrder(false);
     }
   }
 
@@ -1372,6 +1654,18 @@ export default function ManageOrderPage() {
                               className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-blue-50 hover:text-blue-600"
                             >
                               <Eye size={18} />
+                            </button>
+
+                            {/* EDIT ORDER INFORMATION */}
+
+                            <button
+                              type="button"
+                              title="Chỉnh sửa thông tin đơn hàng"
+                              aria-label={`Chỉnh sửa thông tin ${order.order_code}`}
+                              onClick={() => handleOpenEditOrder(order)}
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-emerald-50 hover:text-emerald-600"
+                            >
+                              <FilePenLine size={17} />
                             </button>
 
                             {/* UPDATE STATUS */}
@@ -2339,6 +2633,420 @@ export default function ManageOrderPage() {
         </div>
       )}
 
+      {/* ================================================== */}
+      {/* EDIT ORDER INFORMATION MODAL */}
+      {/* ================================================== */}
+
+      {showEditOrderModal && editingOrder && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (
+              event.target === event.currentTarget &&
+              !isSavingOrder
+            ) {
+              handleCloseEditOrder();
+            }
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="edit-order-title"
+            className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+          >
+            {/* MODAL HEADER */}
+
+            <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
+              <div>
+                <div className="mb-2 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                  <FilePenLine size={20} />
+                </div>
+
+                <h2
+                  id="edit-order-title"
+                  className="text-lg font-bold text-slate-800"
+                >
+                  Chỉnh sửa thông tin đơn hàng
+                </h2>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Cập nhật thông tin người nhận, giao hàng và giá trị đơn hàng.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleCloseEditOrder}
+                disabled={isSavingOrder}
+                aria-label="Đóng cửa sổ"
+                className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditOrderSubmit}>
+              <div className="max-h-[65vh] space-y-6 overflow-y-auto p-6">
+                {/* ORDER SUMMARY */}
+
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">
+                    Thông tin định danh đơn hàng
+                  </p>
+
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <div>
+                      <p className="text-xs text-slate-400">Mã đơn hàng</p>
+                      <p className="mt-1 break-all text-sm font-semibold text-slate-800">
+                        {editingOrder.order_code}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-slate-400">Order ID</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-800">
+                        {editingOrder.order_id}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs text-slate-400">Customer ID</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-800">
+                        {editingOrder.order_user_id}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* RECIPIENT INFORMATION */}
+
+                <section>
+                  <h3 className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-2 text-sm font-bold text-slate-700">
+                    <UserRound size={18} className="text-blue-600" />
+                    Thông tin người nhận
+                  </h3>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <label htmlFor="edit-recipient-name" className="mb-2 block text-sm font-semibold text-slate-700">
+                        Tên người nhận <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        id="edit-recipient-name"
+                        value={editOrderForm.order_recipient_name}
+                        onChange={(event) => handleEditOrderFieldChange("order_recipient_name", event.target.value)}
+                        required
+                        maxLength={150}
+                        disabled={isSavingOrder}
+                        className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="edit-recipient-phone" className="mb-2 block text-sm font-semibold text-slate-700">
+                        Số điện thoại <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        id="edit-recipient-phone"
+                        type="tel"
+                        value={editOrderForm.order_recipient_phone}
+                        onChange={(event) => handleEditOrderFieldChange("order_recipient_phone", event.target.value)}
+                        required
+                        maxLength={20}
+                        disabled={isSavingOrder}
+                        className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label htmlFor="edit-address-line" className="mb-2 block text-sm font-semibold text-slate-700">
+                        Địa chỉ <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        id="edit-address-line"
+                        value={editOrderForm.order_address_line}
+                        onChange={(event) => handleEditOrderFieldChange("order_address_line", event.target.value)}
+                        required
+                        maxLength={255}
+                        disabled={isSavingOrder}
+                        className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="edit-ward" className="mb-2 block text-sm font-semibold text-slate-700">
+                        Phường / xã <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        id="edit-ward"
+                        value={editOrderForm.order_ward}
+                        onChange={(event) => handleEditOrderFieldChange("order_ward", event.target.value)}
+                        required
+                        maxLength={150}
+                        disabled={isSavingOrder}
+                        className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="edit-province" className="mb-2 block text-sm font-semibold text-slate-700">
+                        Tỉnh / thành phố <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        id="edit-province"
+                        value={editOrderForm.order_province}
+                        onChange={(event) => handleEditOrderFieldChange("order_province", event.target.value)}
+                        required
+                        maxLength={150}
+                        disabled={isSavingOrder}
+                        className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50"
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                {/* DELIVERY AND PAYMENT */}
+
+                <section>
+                  <h3 className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-2 text-sm font-bold text-slate-700">
+                    <Truck size={18} className="text-blue-600" />
+                    Giao hàng và thanh toán
+                  </h3>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <label htmlFor="edit-delivery-method" className="mb-2 block text-sm font-semibold text-slate-700">
+                        Phương thức giao hàng <span className="text-rose-500">*</span>
+                      </label>
+                      <select
+                        id="edit-delivery-method"
+                        value={editOrderForm.order_order_delivery_method_id}
+                        onChange={(event) => handleEditOrderFieldChange("order_order_delivery_method_id", event.target.value)}
+                        disabled={isSavingOrder}
+                        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50"
+                      >
+                        <option value="1">Giao hàng tận nơi</option>
+                        <option value="2">Nhận tại cửa hàng</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label htmlFor="edit-payment-method" className="mb-2 block text-sm font-semibold text-slate-700">
+                        Phương thức thanh toán <span className="text-rose-500">*</span>
+                      </label>
+                      <select
+                        id="edit-payment-method"
+                        value={editOrderForm.order_order_payment_method_id}
+                        onChange={(event) => handleEditOrderFieldChange("order_order_payment_method_id", event.target.value)}
+                        disabled={isSavingOrder}
+                        className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50"
+                      >
+                        <option value="1">Thanh toán khi nhận hàng (COD)</option>
+                        <option value="2">Thanh toán qua MOMO</option>
+                        <option value="3">Thanh toán qua VNPAY</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {editingOrder.order_payment_status?.order_payment_status_code === "PAID" ||
+                  editingOrder.order_payment_status?.order_payment_status_code === "REFUNDED" ? (
+                    <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
+                      Đơn hàng đã thanh toán hoặc hoàn tiền. Backend sẽ từ chối thay đổi phương thức thanh toán nếu phương thức mới khác phương thức hiện tại.
+                    </p>
+                  ) : null}
+                </section>
+
+                {/* COUPON INFORMATION */}
+
+                <section>
+                  <h3 className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-2 text-sm font-bold text-slate-700">
+                    <Tag size={18} className="text-blue-600" />
+                    Thông tin Coupon
+                  </h3>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <label htmlFor="edit-coupon-id" className="mb-2 block text-sm font-semibold text-slate-700">
+                        Coupon ID
+                      </label>
+                      <input
+                        id="edit-coupon-id"
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={editOrderForm.order_coupon_id}
+                        onChange={(event) => handleEditOrderFieldChange("order_coupon_id", event.target.value)}
+                        placeholder="Để trống nếu không áp dụng"
+                        disabled={isSavingOrder}
+                        className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="edit-coupon-name" className="mb-2 block text-sm font-semibold text-slate-700">
+                        Tên Coupon
+                      </label>
+                      <input
+                        id="edit-coupon-name"
+                        value={editOrderForm.order_coupon_name}
+                        onChange={(event) => handleEditOrderFieldChange("order_coupon_name", event.target.value)}
+                        placeholder="Tên coupon"
+                        disabled={isSavingOrder}
+                        className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50"
+                      />
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label htmlFor="edit-coupon-discount" className="mb-2 block text-sm font-semibold text-slate-700">
+                        Số tiền giảm từ Coupon (₫)
+                      </label>
+                      <input
+                        id="edit-coupon-discount"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={editOrderForm.order_coupon_discount_amount}
+                        onChange={(event) => handleEditOrderFieldChange("order_coupon_discount_amount", event.target.value)}
+                        placeholder="Để trống nếu không áp dụng"
+                        disabled={isSavingOrder}
+                        className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50"
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                {/* ORDER AMOUNTS */}
+
+                <section>
+                  <h3 className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-2 text-sm font-bold text-slate-700">
+                    <ReceiptText size={18} className="text-blue-600" />
+                    Giá trị đơn hàng
+                  </h3>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <label htmlFor="edit-subtotal" className="mb-2 block text-sm font-semibold text-slate-700">
+                        Tổng tiền sản phẩm (₫) <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        id="edit-subtotal"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        required
+                        value={editOrderForm.order_subtotal}
+                        onChange={(event) => handleEditOrderFieldChange("order_subtotal", event.target.value)}
+                        disabled={isSavingOrder}
+                        className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="edit-shipping-fee" className="mb-2 block text-sm font-semibold text-slate-700">
+                        Phí vận chuyển (₫) <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        id="edit-shipping-fee"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        required
+                        value={editOrderForm.order_shipping_fee}
+                        onChange={(event) => handleEditOrderFieldChange("order_shipping_fee", event.target.value)}
+                        disabled={isSavingOrder}
+                        className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="edit-discount-amount" className="mb-2 block text-sm font-semibold text-slate-700">
+                        Tổng giảm giá (₫) <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        id="edit-discount-amount"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        required
+                        value={editOrderForm.order_discount_amount}
+                        onChange={(event) => handleEditOrderFieldChange("order_discount_amount", event.target.value)}
+                        disabled={isSavingOrder}
+                        className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="edit-total-amount" className="mb-2 block text-sm font-semibold text-slate-700">
+                        Tổng thanh toán (₫) <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        id="edit-total-amount"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        required
+                        value={editOrderForm.order_total_amount}
+                        onChange={(event) => handleEditOrderFieldChange("order_total_amount", event.target.value)}
+                        disabled={isSavingOrder}
+                        className="h-11 w-full rounded-xl border border-slate-200 px-3 text-sm font-semibold text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50"
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                {/* EDIT NOTICE */}
+
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                  <p className="text-xs leading-5 text-amber-800">
+                    Lưu ý: Modal này chỉ chỉnh sửa thông tin cấp đơn hàng. Trạng thái xử lý, trạng thái thanh toán và danh sách sản phẩm không được chỉnh sửa tại đây. Coupon và các khoản tiền cần được kiểm tra lại với quy tắc nghiệp vụ trước khi lưu.
+                  </p>
+                </div>
+
+                {/* FORM ERROR */}
+
+                {editOrderError && (
+                  <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+                    <AlertCircle size={18} className="mt-0.5 shrink-0" />
+                    <p>{editOrderError}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* MODAL FOOTER */}
+
+              <div className="flex flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={handleCloseEditOrder}
+                  disabled={isSavingOrder}
+                  className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Hủy
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={isSavingOrder}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isSavingOrder ? (
+                    <>
+                      <LoaderCircle size={16} className="animate-spin" />
+                      Đang lưu...
+                    </>
+                  ) : (
+                    <>
+                      <Save size={16} />
+                      Lưu thay đổi
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
     </>
   );
 }
@@ -2459,3 +3167,4 @@ function StatCard({
     </div>
   );
 }
+
