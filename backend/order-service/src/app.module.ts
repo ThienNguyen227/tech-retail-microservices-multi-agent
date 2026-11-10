@@ -12,6 +12,9 @@ import { UpdateOrderStatusModule } from './orders/update_order_status/update_ord
 import { CreateOrderModule } from './customer_session/create_order/create_order.module';
 import { CancelOrderModule } from './customer_session/cancel_order/cancel_order.module';
 
+// ADMIN-SESSION
+import { OrderListModule } from './admin_session/order_list/order_list.module';
+
 @Module({
   imports: [
     // Scheduler
@@ -32,6 +35,11 @@ import { CancelOrderModule } from './customer_session/cancel_order/cancel_order.
     UpdateOrderStatusModule,
     CreateOrderModule,
     CancelOrderModule,
+
+
+    // ADMIN-SESSIO
+    OrderListModule,
+
   ],
 
   controllers: [],

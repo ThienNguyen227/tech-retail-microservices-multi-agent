@@ -1,0 +1,1860 @@
+"use client";
+
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import {
+  Search,
+  ShoppingBag,
+  Clock3,
+  Truck,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  RefreshCw,
+  LoaderCircle,
+  X,
+  CalendarDays,
+  Package,
+  Hash,
+  UserRound,
+  ImageIcon,
+  Phone,
+  MapPin,
+  CreditCard,
+  WalletCards,
+  Banknote,
+  AlertCircle,
+  Tag,
+  ReceiptText,
+  Store,
+  ClipboardList,
+} from "lucide-react";
+
+import axios from "axios";
+import { adminOrderService } from "@/lib/axios/services/admin-services/order_service";
+
+// ======================================================
+// INTERFACES
+// ======================================================
+
+type DecimalValue = string | number | null;
+
+interface OrderProcessingStatus {
+  order_processing_status_id: number;
+  order_processing_status_code: string;
+  order_processing_status_name: string;
+}
+
+interface OrderPaymentStatus {
+  order_payment_status_id: number;
+  order_payment_status_code: string;
+  order_payment_status_name: string;
+}
+
+interface OrderDeliveryMethod {
+  delivery_method_id: number;
+  delivery_method_code: string;
+  delivery_method_name: string;
+}
+
+interface OrderPaymentMethod {
+  payment_method_id: number;
+  payment_method_code: string;
+  payment_method_name: string;
+  payment_method_status: boolean;
+}
+
+interface OrderItem {
+  order_item_id: number;
+  order_item_order_id: number;
+  order_item_sku: string;
+  order_item_serial_number: string | null;
+  order_item_product_name: string;
+  order_item_product_image: string;
+  order_item_unit_price: DecimalValue;
+  order_item_quantity: number;
+  order_item_subtotal: DecimalValue;
+
+  order_item_promotion_id: number | null;
+  order_item_promotion_name: string | null;
+  order_item_direct_discount_amount: DecimalValue;
+}
+
+interface Order {
+  order_id: number;
+  order_code: string;
+  order_user_id: number;
+
+  order_order_processing_status_id: number;
+  order_order_payment_status_id: number;
+  order_order_delivery_method_id: number;
+  order_order_payment_method_id: number;
+
+  order_recipient_name: string;
+  order_recipient_phone: string;
+  order_address_line: string;
+  order_ward: string;
+  order_province: string;
+
+  order_subtotal: DecimalValue;
+  order_shipping_fee: DecimalValue;
+
+  order_coupon_id: number | null;
+  order_coupon_name: string | null;
+  order_coupon_discount_amount: DecimalValue;
+
+  order_discount_amount: DecimalValue;
+  order_total_amount: DecimalValue;
+
+  order_created_at: string;
+  order_updated_at: string;
+
+  order_processing_status: OrderProcessingStatus;
+  order_payment_status: OrderPaymentStatus;
+  order_delivery_method: OrderDeliveryMethod;
+  order_payment_method: OrderPaymentMethod;
+
+  order_item: OrderItem[];
+}
+
+interface OrderListResponse {
+  success?: boolean;
+  message?: string;
+  total?: number;
+  data?: Order[];
+}
+
+const PAGE_SIZE = 8;
+
+// ======================================================
+// HELPERS
+// ======================================================
+
+// Chuẩn hóa dữ liệu trả về từ API
+
+function normalizeOrderData(response: unknown): {
+  orders: Order[];
+  total: number;
+} {
+  if (Array.isArray(response)) {
+    return {
+      orders: response as Order[],
+      total: response.length,
+    };
+  }
+
+  if (
+    response &&
+    typeof response === "object" &&
+    "data" in response
+  ) {
+    const result = response as OrderListResponse;
+
+    if (Array.isArray(result.data)) {
+      return {
+        orders: result.data,
+        total:
+          typeof result.total === "number"
+            ? result.total
+            : result.data.length,
+      };
+    }
+  }
+
+  return {
+    orders: [],
+    total: 0,
+  };
+}
+
+// Định dạng tiền tệ
+
+function formatCurrency(value?: DecimalValue) {
+  if (value === null || value === undefined) {
+    return "—";
+  }
+
+  const amount = Number(value);
+
+  if (!Number.isFinite(amount)) {
+    return "—";
+  }
+
+  return `${amount.toLocaleString("vi-VN")} ₫`;
+}
+
+// Định dạng ngày
+
+function formatDate(date?: string | null) {
+  if (!date) return "—";
+
+  const parsedDate = new Date(date);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "—";
+  }
+
+  return parsedDate.toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+// Định dạng ngày giờ
+
+function formatDateTime(date?: string | null) {
+  if (!date) return "—";
+
+  const parsedDate = new Date(date);
+
+  if (Number.isNaN(parsedDate.getTime())) {
+    return "—";
+  }
+
+  return parsedDate.toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+// ======================================================
+// ORDER PROCESSING STATUS
+// ======================================================
+
+function getOrderStatusStyle(status: string) {
+  switch (status) {
+    case "PENDING":
+      return "bg-amber-50 text-amber-700";
+
+    case "CONFIRMED":
+      return "bg-blue-50 text-blue-700";
+
+    case "PROCESSING":
+      return "bg-violet-50 text-violet-700";
+
+    case "READY_FOR_PICKUP":
+      return "bg-indigo-50 text-indigo-700";
+
+    case "SHIPPING":
+      return "bg-cyan-50 text-cyan-700";
+
+    case "DELIVERED":
+      return "bg-teal-50 text-teal-700";
+
+    case "COMPLETED":
+      return "bg-emerald-50 text-emerald-700";
+
+    case "CANCELLED":
+      return "bg-rose-50 text-rose-700";
+
+    case "FAILED":
+      return "bg-red-50 text-red-700";
+
+    default:
+      return "bg-slate-100 text-slate-600";
+  }
+}
+
+function getOrderStatusDot(status: string) {
+  switch (status) {
+    case "PENDING":
+      return "bg-amber-500";
+
+    case "CONFIRMED":
+      return "bg-blue-500";
+
+    case "PROCESSING":
+      return "bg-violet-500";
+
+    case "READY_FOR_PICKUP":
+      return "bg-indigo-500";
+
+    case "SHIPPING":
+      return "bg-cyan-500";
+
+    case "DELIVERED":
+      return "bg-teal-500";
+
+    case "COMPLETED":
+      return "bg-emerald-500";
+
+    case "CANCELLED":
+    case "FAILED":
+      return "bg-rose-500";
+
+    default:
+      return "bg-slate-400";
+  }
+}
+
+function getOrderStatusLabel(status: string, name?: string) {
+  if (name) return name;
+
+  switch (status) {
+    case "PENDING":
+      return "Chờ xác nhận";
+
+    case "CONFIRMED":
+      return "Đã xác nhận";
+
+    case "PROCESSING":
+      return "Đang xử lý";
+
+    case "READY_FOR_PICKUP":
+      return "Sẵn sàng nhận hàng";
+
+    case "SHIPPING":
+      return "Đang giao hàng";
+
+    case "DELIVERED":
+      return "Đã giao hàng";
+
+    case "COMPLETED":
+      return "Hoàn thành";
+
+    case "CANCELLED":
+      return "Đã hủy";
+
+    case "FAILED":
+      return "Thất bại";
+
+    default:
+      return status || "Không xác định";
+  }
+}
+
+// ======================================================
+// ORDER PAYMENT STATUS
+// ======================================================
+
+function getPaymentStatusStyle(status: string) {
+  switch (status) {
+    case "PENDING":
+      return "bg-amber-50 text-amber-700";
+
+    case "PAID":
+      return "bg-emerald-50 text-emerald-700";
+
+    case "FAILED":
+      return "bg-rose-50 text-rose-700";
+
+    case "REFUNDED":
+      return "bg-violet-50 text-violet-700";
+
+    default:
+      return "bg-slate-100 text-slate-600";
+  }
+}
+
+function getPaymentStatusLabel(status: string, name?: string) {
+  if (name) return name;
+
+  switch (status) {
+    case "PENDING":
+      return "Chưa thanh toán";
+
+    case "PAID":
+      return "Đã thanh toán";
+
+    case "FAILED":
+      return "Thanh toán thất bại";
+
+    case "REFUNDED":
+      return "Đã hoàn tiền";
+
+    default:
+      return status || "Không xác định";
+  }
+}
+
+// ======================================================
+// DELIVERY METHOD
+// ======================================================
+
+function getDeliveryMethodLabel(method: string, name?: string) {
+  if (name) return name;
+
+  switch (method) {
+    case "HOME_DELIVERY":
+      return "Giao hàng tận nơi";
+
+    case "STORE_PICKUP":
+      return "Nhận tại cửa hàng";
+
+    default:
+      return method || "Không xác định";
+  }
+}
+
+// ======================================================
+// PAYMENT METHOD
+// ======================================================
+
+function getPaymentMethodLabel(method: string, name?: string) {
+  if (name) return name;
+
+  switch (method) {
+    case "COD":
+      return "Thanh toán khi nhận hàng";
+
+    case "MOMO":
+      return "Thanh toán qua MOMO";
+
+    case "VNPAY":
+      return "Thanh toán qua VNPAY";
+
+    default:
+      return method || "Không xác định";
+  }
+}
+
+// ======================================================
+// ERROR HANDLER
+// ======================================================
+
+function extractErrorMessage(
+  error: unknown,
+  fallback: string,
+): string {
+  if (axios.isAxiosError(error)) {
+    const message = error.response?.data?.message;
+
+    if (Array.isArray(message)) {
+      return message.join(", ");
+    }
+
+    if (typeof message === "string" && message.trim()) {
+      return message;
+    }
+  }
+
+  return fallback;
+}
+
+// ======================================================
+// ADDRESS HELPER
+// ======================================================
+
+function getFullAddress(order: Order) {
+  return [
+    order.order_address_line,
+    order.order_ward,
+    order.order_province,
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
+// ======================================================
+// MAIN PAGE
+// ======================================================
+
+export default function ManageOrderPage() {
+  // ======================================================
+  // DATA
+  // ======================================================
+
+  const [orders, setOrders] = useState<Order[]>([]);
+
+  const [statsOrders, setStatsOrders] = useState<Order[]>([]);
+
+  // ======================================================
+  // SEARCH AND FILTER
+  // ======================================================
+
+  const [keyword, setKeyword] = useState("");
+
+  const [processingStatusFilter, setProcessingStatusFilter] =
+    useState("ALL");
+
+  const [paymentStatusFilter, setPaymentStatusFilter] =
+    useState("ALL");
+
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // ======================================================
+  // SELECTED ORDER
+  // ======================================================
+
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(
+    null,
+  );
+
+  // ======================================================
+  // LOADING AND ERROR
+  // ======================================================
+
+  const [loading, setLoading] = useState(true);
+
+  const [statsLoading, setStatsLoading] = useState(true);
+
+  const [error, setError] = useState("");
+
+  const [statsError, setStatsError] = useState("");
+
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  // ======================================================
+  // LOAD STATISTICS
+  // ======================================================
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadStatistics() {
+      setStatsLoading(true);
+      setStatsError("");
+
+      try {
+        const response = await adminOrderService.getOrderList();
+
+        const result = normalizeOrderData(response);
+
+        if (!cancelled) {
+          setStatsOrders(result.orders);
+        }
+      } catch (err: unknown) {
+        if (!cancelled) {
+          setStatsError(
+            extractErrorMessage(
+              err,
+              "Không thể tải dữ liệu thống kê đơn hàng.",
+            ),
+          );
+
+          console.error("Get order statistics error:", err);
+        }
+      } finally {
+        if (!cancelled) {
+          setStatsLoading(false);
+        }
+      }
+    }
+
+    void loadStatistics();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshKey]);
+
+  // ======================================================
+  // SEARCH AND FILTER
+  // ======================================================
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const timer = setTimeout(async () => {
+      setLoading(true);
+      setError("");
+
+      try {
+        const response = await adminOrderService.getOrderList(
+          keyword.trim() || undefined,
+
+          processingStatusFilter !== "ALL"
+            ? processingStatusFilter
+            : undefined,
+
+          paymentStatusFilter !== "ALL"
+            ? paymentStatusFilter
+            : undefined,
+        );
+
+        const result = normalizeOrderData(response);
+
+        if (!cancelled) {
+          setOrders(result.orders);
+          setCurrentPage(1);
+        }
+      } catch (err: unknown) {
+        if (!cancelled) {
+          setOrders([]);
+
+          setError(
+            extractErrorMessage(
+              err,
+              "Không thể tải danh sách đơn hàng.",
+            ),
+          );
+
+          console.error("Get order list error:", err);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [
+    keyword,
+    processingStatusFilter,
+    paymentStatusFilter,
+    refreshKey,
+  ]);
+
+  // ======================================================
+  // CLOSE MODAL WITH ESCAPE
+  // ======================================================
+
+  useEffect(() => {
+    if (!selectedOrder) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setSelectedOrder(null);
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [selectedOrder]);
+
+  // ======================================================
+  // PAGINATION
+  // ======================================================
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(orders.length / PAGE_SIZE),
+  );
+
+  const safePage = Math.min(currentPage, totalPages);
+
+  const paginatedOrders = orders.slice(
+    (safePage - 1) * PAGE_SIZE,
+    safePage * PAGE_SIZE,
+  );
+
+  // ======================================================
+  // STATISTICS
+  // ======================================================
+
+  const totalOrderCount = statsOrders.length;
+
+  const pendingOrderCount = statsOrders.filter(
+    (order) =>
+      order.order_processing_status?.order_processing_status_code ===
+      "PENDING",
+  ).length;
+
+  const shippingOrderCount = statsOrders.filter(
+    (order) =>
+      order.order_processing_status?.order_processing_status_code ===
+      "SHIPPING",
+  ).length;
+
+  const completedOrderCount = statsOrders.filter((order) =>
+    ["DELIVERED", "COMPLETED"].includes(
+      order.order_processing_status?.order_processing_status_code ?? "",
+    ),
+  ).length;
+
+  // ======================================================
+  // ACTIONS
+  // ======================================================
+
+  const resetFilters = useCallback(() => {
+    setKeyword("");
+    setProcessingStatusFilter("ALL");
+    setPaymentStatusFilter("ALL");
+    setCurrentPage(1);
+  }, []);
+
+  function retryLoad() {
+    setRefreshKey((key) => key + 1);
+  }
+
+  function handleOpenDetail(order: Order) {
+    setSelectedOrder(order);
+  }
+
+  // ======================================================
+  // RENDER
+  // ======================================================
+
+  return (
+    <>
+      <div className="min-h-full space-y-6">
+
+        {/* ================================================== */}
+        {/* PAGE HEADER */}
+        {/* ================================================== */}
+
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+          <div>
+            <div className="flex items-center gap-2 text-sm text-slate-500">
+              <span>Quản trị hệ thống</span>
+
+              <ChevronRight size={14} />
+
+              <span className="font-medium text-blue-600">
+                Quản lý đơn hàng
+              </span>
+            </div>
+
+            <h1 className="mt-3 text-2xl font-bold tracking-tight text-slate-800">
+              Quản lý đơn hàng
+            </h1>
+
+            <p className="mt-1 text-sm text-slate-500">
+              Theo dõi thông tin đơn hàng, sản phẩm, thanh toán và quá
+              trình giao nhận.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              resetFilters();
+              retryLoad();
+            }}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+          >
+            <RefreshCw size={16} />
+            Đặt lại bộ lọc
+          </button>
+        </div>
+
+        {/* ================================================== */}
+        {/* STATISTICS */}
+        {/* ================================================== */}
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+
+          <StatCard
+            title="Tổng đơn hàng"
+            value={totalOrderCount}
+            description="Tổng số đơn hàng trong hệ thống"
+            icon={<ShoppingBag size={23} />}
+            color="blue"
+            loading={statsLoading}
+          />
+
+          <StatCard
+            title="Chờ xác nhận"
+            value={pendingOrderCount}
+            description="Đơn hàng đang chờ xác nhận"
+            icon={<Clock3 size={23} />}
+            color="amber"
+            loading={statsLoading}
+          />
+
+          <StatCard
+            title="Đang giao hàng"
+            value={shippingOrderCount}
+            description="Đơn hàng có trạng thái SHIPPING"
+            icon={<Truck size={23} />}
+            color="cyan"
+            loading={statsLoading}
+          />
+
+          <StatCard
+            title="Đã giao / hoàn thành"
+            value={completedOrderCount}
+            description="Đơn hàng đã giao hoặc hoàn thành"
+            icon={<CheckCircle2 size={23} />}
+            color="emerald"
+            loading={statsLoading}
+          />
+
+        </div>
+
+        {/* ================================================== */}
+        {/* STATISTICS ERROR */}
+        {/* ================================================== */}
+
+        {statsError && (
+          <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+            <AlertCircle
+              size={20}
+              className="mt-0.5 shrink-0 text-amber-600"
+            />
+
+            <div className="flex-1">
+              <p className="text-sm font-medium text-amber-800">
+                Không thể cập nhật thống kê
+              </p>
+
+              <p className="mt-1 text-sm text-amber-700">
+                {statsError}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={retryLoad}
+              className="text-sm font-semibold text-amber-800 hover:underline"
+            >
+              Thử lại
+            </button>
+          </div>
+        )}
+
+        {/* ================================================== */}
+        {/* ORDER LIST */}
+        {/* ================================================== */}
+
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+
+          {/* ================================================== */}
+          {/* SEARCH AND FILTER */}
+          {/* ================================================== */}
+
+          <div className="border-b border-slate-100 p-5">
+            <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+
+              <div>
+                <h2 className="text-base font-bold text-slate-800">
+                  Danh sách đơn hàng
+                </h2>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Tìm kiếm, lọc và xem thông tin chi tiết đơn hàng.
+                </p>
+              </div>
+
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+
+                {/* SEARCH */}
+
+                <div className="relative sm:w-72">
+                  <Search
+                    size={18}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-900"
+                  />
+
+                  <input
+                    value={keyword}
+                    onChange={(event) =>
+                      setKeyword(event.target.value)
+                    }
+                    placeholder="Mã đơn, người nhận, SĐT, SKU..."
+                    className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
+
+                {/* PROCESSING STATUS */}
+
+                <select
+                  value={processingStatusFilter}
+                  onChange={(event) =>
+                    setProcessingStatusFilter(event.target.value)
+                  }
+                  className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-600 outline-none transition focus:border-blue-500"
+                >
+                  <option value="ALL">Tất cả trạng thái đơn hàng</option>
+
+                  <option value="PENDING">Chờ xác nhận</option>
+
+                  <option value="CONFIRMED">Đã xác nhận</option>
+
+                  <option value="PROCESSING">Đang xử lý</option>
+
+                  <option value="READY_FOR_PICKUP">
+                    Sẵn sàng nhận hàng
+                  </option>
+
+                  <option value="SHIPPING">Đang giao hàng</option>
+
+                  <option value="DELIVERED">Đã giao hàng</option>
+
+                  <option value="COMPLETED">Hoàn thành</option>
+
+                  <option value="CANCELLED">Đã hủy</option>
+
+                  <option value="FAILED">Thất bại</option>
+                </select>
+
+                {/* PAYMENT STATUS */}
+
+                <select
+                  value={paymentStatusFilter}
+                  onChange={(event) =>
+                    setPaymentStatusFilter(event.target.value)
+                  }
+                  className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-600 outline-none transition focus:border-blue-500"
+                >
+                  <option value="ALL">Tất cả thanh toán</option>
+
+                  <option value="PENDING">Chưa thanh toán</option>
+
+                  <option value="PAID">Đã thanh toán</option>
+
+                  <option value="FAILED">Thanh toán thất bại</option>
+
+                  <option value="REFUNDED">Đã hoàn tiền</option>
+                </select>
+
+              </div>
+            </div>
+          </div>
+
+          {/* ================================================== */}
+          {/* ORDER TABLE */}
+          {/* ================================================== */}
+
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1150px] text-left">
+
+              <thead className="bg-slate-50">
+                <tr className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+
+                  <th className="px-5 py-4">
+                    Mã đơn hàng
+                  </th>
+
+                  <th className="px-5 py-4">
+                    Người nhận
+                  </th>
+
+                  <th className="px-5 py-4">
+                    Tổng thanh toán
+                  </th>
+
+                  <th className="px-5 py-4">
+                    Trạng thái đơn
+                  </th>
+
+                  <th className="px-5 py-4">
+                    Thanh toán
+                  </th>
+
+                  <th className="px-5 py-4 text-center">
+                    Thao tác
+                  </th>
+
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-slate-100">
+
+                {loading ? (
+                  <tr>
+                    <td colSpan={7} className="px-5 py-16 text-center">
+
+                      <LoaderCircle
+                        className="mx-auto animate-spin text-blue-600"
+                        size={28}
+                      />
+
+                      <p className="mt-3 text-sm text-slate-500">
+                        Đang tải danh sách đơn hàng...
+                      </p>
+
+                    </td>
+                  </tr>
+                ) : error ? (
+                  <tr>
+                    <td colSpan={7} className="px-5 py-16 text-center">
+
+                      <AlertCircle
+                        size={26}
+                        className="mx-auto text-rose-500"
+                      />
+
+                      <p className="mt-3 font-semibold text-rose-600">
+                        {error}
+                      </p>
+
+                      <button
+                        type="button"
+                        onClick={retryLoad}
+                        className="mt-3 text-sm font-semibold text-blue-600 hover:underline"
+                      >
+                        Thử tải lại
+                      </button>
+
+                    </td>
+                  </tr>
+                ) : paginatedOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-5 py-16 text-center">
+
+                      <Search
+                        size={26}
+                        className="mx-auto text-slate-400"
+                      />
+
+                      <p className="mt-3 font-semibold text-slate-700">
+                        Không tìm thấy đơn hàng
+                      </p>
+
+                      <p className="mt-1 text-sm text-slate-500">
+                        Thử thay đổi từ khóa hoặc điều kiện lọc.
+                      </p>
+
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedOrders.map((order) => {
+                    const processingStatus =
+                      order.order_processing_status
+                        ?.order_processing_status_code ?? "";
+
+                    const paymentStatus =
+                      order.order_payment_status
+                        ?.order_payment_status_code ?? "";
+
+                    const firstItem = order.order_item?.[0];
+
+                    return (
+                      <tr
+                        key={order.order_id}
+                        className="transition hover:bg-slate-50/80"
+                      >
+
+                        {/* ORDER CODE */}
+
+                        <td className="px-5 py-4">
+                          <p className="text-sm font-semibold text-slate-800">
+                            {order.order_code}
+                          </p>
+
+                          <p className="mt-1 text-xs text-slate-400">
+                            ID: {order.order_id}
+                          </p>
+
+                          <p className="mt-1 text-xs text-slate-400">
+                            {formatDateTime(order.order_created_at)}
+                          </p>
+                        </td>
+
+                        {/* RECIPIENT */}
+
+                        <td className="px-5 py-4">
+                          <p className="max-w-[180px] truncate text-sm font-semibold text-slate-800">
+                            {order.order_recipient_name}
+                          </p>
+
+                          <p className="mt-1 flex items-center gap-1.5 text-xs text-slate-500">
+                            <Phone size={12} />
+
+                            {order.order_recipient_phone}
+                          </p>
+
+                          <p className="mt-1 text-xs text-slate-400">
+                            Khách hàng ID: {order.order_user_id}
+                          </p>
+                        </td>
+
+                        {/* TOTAL AMOUNT */}
+
+                        <td className="px-5 py-4">
+                          <p className="text-sm font-bold text-slate-800">
+                            {formatCurrency(order.order_total_amount)}
+                          </p>
+
+                          <p className="mt-1 text-xs text-slate-400">
+                            {order.order_item?.length ?? 0} loại sản phẩm
+                          </p>
+                        </td>
+
+                        {/* PROCESSING STATUS */}
+
+                        <td className="px-5 py-4">
+                          <span
+                            className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${getOrderStatusStyle(processingStatus)}`}
+                          >
+                            <span
+                              className={`h-1.5 w-1.5 rounded-full ${getOrderStatusDot(processingStatus)}`}
+                            />
+
+                            {getOrderStatusLabel(
+                              processingStatus,
+                              order.order_processing_status
+                                ?.order_processing_status_name,
+                            )}
+                          </span>
+                        </td>
+
+                        {/* PAYMENT STATUS */}
+
+                        <td className="px-5 py-4">
+                          <span
+                            className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-semibold ${getPaymentStatusStyle(paymentStatus)}`}
+                          >
+                            {getPaymentStatusLabel(
+                              paymentStatus,
+                              order.order_payment_status
+                                ?.order_payment_status_name,
+                            )}
+                          </span>
+
+                          <p className="mt-1 text-xs text-slate-400">
+                            {order.order_payment_method
+                              ?.payment_method_name ?? "—"}
+                          </p>
+                        </td>
+
+                        {/* ACTION */}
+
+                        <td className="px-5 py-4 text-center">
+                          <button
+                            type="button"
+                            title="Xem chi tiết đơn hàng"
+                            aria-label={`Xem chi tiết ${order.order_code}`}
+                            onClick={() => handleOpenDetail(order)}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 transition hover:bg-blue-50 hover:text-blue-600"
+                          >
+                            <Eye size={18} />
+                          </button>
+                        </td>
+
+                      </tr>
+                    );
+                  })
+                )}
+
+              </tbody>
+            </table>
+          </div>
+
+          {/* ================================================== */}
+          {/* PAGINATION */}
+          {/* ================================================== */}
+
+          <div className="flex flex-col justify-between gap-3 border-t border-slate-100 px-5 py-4 sm:flex-row sm:items-center">
+
+            <p className="text-sm text-slate-500">
+              Hiển thị{" "}
+
+              <span className="font-semibold text-slate-700">
+                {orders.length === 0
+                  ? 0
+                  : (safePage - 1) * PAGE_SIZE + 1}
+
+                {" - "}
+
+                {Math.min(
+                  safePage * PAGE_SIZE,
+                  orders.length,
+                )}
+              </span>
+
+              {" "}trên{" "}
+
+              <span className="font-semibold text-slate-700">
+                {orders.length}
+              </span>
+
+              {" "}đơn hàng
+            </p>
+
+            <div className="flex items-center gap-2">
+
+              <button
+                type="button"
+                disabled={safePage <= 1 || loading}
+                onClick={() =>
+                  setCurrentPage((page) => page - 1)
+                }
+                className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronLeft size={17} />
+              </button>
+
+              <span className="min-w-20 text-center text-sm font-medium text-slate-600">
+                Trang {safePage} / {totalPages}
+              </span>
+
+              <button
+                type="button"
+                disabled={safePage >= totalPages || loading}
+                onClick={() =>
+                  setCurrentPage((page) => page + 1)
+                }
+                className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <ChevronRight size={17} />
+              </button>
+
+            </div>
+          </div>
+
+        </section>
+      </div>
+
+      {/* ================================================== */}
+      {/* ORDER DETAIL MODAL */}
+      {/* ================================================== */}
+
+      {selectedOrder && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setSelectedOrder(null);
+            }
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="order-detail-title"
+            className="w-full max-w-4xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+          >
+
+            {/* ================================================== */}
+            {/* MODAL HEADER */}
+            {/* ================================================== */}
+
+            <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
+
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+
+                  <h2
+                    id="order-detail-title"
+                    className="text-lg font-bold text-slate-800"
+                  >
+                    Chi tiết đơn hàng
+                  </h2>
+
+                  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                    {selectedOrder.order_code}
+                  </span>
+
+                </div>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Thông tin đơn hàng, sản phẩm và thanh toán.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedOrder(null)}
+                aria-label="Đóng cửa sổ"
+                className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X size={20} />
+              </button>
+
+            </div>
+
+            {/* ================================================== */}
+            {/* MODAL CONTENT */}
+            {/* ================================================== */}
+
+            <div className="max-h-[70vh] space-y-6 overflow-y-auto p-6">
+
+              {/* ORDER OVERVIEW */}
+
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+
+                <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Mã đơn hàng
+                    </p>
+
+                    <h3 className="mt-1 text-lg font-bold text-slate-800">
+                      {selectedOrder.order_code}
+                    </h3>
+
+                    <p className="mt-1 text-xs text-slate-400">
+                      Order ID: {selectedOrder.order_id}
+                    </p>
+                  </div>
+
+                  <div className="flex flex-col items-start gap-2 sm:items-end">
+
+                    <span
+                      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold ${
+                        getOrderStatusStyle(
+                          selectedOrder.order_processing_status
+                            ?.order_processing_status_code ?? "",
+                        )
+                      }`}
+                    >
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${
+                          getOrderStatusDot(
+                            selectedOrder.order_processing_status
+                              ?.order_processing_status_code ?? "",
+                          )
+                        }`}
+                      />
+
+                      {getOrderStatusLabel(
+                        selectedOrder.order_processing_status
+                          ?.order_processing_status_code ?? "",
+                        selectedOrder.order_processing_status
+                          ?.order_processing_status_name,
+                      )}
+                    </span>
+
+                    <span
+                      className={`rounded-full px-3 py-1.5 text-xs font-semibold ${getPaymentStatusStyle(
+                        selectedOrder.order_payment_status
+                          ?.order_payment_status_code ?? "",
+                      )}`}
+                    >
+                      {getPaymentStatusLabel(
+                        selectedOrder.order_payment_status
+                          ?.order_payment_status_code ?? "",
+                        selectedOrder.order_payment_status
+                          ?.order_payment_status_name,
+                      )}
+                    </span>
+
+                  </div>
+
+                </div>
+              </div>
+
+              {/* ================================================== */}
+              {/* RECIPIENT INFORMATION */}
+              {/* ================================================== */}
+
+              <section>
+                <h3 className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-2 text-sm font-bold text-slate-700">
+                  <UserRound size={18} className="text-blue-600" />
+                  Thông tin người nhận
+                </h3>
+
+                <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+
+                  <DetailRow
+                    icon={<UserRound size={18} />}
+                    label="Tên người nhận"
+                    value={selectedOrder.order_recipient_name}
+                  />
+
+                  <DetailRow
+                    icon={<Phone size={18} />}
+                    label="Số điện thoại"
+                    value={selectedOrder.order_recipient_phone}
+                  />
+
+                  <DetailRow
+                    icon={<MapPin size={18} />}
+                    label="Địa chỉ nhận hàng"
+                    value={getFullAddress(selectedOrder)}
+                  />
+
+                  <DetailRow
+                    icon={<Hash size={18} />}
+                    label="ID tài khoản khách hàng"
+                    value={String(selectedOrder.order_user_id)}
+                  />
+
+                </div>
+              </section>
+
+              {/* ================================================== */}
+              {/* ORDER INFORMATION */}
+              {/* ================================================== */}
+
+              <section>
+                <h3 className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-2 text-sm font-bold text-slate-700">
+                  <ClipboardList size={18} className="text-blue-600" />
+                  Thông tin đơn hàng
+                </h3>
+
+                <div className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
+
+                  <DetailRow
+                    icon={<Hash size={18} />}
+                    label="Mã đơn hàng"
+                    value={selectedOrder.order_code}
+                  />
+
+                  <DetailRow
+                    icon={<Hash size={18} />}
+                    label="Order ID"
+                    value={String(selectedOrder.order_id)}
+                  />
+
+                  <DetailRow
+                    icon={<Truck size={18} />}
+                    label="Phương thức giao hàng"
+                    value={getDeliveryMethodLabel(
+                      selectedOrder.order_delivery_method
+                        ?.delivery_method_code ?? "",
+                      selectedOrder.order_delivery_method
+                        ?.delivery_method_name,
+                    )}
+                  />
+
+                  <DetailRow
+                    icon={<Store size={18} />}
+                    label="Mã phương thức giao hàng"
+                    value={
+                      selectedOrder.order_delivery_method
+                        ?.delivery_method_code ?? "—"
+                    }
+                  />
+
+                  <DetailRow
+                    icon={<CreditCard size={18} />}
+                    label="Phương thức thanh toán"
+                    value={getPaymentMethodLabel(
+                      selectedOrder.order_payment_method
+                        ?.payment_method_code ?? "",
+                      selectedOrder.order_payment_method
+                        ?.payment_method_name,
+                    )}
+                  />
+
+                  <DetailRow
+                    icon={<WalletCards size={18} />}
+                    label="Mã phương thức thanh toán"
+                    value={
+                      selectedOrder.order_payment_method
+                        ?.payment_method_code ?? "—"
+                    }
+                  />
+
+                  <DetailRow
+                    icon={<CalendarDays size={18} />}
+                    label="Ngày tạo đơn hàng"
+                    value={formatDateTime(
+                      selectedOrder.order_created_at,
+                    )}
+                  />
+
+                  <DetailRow
+                    icon={<CalendarDays size={18} />}
+                    label="Cập nhật lần cuối"
+                    value={formatDateTime(
+                      selectedOrder.order_updated_at,
+                    )}
+                  />
+
+                </div>
+              </section>
+
+              {/* ================================================== */}
+              {/* PRODUCT LIST */}
+              {/* ================================================== */}
+
+              <section>
+
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-2">
+
+                  <h3 className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                    <Package size={18} className="text-blue-600" />
+                    Danh sách sản phẩm
+                  </h3>
+
+                  <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                    {selectedOrder.order_item?.length ?? 0} sản phẩm
+                  </span>
+
+                </div>
+
+                {!selectedOrder.order_item ||
+                selectedOrder.order_item.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center">
+
+                    <Package
+                      size={24}
+                      className="mx-auto text-slate-300"
+                    />
+
+                    <p className="mt-2 text-sm font-medium text-slate-600">
+                      Đơn hàng chưa có sản phẩm
+                    </p>
+
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+
+                    {selectedOrder.order_item.map((item, index) => (
+                      <div
+                        key={item.order_item_id}
+                        className="rounded-xl border border-slate-200 bg-white p-4"
+                      >
+
+                        <div className="flex flex-col gap-4 sm:flex-row">
+
+                          {/* PRODUCT IMAGE */}
+
+                          <div className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-xl border border-slate-100 bg-slate-50">
+
+                            {item.order_item_product_image ? (
+                              <img
+                                src={item.order_item_product_image}
+                                alt={item.order_item_product_name}
+                                className="h-full w-full object-contain"
+                              />
+                            ) : (
+                              <ImageIcon
+                                size={30}
+                                className="text-slate-300"
+                              />
+                            )}
+
+                          </div>
+
+                          {/* PRODUCT INFORMATION */}
+
+                          <div className="min-w-0 flex-1">
+
+                            <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-start">
+
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold text-slate-400">
+                                  Sản phẩm #{index + 1}
+                                </p>
+
+                                <h4 className="mt-1 break-words text-sm font-bold text-slate-800">
+                                  {item.order_item_product_name}
+                                </h4>
+
+                                <p className="mt-1 text-xs text-slate-500">
+                                  SKU: {item.order_item_sku}
+                                </p>
+
+                                {item.order_item_serial_number && (
+                                  <p className="mt-1 break-all text-xs text-slate-500">
+                                    Serial Number: {item.order_item_serial_number}
+                                  </p>
+                                )}
+                              </div>
+
+                              <p className="shrink-0 text-sm font-bold text-slate-800">
+                                {formatCurrency(item.order_item_subtotal)}
+                              </p>
+
+                            </div>
+
+                            <div className="mt-3 grid grid-cols-1 gap-3 border-t border-slate-100 pt-3 sm:grid-cols-3">
+
+                              <div>
+                                <p className="text-xs text-slate-400">
+                                  Đơn giá
+                                </p>
+
+                                <p className="mt-1 text-sm font-medium text-slate-700">
+                                  {formatCurrency(
+                                    item.order_item_unit_price,
+                                  )}
+                                </p>
+                              </div>
+
+                              <div>
+                                <p className="text-xs text-slate-400">
+                                  Số lượng
+                                </p>
+
+                                <p className="mt-1 text-sm font-medium text-slate-700">
+                                  {item.order_item_quantity}
+                                </p>
+                              </div>
+
+                              <div>
+                                <p className="text-xs text-slate-400">
+                                  Thành tiền
+                                </p>
+
+                                <p className="mt-1 text-sm font-semibold text-slate-800">
+                                  {formatCurrency(
+                                    item.order_item_subtotal,
+                                  )}
+                                </p>
+                              </div>
+
+                            </div>
+
+                            {/* DIRECT PROMOTION */}
+
+                            {item.order_item_promotion_name && (
+                              <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg bg-emerald-50 p-3">
+
+                                <Tag
+                                  size={16}
+                                  className="shrink-0 text-emerald-600"
+                                />
+
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-xs font-semibold text-emerald-700">
+                                    {item.order_item_promotion_name}
+                                  </p>
+                                </div>
+
+                                {item.order_item_direct_discount_amount !== null && (
+                                  <p className="text-xs font-semibold text-emerald-700">
+                                    -{formatCurrency(
+                                      item.order_item_direct_discount_amount,
+                                    )}
+                                  </p>
+                                )}
+
+                              </div>
+                            )}
+
+                          </div>
+                        </div>
+
+                      </div>
+                    ))}
+
+                  </div>
+                )}
+
+              </section>
+
+              {/* ================================================== */}
+              {/* PAYMENT INFORMATION */}
+              {/* ================================================== */}
+
+              <section>
+
+                <h3 className="mb-4 flex items-center gap-2 border-b border-slate-100 pb-2 text-sm font-bold text-slate-700">
+                  <ReceiptText size={18} className="text-blue-600" />
+                  Chi tiết thanh toán
+                </h3>
+
+                <div className="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+
+                  <div className="space-y-3">
+
+                    {/* SUBTOTAL */}
+
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm text-slate-500">
+                        Tổng tiền sản phẩm
+                      </p>
+
+                      <p className="text-sm font-medium text-slate-700">
+                        {formatCurrency(
+                          selectedOrder.order_subtotal,
+                        )}
+                      </p>
+                    </div>
+
+                    {/* SHIPPING FEE */}
+
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm text-slate-500">
+                        Phí vận chuyển
+                      </p>
+
+                      <p className="text-sm font-medium text-slate-700">
+                        {formatCurrency(
+                          selectedOrder.order_shipping_fee,
+                        )}
+                      </p>
+                    </div>
+
+                    {/* DIRECT DISCOUNT */}
+
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm text-slate-500">
+                        Tổng giảm giá
+                      </p>
+
+                      <p className="text-sm font-semibold text-emerald-600">
+                        -{formatCurrency(
+                          selectedOrder.order_discount_amount,
+                        )}
+                      </p>
+                    </div>
+
+                    {/* COUPON */}
+
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm text-slate-500">
+                        Coupon áp dụng
+                      </p>
+
+                      <p className="text-right text-sm font-medium text-slate-700">
+                        {selectedOrder.order_coupon_name || "Không áp dụng"}
+                      </p>
+                    </div>
+
+                    {/* COUPON DISCOUNT */}
+
+                    {selectedOrder.order_coupon_discount_amount !== null && (
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-sm text-slate-500">
+                          Giảm giá Coupon
+                        </p>
+
+                        <p className="text-sm font-semibold text-emerald-600">
+                          -{formatCurrency(
+                            selectedOrder.order_coupon_discount_amount,
+                          )}
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="border-t border-dashed border-slate-300 pt-3">
+
+                      <div className="flex items-center justify-between gap-3">
+
+                        <p className="text-sm font-bold text-slate-700">
+                          Tổng thanh toán
+                        </p>
+
+                        <p className="text-xl font-bold text-blue-600">
+                          {formatCurrency(
+                            selectedOrder.order_total_amount,
+                          )}
+                        </p>
+
+                      </div>
+
+                    </div>
+
+                  </div>
+
+                </div>
+              </section>
+
+            </div>
+
+            {/* ================================================== */}
+            {/* MODAL FOOTER */}
+            {/* ================================================== */}
+
+            <div className="flex justify-end border-t border-slate-100 bg-slate-50 px-6 py-4">
+
+              <button
+                type="button"
+                onClick={() => setSelectedOrder(null)}
+                className="rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
+              >
+                Đóng
+              </button>
+
+            </div>
+
+          </section>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ======================================================
+// DETAIL ROW COMPONENT
+// ======================================================
+
+function DetailRow({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+
+      <div className="mt-0.5 shrink-0 text-slate-400">
+        {icon}
+      </div>
+
+      <div className="min-w-0 flex-1">
+
+        <p className="text-sm font-medium text-slate-500">
+          {label}
+        </p>
+
+        <p className="mt-1 break-words text-sm font-semibold text-slate-800">
+          {value || "—"}
+        </p>
+
+      </div>
+
+    </div>
+  );
+}
+
+// ======================================================
+// STAT CARD COMPONENT
+// ======================================================
+
+function StatCard({
+  title,
+  value,
+  description,
+  icon,
+  color,
+  loading,
+}: {
+  title: string;
+  value: number;
+  description: string;
+  icon: ReactNode;
+  color: "blue" | "amber" | "cyan" | "emerald";
+  loading: boolean;
+}) {
+  const styles = {
+    blue: {
+      icon: "bg-blue-50 text-blue-600",
+      value: "text-slate-800",
+    },
+
+    amber: {
+      icon: "bg-amber-50 text-amber-600",
+      value: "text-amber-600",
+    },
+
+    cyan: {
+      icon: "bg-cyan-50 text-cyan-600",
+      value: "text-cyan-600",
+    },
+
+    emerald: {
+      icon: "bg-emerald-50 text-emerald-600",
+      value: "text-emerald-600",
+    },
+  };
+
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+
+      <div className="flex items-center justify-between gap-3">
+
+        <div>
+          <p className="text-sm font-medium text-slate-500">
+            {title}
+          </p>
+
+          {loading ? (
+            <LoaderCircle
+              size={24}
+              className="mt-3 animate-spin text-slate-400"
+            />
+          ) : (
+            <p className={`mt-2 text-3xl font-bold ${styles[color].value}`}>
+              {value.toLocaleString("vi-VN")}
+            </p>
+          )}
+        </div>
+
+        <div
+          className={`grid h-12 w-12 shrink-0 place-items-center rounded-xl ${styles[color].icon}`}
+        >
+          {icon}
+        </div>
+
+      </div>
+
+      <p className="mt-3 text-xs text-slate-400">
+        {description}
+      </p>
+
+    </div>
+  );
+}
