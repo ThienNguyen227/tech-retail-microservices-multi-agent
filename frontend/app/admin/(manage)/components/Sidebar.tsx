@@ -17,6 +17,7 @@ import {
   UserCog,
   UserRound,
   FileText,
+   ShoppingBag,
 } from "lucide-react";
 
 const menuItems = [
@@ -61,6 +62,11 @@ const menuItems = [
     title: "Quản lý bảo hành",
     href: "/admin/manage-warranty",
     icon: FileText,
+  },
+  {
+    title: "Quản lý đơn hàng",
+    href: "/admin/manage-order",
+    icon: ShoppingBag,
   },
 ];
 
