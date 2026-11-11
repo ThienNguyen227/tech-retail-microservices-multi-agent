@@ -33,4 +33,15 @@ export class ProductController
     return this.productService.comparePhones(body.ids);
   }
   
+  // 5. POST -> compare laptops
+  @Post('compare-laptops')
+  async compareLaptops(@Body() body: { ids: string[] }) {
+    return this.productService.compareLaptops(body.ids);
+  }
+
+  // 6. POST -> compare tablets
+  @Post('compare-tablets')
+  async compareTablets(@Body() body: { ids: string[] }) {
+    return this.productService.compareTablets(body.ids);
+  }
 }

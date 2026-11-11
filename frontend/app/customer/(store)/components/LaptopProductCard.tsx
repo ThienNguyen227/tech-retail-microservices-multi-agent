@@ -3,6 +3,16 @@
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
 
+import {
+  useProductCompare,
+} from './ProductCompareProvider';
+
+import { CirclePlus, ArrowRight } from 'lucide-react';
+
+// ============================================================
+// TYPES
+// ============================================================
+
 export type LaptopVariant = {
   sku: string;
   slug: string;
@@ -39,19 +49,49 @@ type LaptopProductCardProps = {
   promotions: PromotionDiscount[];
 };
 
+// ============================================================
+// COMPONENT
+// ============================================================
+
 export default function LaptopProductCard({
   product,
   promotions,
 }: LaptopProductCardProps) {
+  // ==========================================================
+  // COMPARE CONTEXT
+  // ==========================================================
+
+  const { addLaptop } = useProductCompare();
+
+  // ==========================================================
+  // RAM OPTIONS
+  // ==========================================================
+
   const rams = useMemo(
-    () => [...new Set((product.variants ?? []).map((variant) => variant.ram))],
+    () => [
+      ...new Set(
+        (product.variants ?? []).map((variant) => variant.ram),
+      ),
+    ],
     [product.variants],
   );
 
+  // ==========================================================
+  // SSD OPTIONS
+  // ==========================================================
+
   const ssds = useMemo(
-    () => [...new Set((product.variants ?? []).map((variant) => variant.ssd))],
+    () => [
+      ...new Set(
+        (product.variants ?? []).map((variant) => variant.ssd),
+      ),
+    ],
     [product.variants],
   );
+
+  // ==========================================================
+  // COLOR OPTIONS
+  // ==========================================================
 
   const colors = useMemo(() => {
     const uniqueColors = new Map<string, LaptopVariant>();
@@ -65,6 +105,10 @@ export default function LaptopProductCard({
     return Array.from(uniqueColors.values());
   }, [product.variants]);
 
+  // ==========================================================
+  // SELECTED OPTIONS
+  // ==========================================================
+
   const [selectedRam, setSelectedRam] = useState(
     product.variants?.[0]?.ram ?? product.ram ?? '',
   );
@@ -77,6 +121,10 @@ export default function LaptopProductCard({
     product.variants?.[0]?.colorSlug ?? '',
   );
 
+  // ==========================================================
+  // SELECTED VARIANT
+  // ==========================================================
+
   const selectedVariant = useMemo(
     () =>
       product.variants?.find(
@@ -87,12 +135,24 @@ export default function LaptopProductCard({
       ) ??
       product.variants?.find(
         (variant) =>
-          variant.ram === selectedRam && variant.ssd === selectedSsd,
+          variant.ram === selectedRam &&
+          variant.ssd === selectedSsd,
       ) ??
-      product.variants?.find((variant) => variant.ram === selectedRam) ??
+      product.variants?.find(
+        (variant) => variant.ram === selectedRam,
+      ) ??
       product.variants?.[0],
-    [product.variants, selectedRam, selectedSsd, selectedColorSlug],
+    [
+      product.variants,
+      selectedRam,
+      selectedSsd,
+      selectedColorSlug,
+    ],
   );
+
+  // ==========================================================
+  // PROMOTION
+  // ==========================================================
 
   const promotion = useMemo(
     () =>
@@ -102,6 +162,10 @@ export default function LaptopProductCard({
     [promotions, selectedVariant?.sku],
   );
 
+  // ==========================================================
+  // CURRENT PRODUCT INFORMATION
+  // ==========================================================
+
   const currentPrice = selectedVariant?.price ?? 0;
   const currentSlug = selectedVariant?.slug ?? product.slug;
   const currentImage = selectedVariant?.images?.[0] ?? product.image;
@@ -109,12 +173,20 @@ export default function LaptopProductCard({
   const currentSsd = selectedVariant?.ssd ?? product.ssd;
   const currentColor = selectedVariant?.color ?? '';
 
+  // ==========================================================
+  // PRICE FORMAT
+  // ==========================================================
+
   const formatPrice = (price: number) =>
     new Intl.NumberFormat('vi-VN', {
       style: 'currency',
       currency: 'VND',
       maximumFractionDigits: 0,
     }).format(price);
+
+  // ==========================================================
+  // CALCULATE PROMOTION PRICE
+  // ==========================================================
 
   const discountValue = Number(promotion?.discountValue ?? 0);
 
@@ -133,9 +205,43 @@ export default function LaptopProductCard({
       ? `-${discountValue}%`
       : `-${formatPrice(discountValue)}`;
 
+  // ==========================================================
+  // ADD LAPTOP TO COMPARE
+  // ==========================================================
+
+  const handleAddToCompare = () => {
+    if (!selectedVariant) {
+      return;
+    }
+
+    const result = addLaptop(product, selectedVariant);
+
+    switch (result) {
+      case 'added':
+        // ProductCompareBar tự động cập nhật thông qua Context
+        break;
+
+      case 'duplicate':
+        alert('Laptop này đã có trong danh sách so sánh!');
+        break;
+
+      case 'limit':
+        alert('Bạn chỉ có thể so sánh tối đa 3 laptop!');
+        break;
+    }
+  };
+
+  // ==========================================================
+  // RENDER
+  // ==========================================================
+
   return (
     <article className="group flex h-full flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white transition duration-300 hover:-translate-y-1 hover:border-teal-200 hover:shadow-xl hover:shadow-slate-900/8">
-      {/* Product image */}
+
+      {/* ================================================== */}
+      {/* PRODUCT IMAGE */}
+      {/* ================================================== */}
+
       <Link
         href={`/customer/product-detail/${currentSlug}`}
         aria-label={`Xem chi tiết ${product.name}`}
@@ -161,15 +267,23 @@ export default function LaptopProductCard({
         </span>
       </Link>
 
-      {/* Product information */}
+      {/* ================================================== */}
+      {/* PRODUCT INFORMATION */}
+      {/* ================================================== */}
+
       <div className="flex flex-1 flex-col px-4 pb-4 sm:px-5 sm:pb-5">
+
+        {/* PRODUCT NAME */}
         <Link href={`/customer/product-detail/${currentSlug}`}>
           <h3 className="line-clamp-2 min-h-11 text-[15px] font-semibold leading-5 text-slate-900 transition-colors group-hover:text-teal-700">
             {product.name} {currentRam} {currentSsd}
           </h3>
         </Link>
 
-        {/* RAM selector */}
+        {/* ================================================== */}
+        {/* RAM SELECTOR */}
+        {/* ================================================== */}
+
         <div className="mt-3 min-h-[58px]">
           {rams.length > 0 && (
             <>
@@ -202,7 +316,10 @@ export default function LaptopProductCard({
           )}
         </div>
 
-        {/* SSD selector */}
+        {/* ================================================== */}
+        {/* SSD SELECTOR */}
+        {/* ================================================== */}
+
         <div className="mt-3 min-h-[58px]">
           {ssds.length > 0 && (
             <>
@@ -235,12 +352,16 @@ export default function LaptopProductCard({
           )}
         </div>
 
-        {/* Color selector */}
+        {/* ================================================== */}
+        {/* COLOR SELECTOR */}
+        {/* ================================================== */}
+
         <div className="mt-3 min-h-[58px]">
           {colors.length > 0 && (
             <>
               <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
                 Màu sắc
+
                 <span className="ml-1.5 normal-case tracking-normal text-slate-600">
                   {currentColor}
                 </span>
@@ -274,7 +395,10 @@ export default function LaptopProductCard({
           )}
         </div>
 
-        {/* Price */}
+        {/* ================================================== */}
+        {/* PRICE */}
+        {/* ================================================== */}
+
         <div className="mt-4 border-t border-slate-100 pt-3">
           {currentPrice > 0 ? (
             <div className="flex min-h-[62px] flex-col justify-center">
@@ -307,21 +431,41 @@ export default function LaptopProductCard({
           ) : (
             <div className="flex min-h-[62px] flex-col justify-center">
               <p className="text-xs text-slate-400">Giá bán</p>
-              <p className="text-lg font-medium text-slate-600">Liên hệ</p>
+              <p className="text-lg font-medium text-slate-600">
+                Liên hệ
+              </p>
             </div>
           )}
         </div>
 
-        {/* Action */}
-        <Link
-          href={`/customer/product-detail/${currentSlug}`}
-          className="mt-auto inline-flex w-full items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-teal-800"
-        >
-          Xem chi tiết
-          <span className="transition-transform group-hover:translate-x-1">
-            →
-          </span>
-        </Link>
+        {/* ================================================== */}
+        {/* ACTION BUTTONS */}
+        {/* ================================================== */}
+
+        <div className="mt-auto grid grid-cols-[auto_minmax(0,1fr)] gap-2">
+
+          {/* COMPARE BUTTON */}
+          <button
+            type="button"
+            onClick={handleAddToCompare}
+            aria-label={`So sánh ${product.name}`}
+            className="inline-flex min-w-0 items-center justify-center gap-1 rounded-lg border border-teal-600 bg-white px-2 py-2 text-[11px] font-semibold text-teal-700 transition-all duration-200 hover:bg-teal-50 active:scale-[0.98] sm:text-xs"
+          >
+            <CirclePlus size={15} />
+            <span>So sánh</span>
+          </button>
+
+          {/* DETAIL BUTTON */}
+          <Link
+            href={`/customer/product-detail/${currentSlug}`}
+            className="inline-flex min-w-0 items-center justify-center gap-1 rounded-lg bg-teal-700 px-2 py-2 text-[11px] font-semibold text-white transition hover:bg-teal-800 sm:gap-1.5 sm:text-xs"
+          >
+            <span className="truncate">Chi tiết</span>
+
+            <ArrowRight size={14} className="shrink-0 transition-transform group-hover:translate-x-1" />
+          </Link>
+
+        </div>
       </div>
     </article>
   );
