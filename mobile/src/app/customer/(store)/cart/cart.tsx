@@ -791,6 +791,7 @@ export default function CartPage() {
       setDeliveryInfo(null);
       setSelectedCoupon(null);
       await refreshCart().catch(() => retryCart.current());
+      router.push("/customer/order" as Href);
     } catch (err) {
       Alert.alert(
         "Giỏ hàng",
