@@ -25,3 +25,12 @@ export const CUSTOMER_URLS = {
 
 export const AI_SERVICE_URL = `${API_HOST}:8000/api/v1/ai-service`;
 export const FRONTEND_ASSET_URL = `${API_HOST}:3000`;
+
+// Frontend gọi trực tiếp payment-service ở cổng 3009, chưa có route gateway.
+const paymentUrl = new URL(API_HOST);
+paymentUrl.port = '3009';
+paymentUrl.pathname = '/api/v1/customer-sesion/payment-service/payment';
+paymentUrl.search = '';
+paymentUrl.hash = '';
+export const PAYMENT_SERVICE_URL =
+  process.env.EXPO_PUBLIC_PAYMENT_API_URL || paymentUrl.toString();
