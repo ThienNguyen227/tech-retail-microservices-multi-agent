@@ -20,6 +20,7 @@ export const CUSTOMER_URLS = {
   order: `${API_HOST}/api/v1/customer-session/order-service`,
   cart: `${API_HOST}/api/v1/customer-session/cart-service`,
   branch: `${API_HOST}/api/v1/customer-session/branch-service`,
+  warranty: `${API_HOST}/api/v1/customer-session/warranty-service`,
   promotion: `${API_HOST}/api/v1/customer-session/promotion-service`,
 } as const;
 

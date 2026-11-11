@@ -8,6 +8,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   Text,
   TextInput,
@@ -216,7 +217,7 @@ function calculatePromotionDiscount(
 export default function CartPage() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const retryCart = useRef<() => void>(() => {});
+  const retryCart = useRef<(isRefresh?: boolean) => void>(() => {});
   const mutationLock = useRef(false);
   const [imageAttempts, setImageAttempts] = useState<Record<string, number>>(
     {},
@@ -224,6 +225,7 @@ export default function CartPage() {
 
   const [cart, setCart] = useState<Cart | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [deletingSku, setDeletingSku] = useState<string | null>(null);
   const [clearing, setClearing] = useState(false);
@@ -469,9 +471,9 @@ export default function CartPage() {
     useCallback(() => {
       let cancelled = false;
 
-      const loadCart = async () => {
+      const loadCart = async (isRefresh = false) => {
         try {
-          setLoading(true);
+          if (isRefresh) setRefreshing(true); else setLoading(true);
           setError("");
           const { userId } = await getStoredUser();
           if (!userId) {
@@ -496,12 +498,12 @@ export default function CartPage() {
             );
           }
         } finally {
-          if (!cancelled) setLoading(false);
+          if (!cancelled) { setLoading(false); setRefreshing(false); }
         }
       };
 
-      retryCart.current = () => {
-        void loadCart();
+      retryCart.current = (isRefresh = false) => {
+        void loadCart(isRefresh);
       };
       void loadCart();
 
@@ -817,7 +819,12 @@ export default function CartPage() {
 
   if (error) {
     return (
-      <View className="flex-1 items-center justify-center bg-slate-50 p-6">
+      <ScrollView
+        alwaysBounceVertical
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { if (!refreshing) retryCart.current(true); }} tintColor="#168b87" />}
+        contentContainerStyle={{ flexGrow: 1, alignItems: "center", justifyContent: "center", padding: 24 }}
+        className="flex-1 bg-slate-50"
+      >
         <Text className="text-center text-red-600" accessibilityRole="alert">
           {error}
         </Text>
@@ -828,13 +835,15 @@ export default function CartPage() {
         >
           <Text className="font-bold text-white">Thử lại</Text>
         </Pressable>
-      </View>
+      </ScrollView>
     );
   }
 
   return (
     <View className="flex-1 bg-[#f8fafc]">
       <ScrollView
+        alwaysBounceVertical
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { if (!busy && !refreshing) retryCart.current(true); }} tintColor="#168b87" />}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{
           padding: 16,

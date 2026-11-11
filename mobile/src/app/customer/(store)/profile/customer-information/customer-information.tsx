@@ -7,6 +7,7 @@ import {
   Modal,
   Alert,
   Pressable,
+  RefreshControl,
   ScrollView,
   Text,
   TextInput,
@@ -64,6 +65,7 @@ function errorMessage(error: unknown, fallback: string) {
 export default function CustomerInformationScreen() {
   const [profile, setProfile] = useState<CustomerProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [editing, setEditing] = useState(false);
@@ -75,8 +77,8 @@ export default function CustomerInformationScreen() {
   const [addressForm, setAddressForm] = useState<{ id?: string; line: string; ward: string; province: string; isDefault: boolean } | null>(null);
   const [addressSaving, setAddressSaving] = useState(false);
 
-  const loadProfile = useCallback(async () => {
-    setLoading(true);
+  const loadProfile = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true); else setLoading(true);
     setError('');
     try {
       const response = await customerCustomerService.getCustomerInformation();
@@ -94,6 +96,7 @@ export default function CustomerInformationScreen() {
       setError(errorMessage(requestError, 'Không thể tải thông tin khách hàng. Vui lòng thử lại.'));
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
@@ -186,7 +189,7 @@ export default function CustomerInformationScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-[#f6f8fb]" edges={['bottom']}>
-      <ScrollView contentContainerClassName="px-4 pb-10 pt-5" showsVerticalScrollIndicator={false}>
+      <ScrollView alwaysBounceVertical refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { if (!loading && !saving && !addressSaving) void loadProfile(true); }} tintColor="#168b87" />} contentContainerClassName="px-4 pb-10 pt-5" showsVerticalScrollIndicator={false}>
         <Breadcrumb title="Thông tin khách hàng" />
         <PageHeading title="Thông tin khách hàng" subtitle="Quản lý hồ sơ cá nhân và địa chỉ nhận hàng của bạn." symbol="✓" />
         <ProfileNavigation active="customer" />
