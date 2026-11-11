@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Product, ProductDocument } from './schemas/product.schema';
 import { Category, CategoryDocument } from './schemas/category.schema';
 import { Brand, BrandDocument } from './schemas/brand.schema';
@@ -87,6 +87,147 @@ export class ProductService {
       product,
       category,
     }
+  }
+
+  // 4. POST -> compare phones
+  async comparePhones(ids: string[]) {
+    // ----------------------------------------------------------
+    // 1. VALIDATE INPUT
+    // ----------------------------------------------------------
+
+    if (!Array.isArray(ids)) {
+      throw new BadRequestException(
+        'Danh sách ID sản phẩm không hợp lệ',
+      );
+    }
+
+    if (ids.length < 2 || ids.length > 3) {
+      throw new BadRequestException(
+        'Chỉ được so sánh từ 2 đến 3 điện thoại',
+      );
+    }
+
+    // ----------------------------------------------------------
+    // 2. VALIDATE MONGODB OBJECT ID
+    // ----------------------------------------------------------
+
+    const normalizedIds = ids.map((id) => {
+      if (
+        typeof id !== 'string' ||
+        !Types.ObjectId.isValid(id.trim())
+      ) {
+        throw new BadRequestException(
+          `Product ID '${id}' không hợp lệ`,
+        );
+      }
+
+      return id.trim().toLowerCase();
+    });
+
+    // ----------------------------------------------------------
+    // 3. CHECK DUPLICATE IDS
+    // ----------------------------------------------------------
+
+    if (
+      new Set(normalizedIds).size !== normalizedIds.length
+    ) {
+      throw new BadRequestException(
+        'Không thể so sánh cùng một sản phẩm nhiều lần',
+      );
+    }
+
+    // ----------------------------------------------------------
+    // 4. FIND PHONE CATEGORY
+    // ----------------------------------------------------------
+
+    const phoneCategory = await this.categoryModel
+      .findOne({
+        slug: 'dien-thoai-di-dong',
+      })
+      .lean()
+      .exec();
+
+    if (!phoneCategory) {
+      throw new NotFoundException(
+        'Không tìm thấy danh mục điện thoại di động',
+      );
+    }
+
+    // ----------------------------------------------------------
+    // 5. FIND PRODUCTS FROM MONGODB
+    // ----------------------------------------------------------
+
+    const objectIds = normalizedIds.map(
+      (id) => new Types.ObjectId(id),
+    );
+
+    const products = await this.productModel
+      .find({
+        _id: {
+          $in: objectIds,
+        },
+      })
+      .lean()
+      .exec();
+
+    // ----------------------------------------------------------
+    // 6. CHECK PRODUCTS EXIST
+    // ----------------------------------------------------------
+
+    if (products.length !== normalizedIds.length) {
+      throw new NotFoundException(
+        'Một hoặc nhiều sản phẩm không tồn tại',
+      );
+    }
+
+    // ----------------------------------------------------------
+    // 7. CHECK PHONE CATEGORY
+    // ----------------------------------------------------------
+
+    const phoneCategoryId = String(phoneCategory.id);
+
+    for (const product of products) {
+      if (String(product.categoryId) !== phoneCategoryId) {
+        throw new BadRequestException(
+          `Sản phẩm '${product.name}' không thuộc danh mục điện thoại`,
+        );
+      }
+    }
+
+    // ----------------------------------------------------------
+    // 8. SORT PRODUCTS BY REQUESTED IDS
+    // ----------------------------------------------------------
+
+    const productMap = new Map(
+      products.map(
+        (product) => [
+          String(product._id).toLowerCase(),
+          product,
+        ] as const,
+      ),
+    );
+
+    const orderedProducts = normalizedIds.map((id) => {
+      const product = productMap.get(id);
+
+      if (!product) {
+        throw new NotFoundException(
+          `Không tìm thấy sản phẩm có ID '${id}'`,
+        );
+      }
+
+      return product;
+    });
+
+    // ----------------------------------------------------------
+    // 9. RETURN ALL PRODUCT DATA
+    // ----------------------------------------------------------
+
+    return {
+      message: 'So sánh điện thoại thành công',
+      count: orderedProducts.length,
+      products: orderedProducts,
+    };
   }
 
 }

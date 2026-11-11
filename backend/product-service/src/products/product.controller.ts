@@ -1,4 +1,4 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
+import { Controller, Get, HttpStatus, Param, Post, Query, Body } from '@nestjs/common';
 import { ProductService } from './product.service';
 
 @Controller('api/v1/customer-session/product-service')
@@ -25,6 +25,12 @@ export class ProductController
   @Get('product-detail')
   async getProductDetailBySlug(@Query('name') slug:string){
     return this.productService.getProductDetailBySlug(slug);
+  }
+
+  // 4.
+  @Post('compare-phones')
+  async comparePhones(@Body() body: {ids: string[]}) {
+    return this.productService.comparePhones(body.ids);
   }
   
 }
