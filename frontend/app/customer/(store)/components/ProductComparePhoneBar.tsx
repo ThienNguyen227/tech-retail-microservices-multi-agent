@@ -1,43 +1,43 @@
-
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
+import {
+  Trash2,
+  X,
+  Plus,
+  ArrowRight,
+  GitCompareArrows,
+} from 'lucide-react';
+
 import { useProductCompare } from './ProductCompareProvider';
 
 const MAX_COMPARE_PRODUCTS = 3;
 
-export default function ProductCompareBar() {
+const PHONE_CATEGORY_PATH = '/customer/product-category/dien-thoai-di-dong';
+const PHONE_COMPARE_PATH = '/customer/product-phone-compare';
+
+export default function ProductComparePhoneBar() {
   const router = useRouter();
   const pathname = usePathname();
 
   const {
     phones,
-    count,
     removePhone,
     clearPhones,
     isHydrated,
   } = useProductCompare();
 
-  // Chỉ hiển thị thanh so sánh tại trang danh mục điện thoại
-  const isPhoneCategoryPage =
-    pathname === '/customer/product-category/dien-thoai-di-dong';
+  const phoneCount = phones.length;
+  const isPhoneCategoryPage = pathname === PHONE_CATEGORY_PATH;
+  const canCompare = phoneCount >= 2;
 
-  // Chờ load localStorage, ẩn khi không có sản phẩm
-  // hoặc khi người dùng đang ở trang khác
-  if (
-    !isHydrated ||
-    count === 0 ||
-    !isPhoneCategoryPage
-  ) {
+  if (!isHydrated || phoneCount === 0 || !isPhoneCategoryPage) {
     return null;
   }
 
-  const canCompare = count >= 2;
-
   const handleCompare = () => {
     if (!canCompare) return;
-
-    router.push('/customer/product-phone-compare');
+    router.push(PHONE_COMPARE_PATH);
   };
 
   const formatPrice = (price: number) =>
@@ -53,54 +53,23 @@ export default function ProductCompareBar() {
 
         {/* HEADER */}
         <div className="mb-3 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-50 text-teal-700">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.8"
-                className="h-5 w-5"
-                aria-hidden="true"
-              >
-                <rect x="3" y="4" width="8" height="16" rx="1.5" />
-                <rect x="13" y="4" width="8" height="16" rx="1.5" />
-              </svg>
-            </div>
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">
+              So sánh điện thoại
+            </h3>
 
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">
-                So sánh sản phẩm
-              </h3>
-
-              <p className="text-[11px] text-slate-500">
-                Đã chọn {count}/{MAX_COMPARE_PRODUCTS} sản phẩm
-              </p>
-            </div>
+            <p className="text-[11px] text-slate-500">
+              Đã chọn {phoneCount}/{MAX_COMPARE_PRODUCTS} sản phẩm
+            </p>
           </div>
 
+          {/* CLEAR ALL */}
           <button
             type="button"
             onClick={clearPhones}
             className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-2 text-xs font-medium text-slate-500 transition hover:bg-rose-50 hover:text-rose-600"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              className="h-4 w-4"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14M10 10v6m4-6v6"
-              />
-            </svg>
-
+            <Trash2 size={16} />
             Xóa tất cả
           </button>
         </div>
@@ -117,6 +86,7 @@ export default function ProductCompareBar() {
                 <img
                   src={`/product/phone/${phone.variant.image || phone.image}`}
                   alt={phone.name}
+                  loading="lazy"
                   className="h-full w-full object-contain p-1"
                 />
               </div>
@@ -147,53 +117,25 @@ export default function ProductCompareBar() {
                 title="Xóa sản phẩm"
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
               >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  className="h-4 w-4"
-                  aria-hidden="true"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="m18 6-12 12M6 6l12 12"
-                  />
-                </svg>
+                <X size={17} />
               </button>
             </div>
           ))}
 
           {/* EMPTY SLOTS */}
           {Array.from({
-            length: MAX_COMPARE_PRODUCTS - count,
+            length: Math.max(0, MAX_COMPARE_PRODUCTS - phoneCount),
           }).map((_, index) => (
             <div
               key={`empty-${index}`}
               className="flex min-w-[260px] flex-1 items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 px-3 py-3 sm:min-w-0"
             >
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-400">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  className="h-5 w-5"
-                  aria-hidden="true"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 5v14m-7-7h14"
-                  />
-                </svg>
+                <Plus size={20} />
               </div>
 
               <span className="text-xs text-slate-400">
-                Thêm sản phẩm ({count + index + 1}/{MAX_COMPARE_PRODUCTS})
+                Thêm sản phẩm ({phoneCount + index + 1}/{MAX_COMPARE_PRODUCTS})
               </span>
             </div>
           ))}
@@ -203,32 +145,22 @@ export default function ProductCompareBar() {
         <div className="mt-3 flex flex-col gap-2 border-t border-slate-100 pt-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-[11px] text-slate-500">
             {canCompare
-              ? `Bạn có thể so sánh ${count} sản phẩm đã chọn.`
+              ? `Bạn có thể so sánh ${phoneCount} điện thoại đã chọn.`
               : 'Vui lòng chọn ít nhất 2 điện thoại để so sánh.'}
           </p>
 
+          {/* COMPARE BUTTON */}
           <button
             type="button"
             onClick={handleCompare}
             disabled={!canCompare}
             className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-teal-700 px-6 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-teal-800 hover:shadow-md disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 disabled:shadow-none sm:w-auto"
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.8"
-              className="h-4 w-4"
-              aria-hidden="true"
-            >
-              <rect x="3" y="4" width="8" height="16" rx="1.5" />
-              <rect x="13" y="4" width="8" height="16" rx="1.5" />
-            </svg>
+            <GitCompareArrows size={16} />
 
             So sánh ngay
 
-            <span aria-hidden="true">→</span>
+            <ArrowRight size={16} />
           </button>
         </div>
       </div>

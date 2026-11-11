@@ -1,7 +1,10 @@
+
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { CirclePlus, ArrowRight } from 'lucide-react';
+import { useProductCompare } from './ProductCompareProvider';
 
 export type TabletVariant = {
   sku: string;
@@ -42,6 +45,10 @@ export default function TabletProductCard({
   product,
   promotions,
 }: TabletProductCardProps) {
+  const { addTablet } = useProductCompare();
+
+  const [compareMessage, setCompareMessage] = useState('');
+
   const storages = useMemo(
     () =>
       [...new Set((product.variants ?? []).map((variant) => variant.storage))],
@@ -71,6 +78,7 @@ export default function TabletProductCard({
   useEffect(() => {
     setSelectedStorage(product.variants?.[0]?.storage ?? '');
     setSelectedColorSlug(product.variants?.[0]?.colorSlug ?? '');
+    setCompareMessage('');
   }, [product._id, product.variants]);
 
   const selectedVariant = useMemo(
@@ -122,6 +130,33 @@ export default function TabletProductCard({
     promotion?.discountType === 'PERCENTAGE'
       ? `-${discountValue}%`
       : `-${formatPrice(discountValue)}`;
+
+  // Add tablet to comparison list
+  const handleAddToCompare = () => {
+    if (!selectedVariant) {
+      setCompareMessage('Không tìm thấy phiên bản sản phẩm.');
+      return;
+    }
+
+    const result = addTablet(product, selectedVariant);
+
+    switch (result) {
+      case 'added':
+        setCompareMessage('Đã thêm vào danh sách so sánh.');
+        break;
+
+      case 'duplicate':
+        setCompareMessage('Sản phẩm này đã có trong danh sách so sánh.');
+        break;
+
+      case 'limit':
+        setCompareMessage('Chỉ được so sánh tối đa 3 sản phẩm.');
+        break;
+
+      default:
+        setCompareMessage('Không thể thêm sản phẩm vào danh sách.');
+    }
+  };
 
   return (
     <article className="group flex h-full flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white transition duration-300 hover:-translate-y-1 hover:border-teal-200 hover:shadow-xl hover:shadow-slate-900/8">
@@ -190,7 +225,10 @@ export default function TabletProductCard({
                     <button
                       key={storage}
                       type="button"
-                      onClick={() => setSelectedStorage(storage)}
+                      onClick={() => {
+                        setSelectedStorage(storage);
+                        setCompareMessage('');
+                      }}
                       aria-pressed={isSelected}
                       className={`rounded-lg border px-3 py-1.5 text-xs font-semibold transition ${
                         isSelected
@@ -227,9 +265,10 @@ export default function TabletProductCard({
                     <button
                       key={colorVariant.colorSlug}
                       type="button"
-                      onClick={() =>
-                        setSelectedColorSlug(colorVariant.colorSlug)
-                      }
+                      onClick={() => {
+                        setSelectedColorSlug(colorVariant.colorSlug);
+                        setCompareMessage('');
+                      }}
                       aria-pressed={isSelected}
                       className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
                         isSelected
@@ -284,16 +323,33 @@ export default function TabletProductCard({
           )}
         </div>
 
-        {/* Action */}
-        <Link
-          href={`/customer/product-detail/${currentSlug}`}
-          className="mt-auto inline-flex w-full items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-teal-800"
-        >
-          Xem chi tiết
-          <span className="transition-transform group-hover:translate-x-1">
-            →
-          </span>
-        </Link>
+        {/* Action buttons */}
+        <div className="mt-auto grid grid-cols-[auto_minmax(0,1fr)] gap-2">
+          {/* COMPARE BUTTON */}
+          <button
+            type="button"
+            onClick={handleAddToCompare}
+            disabled={!selectedVariant}
+            aria-label={`So sánh ${product.name}`}
+            className="inline-flex min-w-0 items-center justify-center gap-1 rounded-lg border border-teal-600 bg-white px-2 py-2 text-[11px] font-semibold text-teal-700 transition-all duration-200 hover:bg-teal-50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 sm:text-xs"
+          >
+            <CirclePlus size={15} className="shrink-0" />
+            <span>So sánh</span>
+          </button>
+
+          {/* DETAIL BUTTON */}
+          <Link
+            href={`/customer/product-detail/${currentSlug}`}
+            className="group inline-flex min-w-0 items-center justify-center gap-1 rounded-lg bg-teal-700 px-2 py-2 text-[11px] font-semibold text-white transition hover:bg-teal-800 active:scale-[0.98] sm:gap-1.5 sm:text-xs"
+          >
+            <span className="truncate">Chi tiết</span>
+
+            <ArrowRight
+              size={14}
+              className="shrink-0 transition-transform group-hover:translate-x-1"
+            />
+          </Link>
+        </div>
       </div>
     </article>
   );

@@ -1,10 +1,10 @@
 import { customerAxios } from "../../customer-axios";
 
 // CALL DIRECT API
-const PRODUCT_SERVICE_URL = "http://localhost:3003/api/v1/customer-session/product-service";
+// const PRODUCT_SERVICE_URL = "http://localhost:3003/api/v1/customer-session/product-service";
 
 // CALL THROUGH API GATEWAY (NGINX)
-// const PRODUCT_SERVICE_URL = "http://localhost/api/v1/customer-session/product-service";
+const PRODUCT_SERVICE_URL = "http://localhost/api/v1/customer-session/product-service";
 
 export const customerProductService = {
   // ======================================== PRODUCT MODULE =================================================//
@@ -56,6 +56,30 @@ export const customerProductService = {
   async comparePhones(ids: string[]) {
     const response = await customerAxios.post(
       `${PRODUCT_SERVICE_URL}/compare-phones`,
+      {
+        ids,
+      },
+    );
+
+    return response.data;
+  },
+
+  // 5. (POST) COMPARE LAPTOPS
+  async compareLaptops(ids: string[]) {
+    const response = await customerAxios.post(
+      `${PRODUCT_SERVICE_URL}/compare-laptops`,
+      {
+        ids,
+      },
+    );
+
+    return response.data;
+  },
+
+  // 6. (POST) COMPARE LAPTOPS
+  async compareTablets(ids: string[]) {
+    const response = await customerAxios.post(
+      `${PRODUCT_SERVICE_URL}/compare-tablets`,
       {
         ids,
       },

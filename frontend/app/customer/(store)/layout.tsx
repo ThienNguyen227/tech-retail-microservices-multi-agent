@@ -24,7 +24,9 @@ import type { ReactNode } from 'react';
 import CustomerHeader from './components/CustomerHeader';
 import AIChatbox from './components/AIChatbox';
 import { ProductCompareProvider } from './components/ProductCompareProvider';
-import ProductCompareBar from './components/ProductComparePhoneBar';
+import ProductComparePhoneBar from './components/ProductComparePhoneBar';
+import ProductCompareLaptopBar from './components/ProductCompareLaptopBar';
+import ProductCompareTabletBar from './components/ProductCompareTabletBar';
 
 export default function CustomerLayout({
   children,
@@ -39,7 +41,9 @@ export default function CustomerLayout({
         <main className="flex-1">{children}</main>
 
         <AIChatbox />
-        <ProductCompareBar />
+        <ProductComparePhoneBar />
+        <ProductCompareLaptopBar />
+        <ProductCompareTabletBar />
       </div>
     </ProductCompareProvider>
   );

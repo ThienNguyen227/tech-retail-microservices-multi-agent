@@ -8,6 +8,8 @@ import {
   useProductCompare,
 } from '../components/ProductCompareProvider';
 
+import { Smartphone } from 'lucide-react';
+
 import {
   customerProductService,
 } from '@/lib/axios/services/customer-services/product_service';
@@ -384,17 +386,7 @@ function EmptyCompareState({
   return (
     <div className="rounded-3xl border border-slate-200 bg-white px-5 py-16 text-center shadow-sm">
       <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-3xl bg-teal-50 text-teal-700">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          className="h-10 w-10"
-        >
-          <rect x="3" y="4" width="8" height="16" rx="1.5" />
-          <rect x="13" y="4" width="8" height="16" rx="1.5" />
-        </svg>
+        <Smartphone></Smartphone>
       </div>
 
       <h2 className="text-xl font-bold text-slate-900">

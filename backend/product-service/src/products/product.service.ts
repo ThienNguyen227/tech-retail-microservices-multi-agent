@@ -230,4 +230,285 @@ export class ProductService {
     };
   }
 
+  // 5. POST - campare laptops
+  async compareLaptops(ids: string[]) {
+    // ----------------------------------------------------------
+    // 1. VALIDATE INPUT
+    // ----------------------------------------------------------
+
+    if (!Array.isArray(ids)) {
+      throw new BadRequestException(
+        'Danh sách ID sản phẩm không hợp lệ',
+      );
+    }
+
+    if (ids.length < 2 || ids.length > 3) {
+      throw new BadRequestException(
+        'Chỉ được so sánh từ 2 đến 3 laptop',
+      );
+    }
+
+    // ----------------------------------------------------------
+    // 2. VALIDATE MONGODB OBJECT ID
+    // ----------------------------------------------------------
+
+    const normalizedIds = ids.map((id) => {
+      if (
+        typeof id !== 'string' ||
+        !Types.ObjectId.isValid(id.trim())
+      ) {
+        throw new BadRequestException(
+          `Product ID '${id}' không hợp lệ`,
+        );
+      }
+
+      return id.trim().toLowerCase();
+    });
+
+    // ----------------------------------------------------------
+    // 3. CHECK DUPLICATE IDS
+    // ----------------------------------------------------------
+
+    if (
+      new Set(normalizedIds).size !== normalizedIds.length
+    ) {
+      throw new BadRequestException(
+        'Không thể so sánh cùng một sản phẩm nhiều lần',
+      );
+    }
+
+    // ----------------------------------------------------------
+    // 4. FIND LAPTOP CATEGORY
+    // ----------------------------------------------------------
+
+    const laptopCategory = await this.categoryModel
+      .findOne({
+        slug: 'may-tinh-xach-tay',
+      })
+      .lean()
+      .exec();
+
+    if (!laptopCategory) {
+      throw new NotFoundException(
+        'Không tìm thấy danh mục máy tính xách tay',
+      );
+    }
+
+    // ----------------------------------------------------------
+    // 5. FIND PRODUCTS FROM MONGODB
+    // ----------------------------------------------------------
+
+    const objectIds = normalizedIds.map(
+      (id) => new Types.ObjectId(id),
+    );
+
+    const products = await this.productModel
+      .find({
+        _id: {
+          $in: objectIds,
+        },
+      })
+      .lean()
+      .exec();
+
+    // ----------------------------------------------------------
+    // 6. CHECK PRODUCTS EXIST
+    // ----------------------------------------------------------
+
+    if (products.length !== normalizedIds.length) {
+      throw new NotFoundException(
+        'Một hoặc nhiều sản phẩm không tồn tại',
+      );
+    }
+
+    // ----------------------------------------------------------
+    // 7. CHECK LAPTOP CATEGORY
+    // ----------------------------------------------------------
+
+    const laptopCategoryId = String(laptopCategory.id);
+
+    for (const product of products) {
+      if (String(product.categoryId) !== laptopCategoryId) {
+        throw new BadRequestException(
+          `Sản phẩm '${product.name}' không thuộc danh mục máy tính xách tay`,
+        );
+      }
+    }
+
+    // ----------------------------------------------------------
+    // 8. SORT PRODUCTS BY REQUESTED IDS
+    // ----------------------------------------------------------
+
+    const productMap = new Map(
+      products.map(
+        (product) => [
+          String(product._id).toLowerCase(),
+          product,
+        ] as const,
+      ),
+    );
+
+    const orderedProducts = normalizedIds.map((id) => {
+      const product = productMap.get(id);
+
+      if (!product) {
+        throw new NotFoundException(
+          `Không tìm thấy sản phẩm có ID '${id}'`,
+        );
+      }
+
+      return product;
+    });
+
+    // ----------------------------------------------------------
+    // 9. RETURN ALL PRODUCT DATA
+    // ----------------------------------------------------------
+
+    return {
+      message: 'So sánh laptop thành công',
+      count: orderedProducts.length,
+      products: orderedProducts,
+    };
+  }
+
+  // 6. POST - compare tablets
+  async compareTablets(ids: string[]) {
+    // ----------------------------------------------------------
+    // 1. VALIDATE INPUT
+    // ----------------------------------------------------------
+
+    if (!Array.isArray(ids)) {
+      throw new BadRequestException(
+        'Danh sách ID sản phẩm không hợp lệ',
+      );
+    }
+
+    if (ids.length < 2 || ids.length > 3) {
+      throw new BadRequestException(
+        'Chỉ được so sánh từ 2 đến 3 máy tính bảng',
+      );
+    }
+
+    // ----------------------------------------------------------
+    // 2. VALIDATE MONGODB OBJECT ID
+    // ----------------------------------------------------------
+
+    const normalizedIds = ids.map((id) => {
+      if (
+        typeof id !== 'string' ||
+        !Types.ObjectId.isValid(id.trim())
+      ) {
+        throw new BadRequestException(
+          `Product ID '${id}' không hợp lệ`,
+        );
+      }
+
+      return id.trim().toLowerCase();
+    });
+
+    // ----------------------------------------------------------
+    // 3. CHECK DUPLICATE IDS
+    // ----------------------------------------------------------
+
+    if (
+      new Set(normalizedIds).size !== normalizedIds.length
+    ) {
+      throw new BadRequestException(
+        'Không thể so sánh cùng một sản phẩm nhiều lần',
+      );
+    }
+
+    // ----------------------------------------------------------
+    // 4. FIND TABLET CATEGORY
+    // ----------------------------------------------------------
+
+    const tabletCategory = await this.categoryModel
+      .findOne({
+        slug: 'may-tinh-bang',
+      })
+      .lean()
+      .exec();
+
+    if (!tabletCategory) {
+      throw new NotFoundException(
+        'Không tìm thấy danh mục máy tính bảng',
+      );
+    }
+
+    // ----------------------------------------------------------
+    // 5. FIND PRODUCTS FROM MONGODB
+    // ----------------------------------------------------------
+
+    const objectIds = normalizedIds.map(
+      (id) => new Types.ObjectId(id),
+    );
+
+    const products = await this.productModel
+      .find({
+        _id: {
+          $in: objectIds,
+        },
+      })
+      .lean()
+      .exec();
+
+    // ----------------------------------------------------------
+    // 6. CHECK PRODUCTS EXIST
+    // ----------------------------------------------------------
+
+    if (products.length !== normalizedIds.length) {
+      throw new NotFoundException(
+        'Một hoặc nhiều sản phẩm không tồn tại',
+      );
+    }
+
+    // ----------------------------------------------------------
+    // 7. CHECK TABLET CATEGORY
+    // ----------------------------------------------------------
+
+    const tabletCategoryId = String(tabletCategory.id);
+
+    for (const product of products) {
+      if (String(product.categoryId) !== tabletCategoryId) {
+        throw new BadRequestException(
+          `Sản phẩm '${product.name}' không thuộc danh mục máy tính bảng`,
+        );
+      }
+    }
+
+    // ----------------------------------------------------------
+    // 8. SORT PRODUCTS BY REQUESTED IDS
+    // ----------------------------------------------------------
+
+    const productMap = new Map(
+      products.map(
+        (product) => [
+          String(product._id).toLowerCase(),
+          product,
+        ] as const,
+      ),
+    );
+
+    const orderedProducts = normalizedIds.map((id) => {
+      const product = productMap.get(id);
+
+      if (!product) {
+        throw new NotFoundException(
+          `Không tìm thấy sản phẩm có ID '${id}'`,
+        );
+      }
+
+      return product;
+    });
+
+    // ----------------------------------------------------------
+    // 9. RETURN ALL PRODUCT DATA
+    // ----------------------------------------------------------
+
+    return {
+      message: 'So sánh máy tính bảng thành công',
+      count: orderedProducts.length,
+      products: orderedProducts,
+    };
+  }
 }
