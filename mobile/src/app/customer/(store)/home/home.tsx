@@ -1,4 +1,6 @@
-import { ScrollView, Text, View } from 'react-native';
+import { useState } from 'react';
+import { getStoredUser } from '@/lib/storage/secure_storage';
+import { Alert, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const categories = [
@@ -8,9 +10,19 @@ const categories = [
 ];
 
 export default function Home() {
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try { await getStoredUser(); }
+    catch { Alert.alert('SmartHub', 'Không thể tải lại phiên khách hàng.'); }
+    finally { setRefreshing(false); }
+  };
   return (
     <SafeAreaView className="flex-1 bg-[#f3f8f8]" edges={['bottom']}>
       <ScrollView
+        alwaysBounceVertical
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#168b87" />}
         className="flex-1"
         contentContainerClassName="px-4 pb-8 pt-5"
         showsVerticalScrollIndicator={false}

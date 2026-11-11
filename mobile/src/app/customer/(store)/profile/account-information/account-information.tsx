@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Modal,
   Pressable,
+  RefreshControl,
   ScrollView,
   Text,
   TextInput,
@@ -45,6 +46,7 @@ function errorMessage(error: unknown, fallback: string) {
 export default function AccountInformationScreen() {
   const [profile, setProfile] = useState<AccountInformation | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [editing, setEditing] = useState(false);
@@ -53,8 +55,8 @@ export default function AccountInformationScreen() {
   const [formPhone, setFormPhone] = useState('');
   const [formError, setFormError] = useState('');
 
-  const loadProfile = useCallback(async () => {
-    setLoading(true);
+  const loadProfile = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true); else setLoading(true);
     setError('');
     try {
       const response = await customerUserService.getAccountInformation();
@@ -69,6 +71,7 @@ export default function AccountInformationScreen() {
       setError(errorMessage(requestError, 'Không thể tải thông tin tài khoản. Vui lòng thử lại.'));
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
@@ -128,7 +131,7 @@ export default function AccountInformationScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-[#f6f8fb]" edges={['bottom']}>
-      <ScrollView contentContainerClassName="px-4 pb-10 pt-5" showsVerticalScrollIndicator={false}>
+      <ScrollView alwaysBounceVertical refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { if (!loading && !saving) void loadProfile(true); }} tintColor="#168b87" />} contentContainerClassName="px-4 pb-10 pt-5" showsVerticalScrollIndicator={false}>
         <Breadcrumb title="Thông tin tài khoản" />
         <PageHeading title="Thông tin tài khoản" subtitle="Quản lý thông tin cá nhân và bảo mật tài khoản của bạn." symbol="U" />
         <ProfileNavigation active="account" />

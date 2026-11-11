@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Image as RNImage, Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -35,12 +35,15 @@ export default function ProductCategoryPage() {
   const [maxPrice, setMaxPrice] = useState(PRICE_MAX);
   const [filterVisible, setFilterVisible] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const refreshRequested = useRef(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     let active = true;
     const timer = setTimeout(() => {
-      setLoading(true);
+      if (!refreshRequested.current) setLoading(true);
       setError('');
     }, 0);
     Promise.all([
@@ -63,13 +66,13 @@ export default function ProductCategoryPage() {
     }).catch(() => {
       if (active) setError('Không thể tải danh sách sản phẩm. Vui lòng thử lại.');
     }).finally(() => {
-      if (active) setLoading(false);
+      if (active) { setLoading(false); setRefreshing(false); refreshRequested.current = false; }
     });
     return () => {
       active = false;
       clearTimeout(timer);
     };
-  }, [kind, selectedBrands, slug]);
+  }, [kind, selectedBrands, slug, refreshKey]);
 
   const filteredProducts = useMemo(() => products.filter((product) => {
     const variants = product.variants ?? [];
@@ -160,6 +163,8 @@ export default function ProductCategoryPage() {
         </View>
       ) : null}
       <FlatList
+        refreshing={refreshing}
+        onRefresh={() => { if (!loading && !refreshRequested.current) { refreshRequested.current = true; setRefreshing(true); setRefreshKey((value) => value + 1); } }}
         data={loading || error ? [] : filteredProducts}
         keyExtractor={(item) => item._id}
         renderItem={renderProduct}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Image, Pressable, ScrollView, Text, View } from "react-native";
+import { Alert, Image, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 import { router } from "expo-router";
 
 import { FRONTEND_ASSET_URL } from "@/constants/api";
@@ -33,7 +33,7 @@ export type LaptopDetailProduct = {
   connectivityAndExpansion?: Record<string, unknown>;
   dimensionsAndBattery?: Record<string, unknown>;
 };
-type Props = { product: LaptopDetailProduct; selectedSlug?: string };
+type Props = { refreshing?: boolean; onRefresh?: () => void; refreshKey?: number; product: LaptopDetailProduct; selectedSlug?: string };
 type PromotionDiscount = {
   promotionId: string;
   promotionName: string;
@@ -103,7 +103,7 @@ function InfoList({ label, value }: { label: string; value?: unknown }) {
   return <InfoRow label={label} value={value} />;
 }
 
-export default function LaptopProductDetail({ product, selectedSlug }: Props) {
+export default function LaptopProductDetail({ product, selectedSlug, refreshing = false, onRefresh, refreshKey = 0 }: Props) {
   const initial =
     product.variants.find((variant) => variant.slug === selectedSlug) ??
     product.variants[0];
@@ -178,7 +178,7 @@ export default function LaptopProductDetail({ product, selectedSlug }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [selected?.sku]);
+  }, [selected?.sku, refreshKey]);
 
   const currentPrice = selected?.price ?? 0;
   const discountValue =
@@ -238,6 +238,8 @@ export default function LaptopProductDetail({ product, selectedSlug }: Props) {
   };
   return (
     <ScrollView
+      alwaysBounceVertical
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#168b87" />}
       contentContainerClassName="px-4 pb-10 pt-4"
       showsVerticalScrollIndicator={false}
     >
