@@ -1,5 +1,6 @@
+import { StoreScrollView } from '@/components/store-scroll-to-top';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, Text } from 'react-native';
+import { ActivityIndicator, RefreshControl, Text } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -47,9 +48,9 @@ export default function ProductDetailPage() {
       {loading ? (
         <ActivityIndicator className="mt-20" color="#0d9488" />
       ) : error || !data?.product ? (
-        <ScrollView alwaysBounceVertical refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#168b87" />} contentContainerClassName="m-5 rounded-2xl bg-white p-8">
+        <StoreScrollView alwaysBounceVertical refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#168b87" />} contentContainerClassName="m-5 rounded-2xl bg-white p-8">
           <Text className="text-center text-red-600">{error || 'Không tìm thấy sản phẩm.'}</Text>
-        </ScrollView>
+        </StoreScrollView>
       ) : data.category?.slug === 'dien-thoai-di-dong' ? (
         <PhoneProductDetail product={data.product as unknown as PhoneDetailProduct} selectedSlug={slug} refreshing={refreshing} onRefresh={onRefresh} refreshKey={refreshKey} />
       ) : data.category?.slug === 'may-tinh-xach-tay' ? (

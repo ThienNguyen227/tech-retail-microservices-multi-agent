@@ -1,3 +1,4 @@
+import { StoreScrollView } from '@/components/store-scroll-to-top';
 import { useCallback, useRef, useState } from "react";
 import { useFocusEffect, useRouter } from "expo-router";
 import {
@@ -374,7 +375,7 @@ export default function OrdersPage() {
 
   return (
     <View className="flex-1 bg-[#f6f8fb]">
-      <ScrollView
+      <StoreScrollView
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -577,7 +578,7 @@ export default function OrdersPage() {
             </View>
           );
         })}
-      </ScrollView>
+      </StoreScrollView>
 
       {/* CANCEL CONFIRMATION MODAL */}
       <Modal
