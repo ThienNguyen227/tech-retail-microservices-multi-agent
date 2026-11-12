@@ -17,6 +17,7 @@ import {
   ShoppingBag,
   ShieldCheck,
   List,
+  Gift,
 } from "lucide-react";
 import { clearAccessToken } from "@/lib/access_token/customer_access_token";
 import { customerUserService } from "@/lib/axios/services/customer-services/user_service";
@@ -456,6 +457,18 @@ export default function CustomerHeader() {
         icon: Tablet,
         active: pathname.startsWith("/customer/product-category/may-tinh-bang"),
       },
+      {
+        label: "Chương trình khuyến mãi",
+        href: "/customer/promotion-list",
+        icon: Gift,
+        active: pathname.startsWith("/customer/promotion-list"),
+      },
+      {
+        label: "Chính sách bảo hành",
+        href: "/customer/warranty-list",
+        icon: ShieldCheck,
+        active: pathname.startsWith("/customer/warranty-list"),
+      },
     ].map((item) => {
       const Icon = item.icon;
 
@@ -526,6 +539,18 @@ export default function CustomerHeader() {
             href: "/customer/product-category/may-tinh-bang",
             icon: Tablet,
             active: pathname.startsWith("/customer/product-category/may-tinh-bang"),
+          },
+          {
+            label: "Chương trình khuyến mãi",
+            href: "/customer/promotion-list",
+            icon: Gift,
+            active: pathname.startsWith("/customer/promotion-list"),
+          },
+          {
+            label: "Chính sách bảo hành",
+            href: "/customer/warranty-list",
+            icon: ShieldCheck,
+            active: pathname.startsWith("/customer/warranty-list"),
           },
         ].map((item) => {
           const Icon = item.icon;

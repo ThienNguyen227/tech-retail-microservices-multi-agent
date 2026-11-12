@@ -39,4 +39,13 @@ export const customerPromotionService = {
 
     return response.data;
   },
+
+  // 4. (GET) GET ALL ACTIVE PROMOTIONS
+  async getAllPromotions() {
+    const response = await customerAxios.get(
+      `${PROMOTION_SERVICE_URL}/promotion-list`,
+    );
+
+    return response.data;
+  },
 };
