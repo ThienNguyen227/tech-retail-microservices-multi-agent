@@ -5,6 +5,7 @@ import {ThrottlerGuard, ThrottlerModule} from '@nestjs/throttler';
 import { PrismaModule } from './prisma/prisma.module';
 import { DirectDiscountModule } from './promotion/direct_discount/direct_discount.module';
 import { CouponModule } from './promotion/coupon/coupon.module';
+import { PromotionListModule } from './promotion/promotion_list/promotion_list.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { CouponModule } from './promotion/coupon/coupon.module';
     PrismaModule,
     DirectDiscountModule,
     CouponModule,
+    PromotionListModule
   ],
 
   controllers: [],
