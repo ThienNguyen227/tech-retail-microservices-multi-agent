@@ -1,3 +1,4 @@
+import { StoreScrollView } from '@/components/store-scroll-to-top';
 import { isAxiosError } from 'axios';
 import { router } from 'expo-router';
 import type { Href } from 'expo-router';
@@ -189,7 +190,7 @@ export default function CustomerInformationScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-[#f6f8fb]" edges={['bottom']}>
-      <ScrollView alwaysBounceVertical refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { if (!loading && !saving && !addressSaving) void loadProfile(true); }} tintColor="#168b87" />} contentContainerClassName="px-4 pb-10 pt-5" showsVerticalScrollIndicator={false}>
+      <StoreScrollView alwaysBounceVertical refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { if (!loading && !saving && !addressSaving) void loadProfile(true); }} tintColor="#168b87" />} contentContainerClassName="px-4 pb-10 pt-5" showsVerticalScrollIndicator={false}>
         <Breadcrumb title="Thông tin khách hàng" />
         <PageHeading title="Thông tin khách hàng" subtitle="Quản lý hồ sơ cá nhân và địa chỉ nhận hàng của bạn." symbol="✓" />
         <ProfileNavigation active="customer" />
@@ -252,7 +253,7 @@ export default function CustomerInformationScreen() {
             </View>
           </View>
         ) : null}
-      </ScrollView>
+      </StoreScrollView>
 
       {/* POPUP CHỈNH SỬA THÔNG TIN KHÁCH HÀNG */}
       <Modal

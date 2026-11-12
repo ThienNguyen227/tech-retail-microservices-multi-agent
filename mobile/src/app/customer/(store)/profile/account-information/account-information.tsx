@@ -1,3 +1,4 @@
+import { StoreScrollView } from '@/components/store-scroll-to-top';
 import { isAxiosError } from 'axios';
 import { router } from 'expo-router';
 import type { Href } from 'expo-router';
@@ -131,7 +132,7 @@ export default function AccountInformationScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-[#f6f8fb]" edges={['bottom']}>
-      <ScrollView alwaysBounceVertical refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { if (!loading && !saving) void loadProfile(true); }} tintColor="#168b87" />} contentContainerClassName="px-4 pb-10 pt-5" showsVerticalScrollIndicator={false}>
+      <StoreScrollView alwaysBounceVertical refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { if (!loading && !saving) void loadProfile(true); }} tintColor="#168b87" />} contentContainerClassName="px-4 pb-10 pt-5" showsVerticalScrollIndicator={false}>
         <Breadcrumb title="Thông tin tài khoản" />
         <PageHeading title="Thông tin tài khoản" subtitle="Quản lý thông tin cá nhân và bảo mật tài khoản của bạn." symbol="U" />
         <ProfileNavigation active="account" />
@@ -227,7 +228,7 @@ export default function AccountInformationScreen() {
             </Modal>
           </View>
         ) : null}
-      </ScrollView>
+      </StoreScrollView>
     </SafeAreaView>
   );
 }

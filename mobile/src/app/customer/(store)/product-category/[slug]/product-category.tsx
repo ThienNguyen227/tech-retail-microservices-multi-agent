@@ -1,9 +1,13 @@
+import { StoreFlatList } from '@/components/store-scroll-to-top';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Image as RNImage, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Image as RNImage, Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import ProductFilter from '@/components/product-filter';
+import ProductComparePhoneBar from '@/components/product-compare-phone-bar';
+import ProductCompareLaptopBar from '@/components/product-compare-laptop-bar';
+import ProductCompareTabletBar from '@/components/product-compare-tablet-bar';
 import { FRONTEND_ASSET_URL } from '@/constants/api';
 import PhoneProductCard, { type Product, type PromotionDiscount } from '@/components/phone-product-card';
 import LaptopProductCard from '@/components/laptop-product-card';
@@ -96,9 +100,8 @@ export default function ProductCategoryPage() {
     router.replace(`/customer/product-category/${slug}${params.toString() ? `?${params}` : ''}` as never);
   };
 
-  const cardHeight = kind === 'phone' ? 480 : kind === 'laptop' ? 500 : 480;
   const renderProduct = useCallback(({ item }: { item: Product }) => (
-    <View style={{ height: cardHeight, marginBottom: 12 }}>
+    <View style={{ marginBottom: 12 }}>
       {kind === 'phone' ? (
         <PhoneProductCard product={item} promotions={promotions} />
       ) : kind === 'laptop' ? (
@@ -107,7 +110,7 @@ export default function ProductCategoryPage() {
         <TabletProductCard product={item} promotions={promotions} />
       )}
     </View>
-  ), [cardHeight, kind, promotions]);
+  ), [kind, promotions]);
 
   return (
     <SafeAreaView className="flex-1 bg-[#f5f8fa]" edges={['bottom']}>
@@ -162,7 +165,8 @@ export default function ProductCategoryPage() {
           </View>
         </View>
       ) : null}
-      <FlatList
+      <StoreFlatList
+        style={{ flex: 1 }}
         refreshing={refreshing}
         onRefresh={() => { if (!loading && !refreshRequested.current) { refreshRequested.current = true; setRefreshing(true); setRefreshKey((value) => value + 1); } }}
         data={loading || error ? [] : filteredProducts}
@@ -174,12 +178,7 @@ export default function ProductCategoryPage() {
         maxToRenderPerBatch={4}
         updateCellsBatchingPeriod={16}
         windowSize={7}
-        removeClippedSubviews
-        getItemLayout={(_, index) => ({
-          length: cardHeight + 12,
-          offset: (cardHeight + 12) * index,
-          index,
-        })}
+        removeClippedSubviews={false}
         ListHeaderComponent={
           <View className="mb-4 flex-row items-center justify-between">
             <View>
@@ -215,6 +214,7 @@ export default function ProductCategoryPage() {
           )
         }
       />
+      {kind === 'phone' ? <ProductComparePhoneBar /> : kind === 'laptop' ? <ProductCompareLaptopBar /> : <ProductCompareTabletBar />}
       <ProductFilter visible={filterVisible} brands={brands} selectedBrands={selectedBrands} selectedRam={selectedRam} selectedStorage={selectedStorage} maxPrice={maxPrice} onToggleBrand={(value) => toggle(selectedBrands, value, setSelectedBrands)} onToggleRam={(value) => toggle(selectedRam, value, setSelectedRam)} onToggleStorage={(value) => toggle(selectedStorage, value, setSelectedStorage)} onPrice={setMaxPrice} onClear={() => { setSelectedBrands([]); setSelectedRam([]); setSelectedStorage([]); setMaxPrice(PRICE_MAX); }} onClose={() => setFilterVisible(false)} onApply={applyFilter} />
     </SafeAreaView>
   );

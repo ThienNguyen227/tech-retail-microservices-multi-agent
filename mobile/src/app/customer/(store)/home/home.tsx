@@ -1,6 +1,7 @@
+import { StoreScrollView } from '@/components/store-scroll-to-top';
 import { useState } from 'react';
 import { getStoredUser } from '@/lib/storage/secure_storage';
-import { Alert, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { Alert, RefreshControl, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 const categories = [
@@ -20,7 +21,7 @@ export default function Home() {
   };
   return (
     <SafeAreaView className="flex-1 bg-[#f3f8f8]" edges={['bottom']}>
-      <ScrollView
+      <StoreScrollView
         alwaysBounceVertical
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#168b87" />}
         className="flex-1"
@@ -90,7 +91,7 @@ export default function Home() {
             Tài khoản của tôi →
           </Text>
         </View>
-      </ScrollView>
+      </StoreScrollView>
     </SafeAreaView>
   );
 }

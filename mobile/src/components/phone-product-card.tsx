@@ -3,6 +3,9 @@ import { Image, Pressable, Text, View } from 'react-native';
 import { router } from 'expo-router';
 
 import { FRONTEND_ASSET_URL } from '@/constants/api';
+import { useProductCompare } from './product-compare-provider';
+import ProductCompareIcon from './product-compare-icon';
+import ProductCompareNotice from './product-compare-notice';
 
 export type PhoneVariant = {
   sku: string;
@@ -52,14 +55,17 @@ const formatPrice = (price: number) =>
   }).format(price);
 
 const getImageUrl = (image: string) =>
-  image.startsWith('http') ? image : `${FRONTEND_ASSET_URL}/product/phone/${image}`;
+  image.startsWith('http')
+    ? image
+    : `${FRONTEND_ASSET_URL}/product/phone/${image}`;
 
-function PhoneProductCard({
-  product,
-  promotions,
-}: PhoneProductCardProps) {
+function PhoneProductCard({ product, promotions }: PhoneProductCardProps) {
+  const { addPhone, isHydrated } = useProductCompare();
+  const [compareMessage, setCompareMessage] = useState('');
   const storages = useMemo(
-    () => [...new Set((product.variants ?? []).map((variant) => variant.storage))],
+    () => [
+      ...new Set((product.variants ?? []).map((variant) => variant.storage)),
+    ],
     [product.variants],
   );
   const colors = useMemo(() => {
@@ -68,7 +74,6 @@ function PhoneProductCard({
       if (!uniqueColors.has(variant.colorSlug)) {
         uniqueColors.set(variant.colorSlug, variant);
       }
-
     });
     return Array.from(uniqueColors.values());
   }, [product.variants]);
@@ -87,7 +92,9 @@ function PhoneProductCard({
           variant.storage === selectedStorage &&
           variant.colorSlug === selectedColorSlug,
       ) ??
-      product.variants?.find((variant) => variant.storage === selectedStorage) ??
+      product.variants?.find(
+        (variant) => variant.storage === selectedStorage,
+      ) ??
       product.variants?.[0],
     [product.variants, selectedStorage, selectedColorSlug],
   );
@@ -120,8 +127,33 @@ function PhoneProductCard({
   const openDetail = () =>
     router.push(`/customer/product-detail/${currentSlug}` as never);
 
+  // ==========================================================
+  // ADD TO COMPARE
+  // ==========================================================
+
+  const handleAddToCompare = () => {
+    if (!selectedVariant) {
+      setCompareMessage('Không tìm thấy phiên bản sản phẩm.');
+      return;
+    }
+    const result = addPhone(product, selectedVariant);
+    switch (result) {
+      case 'added':
+        setCompareMessage('');
+        break;
+
+      case 'duplicate':
+        setCompareMessage('Sản phẩm này đã có trong danh sách so sánh.');
+        break;
+
+      case 'limit':
+        setCompareMessage('Chỉ được so sánh tối đa 3 sản phẩm.');
+        break;
+    }
+  };
+
   return (
-    <View className="h-[480px] flex-1 overflow-hidden rounded-3xl border border-slate-200 bg-white">
+    <View className="w-full overflow-hidden rounded-3xl border border-slate-200 bg-white">
       <Pressable
         onPress={openDetail}
         accessibilityLabel={`Xem chi tiết ${product.name}`}
@@ -143,14 +175,17 @@ function PhoneProductCard({
         </Text>
       </Pressable>
 
-      <View className="flex-1 px-4 pb-4">
+      <View className="px-4 pb-4">
         <Pressable onPress={openDetail}>
-          <Text className="min-h-10 text-[15px] font-semibold leading-5 text-slate-900" numberOfLines={2}>
+          <Text
+            className="min-h-10 text-[15px] font-semibold leading-5 text-slate-900"
+            numberOfLines={2}
+          >
             {product.name} {selectedVariant?.storage ?? ''}
           </Text>
         </Pressable>
 
-        <View className="mt-2 h-7 flex-row flex-wrap gap-1.5 overflow-hidden">
+        <View className="mt-2 min-h-7 flex-row flex-wrap gap-1.5">
           {product.screenTech ? (
             <Text className="rounded-md bg-slate-100 px-2 py-1 text-[10px] font-medium text-slate-600">
               {product.screenTech}
@@ -163,7 +198,7 @@ function PhoneProductCard({
           ) : null}
         </View>
 
-        <View className="mt-3 h-[58px] overflow-hidden">
+        <View className="mt-3 min-h-[58px]">
           {storages.length > 0 ? (
             <>
               <Text className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
@@ -180,7 +215,9 @@ function PhoneProductCard({
                         : 'border-slate-200 bg-white'
                     }`}
                   >
-                    <Text className={`text-xs font-semibold ${storage === selectedStorage ? 'text-white' : 'text-slate-600'}`}>
+                    <Text
+                      className={`text-xs font-semibold ${storage === selectedStorage ? 'text-white' : 'text-slate-600'}`}
+                    >
                       {storage}
                     </Text>
                   </Pressable>
@@ -190,11 +227,14 @@ function PhoneProductCard({
           ) : null}
         </View>
 
-        <View className="mt-3 h-[58px] overflow-hidden">
+        <View className="mt-3 min-h-[58px]">
           {colors.length > 0 ? (
             <>
               <Text className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                Màu sắc: <Text className="normal-case tracking-normal text-slate-600">{currentColor}</Text>
+                Màu sắc:{' '}
+                <Text className="normal-case tracking-normal text-slate-600">
+                  {currentColor}
+                </Text>
               </Text>
               <View className="flex-row flex-wrap gap-2">
                 {colors.map((variant) => (
@@ -207,7 +247,9 @@ function PhoneProductCard({
                         : 'border-slate-200 bg-white'
                     }`}
                   >
-                    <Text className="text-xs font-medium text-slate-600">{variant.color}</Text>
+                    <Text className="text-xs font-medium text-slate-600">
+                      {variant.color}
+                    </Text>
                   </Pressable>
                 ))}
               </View>
@@ -215,19 +257,29 @@ function PhoneProductCard({
           ) : null}
         </View>
 
-        <View className="mt-4 h-[62px] border-t border-slate-100 pt-3">
+        <View className="mt-4 min-h-[62px] border-t border-slate-100 pt-3">
           {currentPrice > 0 ? (
             <>
               <View className="flex-row flex-wrap items-center gap-2">
                 <Text className="text-lg font-semibold text-teal-700">
                   {formatPrice(hasPromotion ? finalPrice : currentPrice)}
                 </Text>
-                {hasPromotion ? <Text className="rounded bg-rose-50 px-1.5 py-0.5 text-[10px] text-rose-600">{discountLabel}</Text> : null}
+                {hasPromotion ? (
+                  <Text className="rounded bg-rose-50 px-1.5 py-0.5 text-[10px] text-rose-600">
+                    {discountLabel}
+                  </Text>
+                ) : null}
               </View>
               {hasPromotion ? (
                 <View className="mt-1 flex-row flex-wrap gap-2">
-                  <Text className="text-xs text-slate-400 line-through">{formatPrice(currentPrice)}</Text>
-                  {savedAmount > 0 ? <Text className="text-[10px] text-emerald-600">Tiết kiệm {formatPrice(savedAmount)}</Text> : null}
+                  <Text className="text-xs text-slate-400 line-through">
+                    {formatPrice(currentPrice)}
+                  </Text>
+                  {savedAmount > 0 ? (
+                    <Text className="text-[10px] text-emerald-600">
+                      Tiết kiệm {formatPrice(savedAmount)}
+                    </Text>
+                  ) : null}
                 </View>
               ) : null}
             </>
@@ -239,10 +291,32 @@ function PhoneProductCard({
           )}
         </View>
 
-        <Pressable onPress={openDetail} className="mt-auto items-center rounded-xl bg-teal-700 px-4 py-3">
-          <Text className="text-sm font-semibold text-white">Xem chi tiết  →</Text>
+        <View className="mt-3">
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`So sánh ${product.name}`}
+            accessibilityState={{ disabled: !isHydrated }}
+            disabled={!isHydrated}
+            onPress={handleAddToCompare}
+            className="mb-2 min-h-11 flex-row items-center justify-center gap-2 rounded-xl border border-teal-200 bg-teal-50 px-4 py-2"
+          >
+            <ProductCompareIcon size={18} />
+            <Text className="text-sm font-semibold text-teal-700">So sánh</Text>
+          </Pressable>
+        </View>
+        <Pressable
+          onPress={openDetail}
+          className="min-h-11 items-center rounded-xl bg-teal-700 px-4 py-3"
+        >
+          <Text className="text-sm font-semibold text-white">
+            Xem chi tiết →
+          </Text>
         </Pressable>
       </View>
+      <ProductCompareNotice
+        message={compareMessage}
+        onClose={() => setCompareMessage('')}
+      />
     </View>
   );
 }

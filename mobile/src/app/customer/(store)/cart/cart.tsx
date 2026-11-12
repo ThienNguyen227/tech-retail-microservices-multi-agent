@@ -1,3 +1,4 @@
+import { StoreScrollView } from '@/components/store-scroll-to-top';
 import { useCallback, useMemo, useRef, useState } from "react";
 import { useFocusEffect, useRouter, type Href } from "expo-router";
 import {
@@ -819,7 +820,7 @@ export default function CartPage() {
 
   if (error) {
     return (
-      <ScrollView
+      <StoreScrollView
         alwaysBounceVertical
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { if (!refreshing) retryCart.current(true); }} tintColor="#168b87" />}
         contentContainerStyle={{ flexGrow: 1, alignItems: "center", justifyContent: "center", padding: 24 }}
@@ -835,13 +836,13 @@ export default function CartPage() {
         >
           <Text className="font-bold text-white">Thử lại</Text>
         </Pressable>
-      </ScrollView>
+      </StoreScrollView>
     );
   }
 
   return (
     <View className="flex-1 bg-[#f8fafc]">
-      <ScrollView
+      <StoreScrollView
         alwaysBounceVertical
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { if (!busy && !refreshing) retryCart.current(true); }} tintColor="#168b87" />}
         keyboardShouldPersistTaps="handled"
@@ -1204,7 +1205,7 @@ export default function CartPage() {
             </View>
           </>
         )}
-      </ScrollView>
+      </StoreScrollView>
 
       {/* Modal thông tin nhận hàng */}
       <Modal

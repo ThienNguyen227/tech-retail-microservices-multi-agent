@@ -1,3 +1,4 @@
+import { StoreScrollView } from '@/components/store-scroll-to-top';
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -700,7 +701,7 @@ export default function WarrantyPage() {
   // ==========================================================
 
   return (
-    <ScrollView
+    <StoreScrollView
       alwaysBounceVertical
       refreshControl={
         <RefreshControl
@@ -1257,7 +1258,7 @@ export default function WarrantyPage() {
           </View>
         </Modal>
       )}
-    </ScrollView>
+    </StoreScrollView>
   );
 }
 // ============================================================

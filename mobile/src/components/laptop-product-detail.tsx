@@ -1,3 +1,4 @@
+import { StoreScrollView } from '@/components/store-scroll-to-top';
 import { useEffect, useMemo, useState } from "react";
 import { Alert, Image, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 import { router } from "expo-router";
@@ -237,7 +238,7 @@ export default function LaptopProductDetail({ product, selectedSlug, refreshing 
     }
   };
   return (
-    <ScrollView
+    <StoreScrollView
       alwaysBounceVertical
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#168b87" />}
       contentContainerClassName="px-4 pb-10 pt-4"
@@ -514,6 +515,6 @@ export default function LaptopProductDetail({ product, selectedSlug, refreshing 
           value={product.dimensionsAndBattery?.material}
         />
       </Section>
-    </ScrollView>
+    </StoreScrollView>
   );
 }

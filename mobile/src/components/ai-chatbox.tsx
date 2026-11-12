@@ -340,7 +340,7 @@ export default function AIChatbox() {
   const minimumTop = insets.top + 8;
   const maximumTop = Math.max(
     minimumTop,
-    height - insets.bottom - buttonSize,
+    height - insets.bottom - buttonSize - 64,
   );
   const [buttonPosition, setButtonPosition] = useState({
     x: Math.max(horizontalMargin, width - buttonSize - horizontalMargin),
@@ -361,7 +361,7 @@ export default function AIChatbox() {
       y: Math.min(Math.max(minimumTop, current.y), maximumTop),
       };
       positionRef.current = nextPosition;
-      return nextPosition;
+      return current.x === nextPosition.x && current.y === nextPosition.y ? current : nextPosition;
     });
   }, [height, width, insets.bottom, insets.top, maximumTop, minimumTop]);
 
@@ -495,7 +495,9 @@ export default function AIChatbox() {
           ),
         };
         positionRef.current = nextPosition;
-        setButtonPosition(nextPosition);
+        setButtonPosition((current) =>
+          current.x === nextPosition.x && current.y === nextPosition.y ? current : nextPosition,
+        );
       },
       onPanResponderRelease: () => {
         if (!hasMoved.current) {
