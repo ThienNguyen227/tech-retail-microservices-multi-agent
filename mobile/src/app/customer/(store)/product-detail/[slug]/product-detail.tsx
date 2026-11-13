@@ -1,8 +1,7 @@
 import { StoreScrollView } from '@/components/store-scroll-to-top';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, RefreshControl, Text } from 'react-native';
+import { ActivityIndicator, RefreshControl, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import PhoneProductDetail, { type PhoneDetailProduct } from '@/components/phone-product-detail';
 import LaptopProductDetail, { type LaptopDetailProduct } from '@/components/laptop-product-detail';
@@ -44,7 +43,7 @@ export default function ProductDetailPage() {
   }, [slug, refreshKey]);
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-50" edges={['bottom']}>
+    <View className="flex-1 bg-slate-50">
       {loading ? (
         <ActivityIndicator className="mt-20" color="#0d9488" />
       ) : error || !data?.product ? (
@@ -58,6 +57,6 @@ export default function ProductDetailPage() {
       ) : (
         <TabletProductDetail product={data.product as unknown as TabletDetailProduct} selectedSlug={slug} refreshing={refreshing} onRefresh={onRefresh} refreshKey={refreshKey} />
       )}
-    </SafeAreaView>
+    </View>
   );
 }

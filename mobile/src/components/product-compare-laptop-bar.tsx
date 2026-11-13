@@ -55,7 +55,7 @@ export default function ProductCompareLaptopBar() {
 
   return (
     <View
-      className="border-t border-slate-200 bg-white px-4 pb-3 pt-2"
+      className="border-t border-slate-200 bg-white px-4 pb-1 pt-1"
       onLayout={(event) => {
         const height = event.nativeEvent.layout.height;
         if (measuredHeight.current === height) return;
@@ -67,14 +67,15 @@ export default function ProductCompareLaptopBar() {
       <View className="flex-row items-center justify-between gap-2">
         <View className="flex-1 flex-row items-center gap-2">
           <ProductCompareIcon />
-          <Text className="flex-1 text-sm font-bold text-slate-800">
+          <Text className="flex-1 text-xs font-bold text-slate-800">
             So sánh {label} ({laptopCount}/{MAX_COMPARE_PRODUCTS})
           </Text>
         </View>
         <Pressable
           accessibilityRole="button"
           onPress={clearLaptops}
-          className="min-h-11 flex-row items-center gap-1 px-2"
+          hitSlop={4}
+          className="min-h-9 flex-row items-center gap-1 px-2"
         >
           <ProductCompareIcon name="trash" size={16} color="#e11d48" />
           <Text className="text-xs font-semibold text-rose-600">
@@ -86,16 +87,16 @@ export default function ProductCompareLaptopBar() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={{ flexGrow: 0, maxHeight: 130 }}
-        contentContainerStyle={{ gap: 8, paddingBottom: 8 }}
+        style={{ flexGrow: 0 }}
+        contentContainerStyle={{ gap: 6, paddingBottom: 4 }}
       >
         {laptops.map((item) => (
           <View
             key={item.productId}
-            className="w-44 rounded-xl border border-slate-200 bg-slate-50 p-2"
+            className="w-48 rounded-xl border border-slate-200 bg-slate-50 p-1.5"
           >
             <View className="flex-row items-center gap-1">
-              <View className="h-10 w-10">
+              <View className="h-8 w-8">
                 <ProductCompareImage
                   image={item.variant.image || item.image}
                   name={item.name}
@@ -112,17 +113,21 @@ export default function ProductCompareLaptopBar() {
                 accessibilityRole="button"
                 accessibilityLabel={`Xóa ${item.name} khỏi danh sách so sánh`}
                 onPress={() => removeLaptop(item.productId)}
-                className="min-h-11 w-11 items-center justify-center"
+                hitSlop={6}
+                className="h-8 w-8 items-center justify-center"
               >
                 <ProductCompareIcon name="close" size={16} color="#64748b" />
               </Pressable>
             </View>
-            <Text className="mt-1 text-[10px] text-slate-500" numberOfLines={2}>
+            <Text
+              className="mt-0.5 text-[10px] text-slate-500"
+              numberOfLines={2}
+            >
               {[item.variant.ram, item.variant.ssd, item.variant.color]
                 .filter(Boolean)
                 .join(' · ')}
             </Text>
-            <Text className="mt-1 text-xs font-bold text-teal-700">
+            <Text className="mt-0.5 text-[11px] font-bold text-teal-700">
               {item.variant.price > 0
                 ? new Intl.NumberFormat('vi-VN', {
                     style: 'currency',
@@ -134,7 +139,7 @@ export default function ProductCompareLaptopBar() {
         ))}
         {laptopCount < MAX_COMPARE_PRODUCTS ? (
           <View className="w-24 items-center justify-center rounded-xl border border-dashed border-slate-300 px-2">
-            <Text className="text-center text-xs text-slate-500">
+            <Text className="text-center text-[11px] text-slate-500">
               Chọn thêm {label} từ danh sách
             </Text>
           </View>
@@ -157,14 +162,15 @@ export default function ProductCompareLaptopBar() {
           accessibilityState={{ disabled: !canCompare }}
           disabled={!canCompare}
           onPress={handleCompare}
-          className={`min-h-11 flex-row items-center justify-center gap-2 rounded-xl px-4 ${!canCompare ? 'bg-slate-200' : 'bg-teal-700'}`}
+          hitSlop={4}
+          className={`min-h-9 flex-row items-center justify-center gap-1.5 rounded-xl px-3 ${!canCompare ? 'bg-slate-200' : 'bg-teal-700'}`}
         >
           <ProductCompareIcon
             size={16}
             color={!canCompare ? '#94a3b8' : '#fff'}
           />
           <Text
-            className={`text-sm font-semibold ${!canCompare ? 'text-slate-400' : 'text-white'}`}
+            className={`text-xs font-semibold ${!canCompare ? 'text-slate-400' : 'text-white'}`}
           >
             So sánh ngay
           </Text>

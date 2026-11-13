@@ -2,7 +2,6 @@ import { StoreFlatList } from '@/components/store-scroll-to-top';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image as RNImage, Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import ProductFilter from '@/components/product-filter';
 import ProductComparePhoneBar from '@/components/product-compare-phone-bar';
@@ -113,14 +112,14 @@ export default function ProductCategoryPage() {
   ), [kind, promotions]);
 
   return (
-    <SafeAreaView className="flex-1 bg-[#f5f8fa]" edges={['bottom']}>
+    <View className="flex-1 bg-[#f5f8fa]">
       {brands.length ? (
-        <View className="bg-[#f5f8fa] px-4 pb-1 pt-3">
+        <View className="bg-[#f5f8fa] px-4 pb-1 pt-2">
           <View
-            className="rounded-2xl border border-slate-200 bg-white p-4"
-            style={{ height: 100}}
+            className="rounded-2xl border border-slate-200 bg-white p-3"
+            style={{ height: 80}}
           >
-            <Text className="mb-3 font-bold text-slate-800">
+            <Text className="mb-2 text-xs font-bold text-slate-800">
               Lọc theo thương hiệu {categoryName}
             </Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -131,9 +130,9 @@ export default function ProductCategoryPage() {
                     ? 'border-teal-600 bg-teal-600'
                     : 'border-slate-200 bg-slate-100'
                 }`}
-                style={{ height: 36, width: 76 }}
+                style={{ height: 32, width: 68 }}
               >
-                <Text className={!selectedBrands.length ? 'font-bold text-white' : 'text-slate-600'}>
+                <Text className={!selectedBrands.length ? 'text-xs font-bold text-white' : 'text-xs text-slate-600'}>
                   Tất cả
                 </Text>
               </Pressable>
@@ -147,17 +146,17 @@ export default function ProductCategoryPage() {
                       ? 'border-teal-500 bg-teal-50'
                       : 'border-slate-200 bg-white'
                   }`}
-                  style={{ height: 36, width: 76 }}
+                  style={{ height: 32, width: 68 }}
                 >
                   {brand.image ? (
                     <RNImage
                       source={{ uri: `${FRONTEND_ASSET_URL}/brand/${brand.image}` }}
                       accessibilityLabel={brand.name}
-                      style={{ width: 56, height: 24 }}
+                      style={{ width: 48, height: 20 }}
                       resizeMode="contain"
                     />
                   ) : (
-                    <Text className="text-center text-xs text-slate-600">{brand.name}</Text>
+                    <Text className="text-center text-[11px] text-slate-600">{brand.name}</Text>
                   )}
                 </Pressable>
               ))}
@@ -216,6 +215,6 @@ export default function ProductCategoryPage() {
       />
       {kind === 'phone' ? <ProductComparePhoneBar /> : kind === 'laptop' ? <ProductCompareLaptopBar /> : <ProductCompareTabletBar />}
       <ProductFilter visible={filterVisible} brands={brands} selectedBrands={selectedBrands} selectedRam={selectedRam} selectedStorage={selectedStorage} maxPrice={maxPrice} onToggleBrand={(value) => toggle(selectedBrands, value, setSelectedBrands)} onToggleRam={(value) => toggle(selectedRam, value, setSelectedRam)} onToggleStorage={(value) => toggle(selectedStorage, value, setSelectedStorage)} onPrice={setMaxPrice} onClear={() => { setSelectedBrands([]); setSelectedRam([]); setSelectedStorage([]); setMaxPrice(PRICE_MAX); }} onClose={() => setFilterVisible(false)} onApply={applyFilter} />
-    </SafeAreaView>
+    </View>
   );
 }

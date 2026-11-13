@@ -1,5 +1,5 @@
 import { StoreScrollView } from '@/components/store-scroll-to-top';
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -10,13 +10,13 @@ import {
   Text,
   TextInput,
   View,
-} from "react-native";
-import Svg, { Path } from "react-native-svg";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { FRONTEND_ASSET_URL } from "@/constants/api";
-import { getStoredUser } from "@/lib/storage/secure_storage";
-import { useFocusEffect, useRouter } from "expo-router";
-import { customerCustomerService } from "@/lib/axios/services/customer-services/warranty_service";
+} from 'react-native';
+import Svg, { Path } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { FRONTEND_ASSET_URL } from '@/constants/api';
+import { getStoredUser } from '@/lib/storage/secure_storage';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { customerCustomerService } from '@/lib/axios/services/customer-services/warranty_service';
 
 // ============================================================
 // 1. TYPES
@@ -83,58 +83,58 @@ type WarrantyResponse = {
   data: Warranty[];
 };
 
-type FilterStatus = "ALL" | "ACTIVE" | "EXPIRED";
+type FilterStatus = 'ALL' | 'ACTIVE' | 'EXPIRED';
 
-type EffectiveStatus = "ACTIVE" | "EXPIRED" | "OTHER";
+type EffectiveStatus = 'ACTIVE' | 'EXPIRED' | 'OTHER';
 
 type RequestStatusCode =
-  "RECEIVED" | "INSPECTING" | "IN_REPAIR" | "COMPLETED" | "REJECTED" | "OTHER";
+  'RECEIVED' | 'INSPECTING' | 'IN_REPAIR' | 'COMPLETED' | 'REJECTED' | 'OTHER';
 
 // ============================================================
 // 2. FORMAT HELPERS
 // ============================================================
 
 const formatDate = (value: string | null | undefined) => {
-  if (!value) return "—";
+  if (!value) return '—';
 
   const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) return "—";
+  if (Number.isNaN(date.getTime())) return '—';
 
-  return date.toLocaleDateString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
+  return date.toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
   });
 };
 
 const formatDateTime = (value: string | null | undefined) => {
-  if (!value) return "—";
+  if (!value) return '—';
 
   const date = new Date(value);
 
-  if (Number.isNaN(date.getTime())) return "—";
+  if (Number.isNaN(date.getTime())) return '—';
 
-  return date.toLocaleString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
+  return date.toLocaleString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   });
 };
 
 const getStatusCode = (warranty: Warranty) =>
-  (warranty.status?.warranty_status_code ?? "").toUpperCase();
+  (warranty.status?.warranty_status_code ?? '').toUpperCase();
 
 const getStatusLabel = (warranty: Warranty) =>
-  warranty.status?.warranty_status_name || "Chưa xác định";
+  warranty.status?.warranty_status_name || 'Chưa xác định';
 
 function getEffectiveStatus(warranty: Warranty): EffectiveStatus {
   const code = getStatusCode(warranty);
 
-  if (code.includes("EXPIRED") || code.includes("HET_HAN")) {
-    return "EXPIRED";
+  if (code.includes('EXPIRED') || code.includes('HET_HAN')) {
+    return 'EXPIRED';
   }
 
   const endDate = new Date(warranty.warranty_end_date);
@@ -142,22 +142,22 @@ function getEffectiveStatus(warranty: Warranty): EffectiveStatus {
   if (!Number.isNaN(endDate.getTime())) {
     endDate.setHours(23, 59, 59, 999);
 
-    if (code === "ACTIVE" && endDate < new Date()) {
-      return "EXPIRED";
+    if (code === 'ACTIVE' && endDate < new Date()) {
+      return 'EXPIRED';
     }
   }
 
-  if (code === "ACTIVE" || code.includes("VALID")) {
-    return "ACTIVE";
+  if (code === 'ACTIVE' || code.includes('VALID')) {
+    return 'ACTIVE';
   }
 
-  return "OTHER";
+  return 'OTHER';
 }
 
 function getProductImage(image: string | null) {
-  if (!image) return "";
+  if (!image) return '';
 
-  if (/^https?:\/\//i.test(image) || image.startsWith("/")) {
+  if (/^https?:\/\//i.test(image) || image.startsWith('/')) {
     return /^https?:\/\//i.test(image)
       ? image
       : `${FRONTEND_ASSET_URL}${image}`;
@@ -174,9 +174,9 @@ function StatusBadge({ warranty }: { warranty: Warranty }) {
   const status = getEffectiveStatus(warranty);
 
   const styles: Record<EffectiveStatus, string> = {
-    ACTIVE: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-    EXPIRED: "bg-rose-50 text-rose-700 ring-rose-200",
-    OTHER: "bg-slate-100 text-slate-600 ring-slate-200",
+    ACTIVE: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+    EXPIRED: 'bg-rose-50 text-rose-700 ring-rose-200',
+    OTHER: 'bg-slate-100 text-slate-600 ring-slate-200',
   };
 
   const icons: Record<EffectiveStatus, typeof CheckCircle2> = {
@@ -188,19 +188,19 @@ function StatusBadge({ warranty }: { warranty: Warranty }) {
   const Icon = icons[status];
 
   const label =
-    status === "EXPIRED"
-      ? "Hết hạn"
-      : status === "ACTIVE"
-        ? "Còn hiệu lực"
+    status === 'EXPIRED'
+      ? 'Hết hạn'
+      : status === 'ACTIVE'
+        ? 'Còn hiệu lực'
         : getStatusLabel(warranty);
 
   return (
     <View
       className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${styles[status]}`}
       style={{
-        flexDirection: "row",
-        alignItems: "center",
-        alignSelf: "flex-start",
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
       }}
     >
       <Icon size={13} className={styles[status]} />
@@ -226,14 +226,14 @@ function getRequestStatusCode(request: WarrantyRequest): RequestStatusCode {
   const code = request.status?.warranty_request_status_code?.toUpperCase();
 
   switch (code) {
-    case "RECEIVED":
-    case "INSPECTING":
-    case "IN_REPAIR":
-    case "COMPLETED":
-    case "REJECTED":
+    case 'RECEIVED':
+    case 'INSPECTING':
+    case 'IN_REPAIR':
+    case 'COMPLETED':
+    case 'REJECTED':
       return code;
     default:
-      return "OTHER";
+      return 'OTHER';
   }
 }
 
@@ -249,33 +249,33 @@ function RequestStatusBadge({ request }: { request: WarrantyRequest }) {
     }
   > = {
     RECEIVED: {
-      label: "Đã tiếp nhận",
-      className: "bg-blue-50 text-blue-700 ring-blue-200",
+      label: 'Đã tiếp nhận',
+      className: 'bg-blue-50 text-blue-700 ring-blue-200',
       icon: ClipboardList,
     },
     INSPECTING: {
-      label: "Đang kiểm tra",
-      className: "bg-amber-50 text-amber-700 ring-amber-200",
+      label: 'Đang kiểm tra',
+      className: 'bg-amber-50 text-amber-700 ring-amber-200',
       icon: Search,
     },
     IN_REPAIR: {
-      label: "Đang sửa chữa",
-      className: "bg-violet-50 text-violet-700 ring-violet-200",
+      label: 'Đang sửa chữa',
+      className: 'bg-violet-50 text-violet-700 ring-violet-200',
       icon: Wrench,
     },
     COMPLETED: {
-      label: "Hoàn thành",
-      className: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+      label: 'Hoàn thành',
+      className: 'bg-emerald-50 text-emerald-700 ring-emerald-200',
       icon: CheckCircle2,
     },
     REJECTED: {
-      label: "Từ chối",
-      className: "bg-rose-50 text-rose-700 ring-rose-200",
+      label: 'Từ chối',
+      className: 'bg-rose-50 text-rose-700 ring-rose-200',
       icon: XCircle,
     },
     OTHER: {
-      label: request.status?.warranty_request_status_name || "Chưa xác định",
-      className: "bg-slate-100 text-slate-600 ring-slate-200",
+      label: request.status?.warranty_request_status_name || 'Chưa xác định',
+      className: 'bg-slate-100 text-slate-600 ring-slate-200',
       icon: AlertCircle,
     },
   };
@@ -288,9 +288,9 @@ function RequestStatusBadge({ request }: { request: WarrantyRequest }) {
     <View
       className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset ${item.className}`}
       style={{
-        flexDirection: "row",
-        alignItems: "center",
-        alignSelf: "flex-start",
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
       }}
     >
       <Icon size={13} />
@@ -315,15 +315,15 @@ function RequestStatusBadge({ request }: { request: WarrantyRequest }) {
 function RequestTypeBadge({ request }: { request: WarrantyRequest }) {
   const code = request.type?.warranty_request_type_code?.toUpperCase();
 
-  const isRepair = code === "REPAIR";
+  const isRepair = code === 'REPAIR';
 
   return (
     <View
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${isRepair ? "bg-violet-50 text-violet-700" : "bg-teal-50 text-teal-700"}`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${isRepair ? 'bg-violet-50 text-violet-700' : 'bg-teal-50 text-teal-700'}`}
       style={{
-        flexDirection: "row",
-        alignItems: "center",
-        alignSelf: "flex-start",
+        flexDirection: 'row',
+        alignItems: 'center',
+        alignSelf: 'flex-start',
       }}
     >
       {isRepair ? <Wrench size={13} /> : <ShieldCheck size={13} />}
@@ -331,12 +331,12 @@ function RequestTypeBadge({ request }: { request: WarrantyRequest }) {
         className="text-xs font-semibold"
         style={{
           color: getIconColor(
-            `inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${isRepair ? "bg-violet-50 text-violet-700" : "bg-teal-50 text-teal-700"}`,
+            `inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold ${isRepair ? 'bg-violet-50 text-violet-700' : 'bg-teal-50 text-teal-700'}`,
           ),
         }}
       >
         {request.type?.warranty_request_type_name ||
-          (isRepair ? "Sửa chữa sản phẩm" : "Bảo hành sản phẩm")}
+          (isRepair ? 'Sửa chữa sản phẩm' : 'Bảo hành sản phẩm')}
       </Text>
     </View>
   );
@@ -484,7 +484,7 @@ function WarrantyRequestHistory({ requests }: { requests: WarrantyRequest[] }) {
                     </Text>
 
                     <Text className="mt-1 text-sm leading-6 text-slate-700">
-                      {request.warranty_request_description || "Không có mô tả"}
+                      {request.warranty_request_description || 'Không có mô tả'}
                     </Text>
                   </View>
 
@@ -522,7 +522,7 @@ function WarrantyRequestHistory({ requests }: { requests: WarrantyRequest[] }) {
 
                   <View className="mt-3 border-t border-slate-100 pt-2">
                     <Text className="text-xs text-slate-400">
-                      Ngày tạo yêu cầu:{" "}
+                      Ngày tạo yêu cầu:{' '}
                       {formatDateTime(request.warranty_request_created_at)}
                     </Text>
                   </View>
@@ -550,15 +550,16 @@ export default function WarrantyPage() {
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
 
-  const [keyword, setKeyword] = useState("");
-  const [debouncedKeyword, setDebouncedKeyword] = useState("");
-  const [filterStatus, setFilterStatus] = useState<FilterStatus>("ALL");
+  const [keyword, setKeyword] = useState('');
+  const [debouncedKeyword, setDebouncedKeyword] = useState('');
+  const [filterStatus, setFilterStatus] = useState<FilterStatus>('ALL');
   const [filterOpen, setFilterOpen] = useState(false);
 
-  const [selectedWarranty, setSelectedWarranty] =
-    useState<Warranty | null>(null);
+  const [selectedWarranty, setSelectedWarranty] = useState<Warranty | null>(
+    null,
+  );
 
   // ==========================================================
   // 8.2. DEBOUNCE SEARCH
@@ -584,7 +585,7 @@ export default function WarrantyPage() {
         setLoading(true);
       }
 
-      setError("");
+      setError('');
 
       const currentRequest = ++requestId.current;
 
@@ -593,7 +594,7 @@ export default function WarrantyPage() {
         const { userId } = await getStoredUser();
 
         if (!userId) {
-          router.replace("/customer/login");
+          router.replace('/customer/login');
 
           return;
         }
@@ -601,19 +602,19 @@ export default function WarrantyPage() {
         const response: WarrantyResponse =
           await customerCustomerService.getWarranty(
             debouncedKeyword || undefined,
-            filterStatus === "ALL" ? undefined : filterStatus,
+            filterStatus === 'ALL' ? undefined : filterStatus,
           );
 
         if (currentRequest !== requestId.current) return;
 
         if (!response || !Array.isArray(response.data)) {
-          throw new Error("Dữ liệu bảo hành trả về không hợp lệ.");
+          throw new Error('Dữ liệu bảo hành trả về không hợp lệ.');
         }
 
         setWarranties(response.data);
 
         setTotal(
-          typeof response.total === "number"
+          typeof response.total === 'number'
             ? response.total
             : response.data.length,
         );
@@ -643,7 +644,7 @@ export default function WarrantyPage() {
         setError(
           axiosError.response?.data?.message ||
             axiosError.message ||
-            "Không thể tải danh sách bảo hành. Vui lòng thử lại.",
+            'Không thể tải danh sách bảo hành. Vui lòng thử lại.',
         );
       } finally {
         if (currentRequest === requestId.current) {
@@ -672,10 +673,10 @@ export default function WarrantyPage() {
 
   const stats = useMemo(() => {
     return {
-      active: warranties.filter((item) => getEffectiveStatus(item) === "ACTIVE")
+      active: warranties.filter((item) => getEffectiveStatus(item) === 'ACTIVE')
         .length,
       expired: warranties.filter(
-        (item) => getEffectiveStatus(item) === "EXPIRED",
+        (item) => getEffectiveStatus(item) === 'EXPIRED',
       ).length,
     };
   }, [warranties]);
@@ -685,16 +686,16 @@ export default function WarrantyPage() {
   // ==========================================================
 
   const clearFilters = () => {
-    setKeyword("");
+    setKeyword('');
 
-    setDebouncedKeyword("");
+    setDebouncedKeyword('');
 
-    setFilterStatus("ALL");
+    setFilterStatus('ALL');
 
     setFilterOpen(false);
   };
 
-  const hasFilters = Boolean(keyword.trim()) || filterStatus !== "ALL";
+  const hasFilters = Boolean(keyword.trim()) || filterStatus !== 'ALL';
 
   // ==========================================================
   // 9. RENDER
@@ -768,7 +769,7 @@ export default function WarrantyPage() {
 
                 <Text className="mt-1 text-sm text-slate-500">
                   {loading
-                    ? "Đang tải dữ liệu..."
+                    ? 'Đang tải dữ liệu...'
                     : `Hiển thị ${warranties.length} / ${total} sản phẩm`}
                 </Text>
               </View>
@@ -792,22 +793,22 @@ export default function WarrantyPage() {
                     accessibilityState={{ expanded: filterOpen }}
                     onPress={() => setFilterOpen((open) => !open)}
                     style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "space-between",
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
                     }}
                     className="min-h-12 rounded-xl border border-slate-200 bg-white px-4 py-3"
                   >
                     <Text className="flex-1 text-sm text-slate-700">
-                      {filterStatus === "ALL"
-                        ? "Tất cả trạng thái"
-                        : filterStatus === "ACTIVE"
-                          ? "Còn hiệu lực"
-                          : "Đã hết hạn"}
+                      {filterStatus === 'ALL'
+                        ? 'Tất cả trạng thái'
+                        : filterStatus === 'ACTIVE'
+                          ? 'Còn hiệu lực'
+                          : 'Đã hết hạn'}
                     </Text>
                     <View
                       style={{
-                        transform: [{ rotate: filterOpen ? "180deg" : "0deg" }],
+                        transform: [{ rotate: filterOpen ? '180deg' : '0deg' }],
                       }}
                     >
                       <NativeIcon path="m6 9 6 6 6-6" size={18} />
@@ -815,7 +816,7 @@ export default function WarrantyPage() {
                   </Pressable>
                   {filterOpen && (
                     <View className="rounded-xl border border-slate-200 bg-white p-1">
-                      {(["ALL", "ACTIVE", "EXPIRED"] as const).map((status) => (
+                      {(['ALL', 'ACTIVE', 'EXPIRED'] as const).map((status) => (
                         <Pressable
                           key={status}
                           accessibilityRole="radio"
@@ -827,16 +828,16 @@ export default function WarrantyPage() {
 
                             setFilterOpen(false);
                           }}
-                          className={`min-h-12 rounded-lg px-3 py-4 ${filterStatus === status ? "bg-teal-50" : "bg-white"}`}
+                          className={`min-h-12 rounded-lg px-3 py-4 ${filterStatus === status ? 'bg-teal-50' : 'bg-white'}`}
                         >
                           <Text
-                            className={`text-sm ${filterStatus === status ? "font-semibold text-teal-700" : "text-slate-700"}`}
+                            className={`text-sm ${filterStatus === status ? 'font-semibold text-teal-700' : 'text-slate-700'}`}
                           >
-                            {status === "ALL"
-                              ? "Tất cả trạng thái"
-                              : status === "ACTIVE"
-                                ? "Còn hiệu lực"
-                                : "Đã hết hạn"}
+                            {status === 'ALL'
+                              ? 'Tất cả trạng thái'
+                              : status === 'ACTIVE'
+                                ? 'Còn hiệu lực'
+                                : 'Đã hết hạn'}
                           </Text>
                         </Pressable>
                       ))}
@@ -875,8 +876,8 @@ export default function WarrantyPage() {
                   </Text>
 
                   <Text className="mt-1 text-sm text-rose-700">
-                    {error === "Network Error"
-                      ? "Không thể kết nối đến máy chủ. Vui lòng thử lại sau."
+                    {error === 'Network Error'
+                      ? 'Không thể kết nối đến máy chủ. Vui lòng thử lại sau.'
                       : error}
                   </Text>
                 </View>
@@ -911,14 +912,14 @@ export default function WarrantyPage() {
 
               <Text className="text-base font-bold text-slate-800">
                 {hasFilters
-                  ? "Không tìm thấy kết quả"
-                  : "Bạn chưa có sản phẩm bảo hành"}
+                  ? 'Không tìm thấy kết quả'
+                  : 'Bạn chưa có sản phẩm bảo hành'}
               </Text>
 
               <Text className="mt-2 max-w-md text-sm leading-6 text-slate-500">
                 {hasFilters
-                  ? "Hãy thử từ khóa khác hoặc thay đổi bộ lọc trạng thái."
-                  : "Thông tin bảo hành sẽ xuất hiện tại đây khi đơn hàng của bạn đủ điều kiện đăng ký bảo hành."}
+                  ? 'Hãy thử từ khóa khác hoặc thay đổi bộ lọc trạng thái.'
+                  : 'Thông tin bảo hành sẽ xuất hiện tại đây khi đơn hàng của bạn đủ điều kiện đăng ký bảo hành.'}
               </Text>
 
               {hasFilters && (
@@ -951,7 +952,7 @@ export default function WarrantyPage() {
                               warranty.warranty_product_image,
                             )}
                             accessibilityLabel={
-                              warranty.warranty_product_name || "Sản phẩm"
+                              warranty.warranty_product_name || 'Sản phẩm'
                             }
                             className="h-full w-full object-contain"
                           />
@@ -963,7 +964,7 @@ export default function WarrantyPage() {
                       <View className="min-w-0 flex-1">
                         <Text className="line-clamp-2 text-sm font-bold text-slate-800">
                           {warranty.warranty_product_name ||
-                            "Sản phẩm công nghệ"}
+                            'Sản phẩm công nghệ'}
                         </Text>
 
                         <Text className="mt-1 text-xs text-slate-500">
@@ -1046,213 +1047,221 @@ export default function WarrantyPage() {
           transparent
           animationType="slide"
           onRequestClose={() => setSelectedWarranty(null)}
+          statusBarTranslucent
+          navigationBarTranslucent
         >
-          <View
-            style={{
-              paddingTop: insets.top + 16,
-            }}
-            className="flex-1 justify-end bg-slate-950/50"
-          >
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Đóng chi tiết"
-              className="flex-1"
-              onPress={() => setSelectedWarranty(null)}
-            />
+          <View className="flex-1 bg-slate-950/50">
             <View
-              accessibilityViewIsModal
-              style={{ paddingBottom: Math.max(insets.bottom, 16) }}
-              className="max-h-[95%] rounded-t-3xl bg-white"
+              style={{
+                paddingTop: insets.top + 16,
+              }}
+              className="flex-1 justify-end"
             >
-              {/* MODAL HEADER */}
-              <View className="flex-row items-center justify-between gap-3 rounded-t-3xl border-b border-slate-100 bg-teal-50 px-5 py-3">
-                <View className="min-w-0 flex-1">
-                  <Text
-                    id="warranty-modal-title"
-                    className="text-lg font-bold text-slate-900"
-                  >
-                    Chi tiết bảo hành
-                  </Text>
-
-                  <Text className="mt-1 text-xs text-slate-500">
-                    Mã: {selectedWarranty.warranty_code}
-                  </Text>
-                </View>
-
-                <Pressable
-                  onPress={() => setSelectedWarranty(null)}
-                  accessibilityLabel="Đóng chi tiết"
-                  className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 flex-row"
-                  accessibilityRole="button"
-                >
-                  <X size={20} />
-                </Pressable>
-              </View>
-
-              {/* MODAL BODY */}
-              <ScrollView contentContainerClassName="gap-5 p-5">
-                {/* PRODUCT SUMMARY */}
-                <View className="flex flex-col gap-4 rounded-2xl border border-teal-100 bg-teal-50/60 p-4">
-                  <View className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white flex-row">
-                    {selectedWarranty.warranty_product_image ? (
-                      <ProductImage
-                        uri={getProductImage(
-                          selectedWarranty.warranty_product_image,
-                        )}
-                        accessibilityLabel={
-                          selectedWarranty.warranty_product_name || "Sản phẩm"
-                        }
-                        className="h-full w-full object-contain"
-                      />
-                    ) : (
-                      <Package size={34} className="text-slate-400" />
-                    )}
-                  </View>
-
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Đóng chi tiết"
+                className="flex-1"
+                onPress={() => setSelectedWarranty(null)}
+              />
+              <View
+                accessibilityViewIsModal
+                style={{ paddingBottom: Math.max(insets.bottom, 16) }}
+                className="max-h-[95%] rounded-t-3xl bg-white"
+              >
+                {/* MODAL HEADER */}
+                <View className="flex-row items-center justify-between gap-3 rounded-t-3xl border-b border-slate-100 bg-teal-50 px-5 py-3">
                   <View className="min-w-0 flex-1">
-                    <Text className="text-lg font-bold text-slate-900">
-                      {selectedWarranty.warranty_product_name ||
-                        "Sản phẩm công nghệ"}
+                    <Text
+                      id="warranty-modal-title"
+                      className="text-lg font-bold text-slate-900"
+                    >
+                      Chi tiết bảo hành
                     </Text>
 
-                    <Text className="mt-1 text-sm text-slate-500">
-                      SKU: {selectedWarranty.warranty_sku}
+                    <Text className="mt-1 text-xs text-slate-500">
+                      Mã: {selectedWarranty.warranty_code}
                     </Text>
-
-                    <View className="mt-3">
-                      <StatusBadge warranty={selectedWarranty} />
-                    </View>
                   </View>
-                </View>
 
-                {/* WARRANTY INFORMATION */}
-                <View>
-                  <View
-                    className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-800 flex-row"
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      alignSelf: "flex-start",
-                    }}
+                  <Pressable
+                    onPress={() => setSelectedWarranty(null)}
+                    accessibilityLabel="Đóng chi tiết"
+                    className="flex h-9 w-9 items-center justify-center rounded-xl text-slate-500 flex-row"
+                    accessibilityRole="button"
                   >
-                    <ShieldCheck size={17} className="text-teal-600" />
-                    <Text className="flex-1 text-sm font-bold text-slate-800">
-                      Thông tin bảo hành
-                    </Text>
-                  </View>
-
-                  <View className="gap-3 flex-col">
-                    <DetailItem
-                      icon={<ShieldCheck size={17} />}
-                      label="Mã bảo hành"
-                      value={selectedWarranty.warranty_code}
-                    />
-
-                    <DetailItem
-                      icon={<Hash size={17} />}
-                      label="ID bảo hành"
-                      value={String(selectedWarranty.warranty_id)}
-                    />
-
-                    <DetailItem
-                      icon={<CalendarDays size={17} />}
-                      label="Ngày bắt đầu"
-                      value={formatDate(selectedWarranty.warranty_start_date)}
-                    />
-
-                    <DetailItem
-                      icon={<CalendarDays size={17} />}
-                      label="Ngày kết thúc"
-                      value={formatDate(selectedWarranty.warranty_end_date)}
-                    />
-
-                    <DetailItem
-                      icon={<Clock size={17} />}
-                      label="Thời hạn"
-                      value={`${selectedWarranty.warranty_duration_months} tháng`}
-                    />
-
-                    <DetailItem
-                      icon={<ShoppingBag size={17} />}
-                      label="Mã đơn hàng"
-                      value={selectedWarranty.order_code}
-                    />
-
-                    <DetailItem
-                      icon={<Package size={17} />}
-                      label="Mã SKU"
-                      value={selectedWarranty.warranty_sku}
-                    />
-
-                    <DetailItem
-                      icon={<Hash size={17} />}
-                      label="Số serial"
-                      value={
-                        selectedWarranty.warranty_serial_number ||
-                        "Chưa cập nhật"
-                      }
-                    />
-                  </View>
+                    <X size={20} />
+                  </Pressable>
                 </View>
 
-                {/* SYSTEM INFORMATION */}
-                <View className="rounded-xl border border-slate-200 p-4">
-                  <View
-                    className="flex items-center gap-2 text-sm font-bold text-slate-800 flex-row"
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      alignSelf: "flex-start",
-                    }}
+                {/* MODAL BODY */}
+                <ScrollView contentContainerClassName="gap-5 p-5">
+                  {/* PRODUCT SUMMARY */}
+                  <View className="flex flex-col gap-4 rounded-2xl border border-teal-100 bg-teal-50/60 p-4">
+                    <View className="flex h-24 w-24 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white flex-row">
+                      {selectedWarranty.warranty_product_image ? (
+                        <ProductImage
+                          uri={getProductImage(
+                            selectedWarranty.warranty_product_image,
+                          )}
+                          accessibilityLabel={
+                            selectedWarranty.warranty_product_name || 'Sản phẩm'
+                          }
+                          className="h-full w-full object-contain"
+                        />
+                      ) : (
+                        <Package size={34} className="text-slate-400" />
+                      )}
+                    </View>
+
+                    <View className="min-w-0 flex-1">
+                      <Text className="text-lg font-bold text-slate-900">
+                        {selectedWarranty.warranty_product_name ||
+                          'Sản phẩm công nghệ'}
+                      </Text>
+
+                      <Text className="mt-1 text-sm text-slate-500">
+                        SKU: {selectedWarranty.warranty_sku}
+                      </Text>
+
+                      <View className="mt-3">
+                        <StatusBadge warranty={selectedWarranty} />
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* WARRANTY INFORMATION */}
+                  <View>
+                    <View
+                      className="mb-3 flex items-center gap-2 text-sm font-bold text-slate-800 flex-row"
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        alignSelf: 'flex-start',
+                      }}
+                    >
+                      <ShieldCheck size={17} className="text-teal-600" />
+                      <Text className="flex-1 text-sm font-bold text-slate-800">
+                        Thông tin bảo hành
+                      </Text>
+                    </View>
+
+                    <View className="gap-3 flex-col">
+                      <DetailItem
+                        icon={<ShieldCheck size={17} />}
+                        label="Mã bảo hành"
+                        value={selectedWarranty.warranty_code}
+                      />
+
+                      <DetailItem
+                        icon={<Hash size={17} />}
+                        label="ID bảo hành"
+                        value={String(selectedWarranty.warranty_id)}
+                      />
+
+                      <DetailItem
+                        icon={<CalendarDays size={17} />}
+                        label="Ngày bắt đầu"
+                        value={formatDate(selectedWarranty.warranty_start_date)}
+                      />
+
+                      <DetailItem
+                        icon={<CalendarDays size={17} />}
+                        label="Ngày kết thúc"
+                        value={formatDate(selectedWarranty.warranty_end_date)}
+                      />
+
+                      <DetailItem
+                        icon={<Clock size={17} />}
+                        label="Thời hạn"
+                        value={`${selectedWarranty.warranty_duration_months} tháng`}
+                      />
+
+                      <DetailItem
+                        icon={<ShoppingBag size={17} />}
+                        label="Mã đơn hàng"
+                        value={selectedWarranty.order_code}
+                      />
+
+                      <DetailItem
+                        icon={<Package size={17} />}
+                        label="Mã SKU"
+                        value={selectedWarranty.warranty_sku}
+                      />
+
+                      <DetailItem
+                        icon={<Hash size={17} />}
+                        label="Số serial"
+                        value={
+                          selectedWarranty.warranty_serial_number ||
+                          'Chưa cập nhật'
+                        }
+                      />
+                    </View>
+                  </View>
+
+                  {/* SYSTEM INFORMATION */}
+                  <View className="rounded-xl border border-slate-200 p-4">
+                    <View
+                      className="flex items-center gap-2 text-sm font-bold text-slate-800 flex-row"
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        alignSelf: 'flex-start',
+                      }}
+                    >
+                      <Clock size={17} className="text-teal-600" />
+                      <Text className="flex-1 text-sm font-bold text-slate-800">
+                        Thông tin hệ thống
+                      </Text>
+                    </View>
+
+                    <View className="mt-3 gap-3 text-sm">
+                      <View className="flex items-start justify-between gap-4 flex-row">
+                        <Text className="text-slate-500">Trạng thái gốc</Text>
+
+                        <Text className="text-right font-medium text-slate-700">
+                          {getStatusLabel(selectedWarranty)}
+                        </Text>
+                      </View>
+
+                      <View className="flex items-start justify-between gap-4 flex-row">
+                        <Text className="text-slate-500">Ngày tạo</Text>
+
+                        <Text className="text-right font-medium text-slate-700">
+                          {formatDate(selectedWarranty.warranty_created_at)}
+                        </Text>
+                      </View>
+
+                      <View className="flex items-start justify-between gap-4 flex-row">
+                        <Text className="text-slate-500">
+                          Cập nhật lần cuối
+                        </Text>
+
+                        <Text className="text-right font-medium text-slate-700">
+                          {formatDate(selectedWarranty.warranty_updated_at)}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* WARRANTY REQUEST HISTORY */}
+                  <WarrantyRequestHistory
+                    requests={selectedWarranty.requests ?? []}
+                  />
+                </ScrollView>
+
+                {/* MODAL FOOTER */}
+                <View className="border-t border-slate-100 bg-white px-5 pt-3">
+                  <Pressable
+                    onPress={() => setSelectedWarranty(null)}
+                    className="min-h-12 w-full items-center justify-center rounded-xl bg-teal-700 p-3"
+                    accessibilityRole="button"
                   >
-                    <Clock size={17} className="text-teal-600" />
-                    <Text className="flex-1 text-sm font-bold text-slate-800">
-                      Thông tin hệ thống
+                    <Text className="text-sm font-semibold text-white">
+                      Đóng
                     </Text>
-                  </View>
-
-                  <View className="mt-3 gap-3 text-sm">
-                    <View className="flex items-start justify-between gap-4 flex-row">
-                      <Text className="text-slate-500">Trạng thái gốc</Text>
-
-                      <Text className="text-right font-medium text-slate-700">
-                        {getStatusLabel(selectedWarranty)}
-                      </Text>
-                    </View>
-
-                    <View className="flex items-start justify-between gap-4 flex-row">
-                      <Text className="text-slate-500">Ngày tạo</Text>
-
-                      <Text className="text-right font-medium text-slate-700">
-                        {formatDate(selectedWarranty.warranty_created_at)}
-                      </Text>
-                    </View>
-
-                    <View className="flex items-start justify-between gap-4 flex-row">
-                      <Text className="text-slate-500">Cập nhật lần cuối</Text>
-
-                      <Text className="text-right font-medium text-slate-700">
-                        {formatDate(selectedWarranty.warranty_updated_at)}
-                      </Text>
-                    </View>
-                  </View>
+                  </Pressable>
                 </View>
-
-                {/* WARRANTY REQUEST HISTORY */}
-                <WarrantyRequestHistory
-                  requests={selectedWarranty.requests ?? []}
-                />
-              </ScrollView>
-
-              {/* MODAL FOOTER */}
-              <View className="border-t border-slate-100 bg-white px-5 pt-3">
-                <Pressable
-                  onPress={() => setSelectedWarranty(null)}
-                  className="min-h-12 w-full items-center justify-center rounded-xl bg-teal-700 p-3"
-                  accessibilityRole="button"
-                >
-                  <Text className="text-sm font-semibold text-white">Đóng</Text>
-                </Pressable>
               </View>
             </View>
           </View>
@@ -1282,8 +1291,8 @@ function NativeIcon({
       style={{
         width: size,
         height: size,
-        alignItems: "center",
-        justifyContent: "center",
+        alignItems: 'center',
+        justifyContent: 'center',
         flexShrink: 0,
       }}
     >
@@ -1426,7 +1435,7 @@ function ProductImage({
   return attempt >= candidates.length ? (
     <View
       className={className}
-      style={{ alignItems: "center", justifyContent: "center" }}
+      style={{ alignItems: 'center', justifyContent: 'center' }}
     >
       <Package size={24} className="text-slate-400" />
     </View>
@@ -1441,33 +1450,33 @@ function ProductImage({
   );
 }
 
-function getIconColor(className = "") {
+function getIconColor(className = '') {
   const colors: Record<string, string> = {
-    "rose-700": "#be123c",
-    "rose-600": "#e11d48",
-    "emerald-700": "#047857",
-    "blue-700": "#1d4ed8",
-    "amber-700": "#b45309",
-    "violet-700": "#6d28d9",
-    "slate-400": "#94a3b8",
-    "slate-600": "#475569",
+    'rose-700': '#be123c',
+    'rose-600': '#e11d48',
+    'emerald-700': '#047857',
+    'blue-700': '#1d4ed8',
+    'amber-700': '#b45309',
+    'violet-700': '#6d28d9',
+    'slate-400': '#94a3b8',
+    'slate-600': '#475569',
   };
 
   const token = className.match(/text-([a-z]+-\d+)/)?.[1];
 
-  return token ? (colors[token] ?? "#168b87") : "#168b87";
+  return token ? (colors[token] ?? '#168b87') : '#168b87';
 }
 
 function getProductImageCandidates(uri: string) {
-  const prefix = FRONTEND_ASSET_URL + "/product/";
+  const prefix = FRONTEND_ASSET_URL + '/product/';
 
-  const filename = uri.startsWith(prefix) ? uri.slice(prefix.length) : "";
+  const filename = uri.startsWith(prefix) ? uri.slice(prefix.length) : '';
 
-  return filename && !filename.includes("/")
+  return filename && !filename.includes('/')
     ? [
         uri,
-        ...["phone", "laptop", "tablet"].map(
-          (kind) => prefix + kind + "/" + filename,
+        ...['phone', 'laptop', 'tablet'].map(
+          (kind) => prefix + kind + '/' + filename,
         ),
       ]
     : [uri];

@@ -1,6 +1,15 @@
 import { StoreScrollView } from '@/components/store-scroll-to-top';
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Image, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
+import {
+  Alert,
+  Image,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  Text,
+  View,
+  DeviceEventEmitter,
+} from "react-native";
 import { router } from "expo-router";
 
 import { FRONTEND_ASSET_URL } from "@/constants/api";
@@ -217,6 +226,7 @@ export default function PhoneProductDetail({ product, selectedSlug, refreshing =
           price: selected.price,
         },
       });
+      DeviceEventEmitter.emit('cart-updated');
       Alert.alert("Thành công", "Đã thêm sản phẩm vào giỏ hàng.");
     } catch (error) {
       Alert.alert(

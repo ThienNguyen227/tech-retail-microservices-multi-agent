@@ -12,7 +12,7 @@ type Controls = {
 };
 const Context = createContext<Controls | null>(null);
 
-export function StoreScrollToTopProvider({ children }: { children: ReactNode }) {
+export function StoreScrollToTopProvider({ children, bottomOffset = 0 }: { children: ReactNode; bottomOffset?: number }) {
   const active = useRef<Target | null>(null);
   const [visible, setVisible] = useState(false);
   const [footerHeight, setFooterHeight] = useState(0);
@@ -40,7 +40,7 @@ export function StoreScrollToTopProvider({ children }: { children: ReactNode }) 
 
   return <Context.Provider value={controls}>
     {children}
-    {visible ? <View pointerEvents="box-none" style={{ position: 'absolute', right: 22, bottom: insets.bottom + (footerHeight > 0 ? footerHeight + 12 : 16), zIndex: 49 }}>
+    {visible ? <View pointerEvents="box-none" style={{ position: 'absolute', right: 22, bottom: Math.max(insets.bottom, bottomOffset) + (footerHeight > 0 ? footerHeight + 12 : 16), zIndex: 49 }}>
       <Pressable accessibilityRole="button" accessibilityLabel="Lên đầu trang" onPress={scrollToTop}
         className="h-11 w-11 items-center justify-center rounded-full border border-teal-100 bg-teal-700 active:bg-teal-800"
         style={{ elevation: 5, shadowColor: '#0f172a', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.16, shadowRadius: 6 }}>

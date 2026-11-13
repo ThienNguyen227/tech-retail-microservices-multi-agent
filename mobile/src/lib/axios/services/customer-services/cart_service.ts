@@ -16,7 +16,7 @@ export type AddCartItemPayload = {
 
 export type UpdateCartQuantityPayload = {
   sku: string;
-  action: "increase" | "decrease";
+  action: 'increase' | 'decrease';
 };
 
 export const customerCartService = {
@@ -28,7 +28,10 @@ export const customerCartService = {
 
   // 2. (POST) ADD ITEM
   async addItem(payload: AddCartItemPayload) {
-    const response = await customerAxios.post(`${CUSTOMER_URLS.cart}/item`, payload);
+    const response = await customerAxios.post(
+      `${CUSTOMER_URLS.cart}/item`,
+      payload,
+    );
     return response.data;
   },
 
@@ -51,7 +54,9 @@ export const customerCartService = {
 
   // 5. (DELETE) CLEAR CART
   async clearCart() {
-    const response = await customerAxios.delete(`${CUSTOMER_URLS.cart}/all-items`);
+    const response = await customerAxios.delete(
+      `${CUSTOMER_URLS.cart}/all-items`,
+    );
     return response.data;
   },
 };

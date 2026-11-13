@@ -298,7 +298,7 @@ function TypingIndicator() {
   );
 }
 
-export default function AIChatbox() {
+export default function AIChatbox({ bottomOffset = 0 }: { bottomOffset?: number }) {
   const { height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [visible, setVisible] = useState(false);
@@ -340,7 +340,7 @@ export default function AIChatbox() {
   const minimumTop = insets.top + 8;
   const maximumTop = Math.max(
     minimumTop,
-    height - insets.bottom - buttonSize - 64,
+    height - Math.max(insets.bottom, bottomOffset) - buttonSize - 64,
   );
   const [buttonPosition, setButtonPosition] = useState({
     x: Math.max(horizontalMargin, width - buttonSize - horizontalMargin),

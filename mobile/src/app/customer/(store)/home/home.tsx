@@ -2,7 +2,6 @@ import { StoreScrollView } from '@/components/store-scroll-to-top';
 import { useState } from 'react';
 import { getStoredUser } from '@/lib/storage/secure_storage';
 import { Alert, RefreshControl, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 const categories = [
   { title: 'Điện thoại', subtitle: 'Mẫu mới mỗi ngày', color: '#dff5f1' },
@@ -20,7 +19,7 @@ export default function Home() {
     finally { setRefreshing(false); }
   };
   return (
-    <SafeAreaView className="flex-1 bg-[#f3f8f8]" edges={['bottom']}>
+    <View className="flex-1 bg-[#f3f8f8]">
       <StoreScrollView
         alwaysBounceVertical
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#168b87" />}
@@ -92,6 +91,6 @@ export default function Home() {
           </Text>
         </View>
       </StoreScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
