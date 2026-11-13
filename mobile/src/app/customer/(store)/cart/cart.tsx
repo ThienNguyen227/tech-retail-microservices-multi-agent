@@ -1,6 +1,23 @@
+import {
+  ChevronLeft,
+  Banknote,
+  Clock,
+  MapPin,
+  Phone,
+  ShoppingBag,
+  Store,
+  Trash2,
+  Truck,
+  Wallet,
+  X,
+  Minus,
+  Plus,
+  CircleDot,
+  Circle,
+} from 'lucide-react-native';
 import { StoreScrollView } from '@/components/store-scroll-to-top';
-import { useCallback, useMemo, useRef, useState } from "react";
-import { useFocusEffect, useRouter, type Href } from "expo-router";
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import {
   ActivityIndicator,
   Alert,
@@ -14,25 +31,26 @@ import {
   Text,
   TextInput,
   View,
-} from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { isAxiosError } from "axios";
-import { FRONTEND_ASSET_URL } from "@/constants/api";
-import { getStoredUser } from "@/lib/storage/secure_storage";
-import { customerCustomerService } from "@/lib/axios/services/customer-services/customer_service";
-import { customerCartService } from "@/lib/axios/services/customer-services/cart_service";
-import { customerBranchService } from "@/lib/axios/services/customer-services/branch_service";
-import { customerPromotionService } from "@/lib/axios/services/customer-services/promotion_service";
-import { customerOrderService } from "@/lib/axios/services/customer-services/order_service";
+  DeviceEventEmitter,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { isAxiosError } from 'axios';
+import { FRONTEND_ASSET_URL } from '@/constants/api';
+import { getStoredUser } from '@/lib/storage/secure_storage';
+import { customerCustomerService } from '@/lib/axios/services/customer-services/customer_service';
+import { customerCartService } from '@/lib/axios/services/customer-services/cart_service';
+import { customerBranchService } from '@/lib/axios/services/customer-services/branch_service';
+import { customerPromotionService } from '@/lib/axios/services/customer-services/promotion_service';
+import { customerOrderService } from '@/lib/axios/services/customer-services/order_service';
 
 const confirmAction = (message: string) =>
   new Promise<boolean>((resolve) => {
     Alert.alert(
-      "Xác nhận",
+      'Xác nhận',
       message,
       [
-        { text: "Hủy", style: "cancel", onPress: () => resolve(false) },
-        { text: "Xóa", style: "destructive", onPress: () => resolve(true) },
+        { text: 'Hủy', style: 'cancel', onPress: () => resolve(false) },
+        { text: 'Xóa', style: 'destructive', onPress: () => resolve(true) },
       ],
       { cancelable: true, onDismiss: () => resolve(false) },
     );
@@ -46,8 +64,8 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 
 const imageUrl = (image: string, attempt = 0) => {
   if (/^https?:\/\//.test(image)) return image;
-  const path = image.replace(/^\/?product\//, "").replace(/^\//, "");
-  const directory = ["", "phone/", "laptop/", "tablet/"][attempt] ?? "";
+  const path = image.replace(/^\/?product\//, '').replace(/^\//, '');
+  const directory = ['', 'phone/', 'laptop/', 'tablet/'][attempt] ?? '';
   return `${FRONTEND_ASSET_URL}/product/${directory}${path}`;
 };
 
@@ -122,7 +140,7 @@ type Branch = {
 };
 
 type DeliveryInfo = {
-  type: "DELIVERY" | "PICKUP";
+  type: 'DELIVERY' | 'PICKUP';
   fullName?: string;
   phone?: string;
   addressId?: string;
@@ -136,14 +154,14 @@ type Coupon = {
   discountValue: string;
   minOrderValue: string;
   maxDiscountValue: string | null;
-  discountType: "PERCENTAGE" | "FIXED_AMOUNT";
+  discountType: 'PERCENTAGE' | 'FIXED_AMOUNT';
 };
 
 type DirectPromotion = {
   sku: string;
   promotionId?: number | string;
   promotionName?: string;
-  discountType: "PERCENTAGE" | "FIXED_AMOUNT";
+  discountType: 'PERCENTAGE' | 'FIXED_AMOUNT';
   discountValue: string | number;
   maxDiscountValue?: string | number | null;
   minOrderValue?: string | number | null;
@@ -162,31 +180,31 @@ type ItemPricing = {
 
 const PAYMENT_METHODS = [
   {
-    code: "COD",
-    name: "Thanh toán khi nhận hàng (COD)",
-    description: "Thanh toán bằng tiền mặt khi nhận hàng",
-    icon: "₫",
+    code: 'COD',
+    name: 'Thanh toán khi nhận hàng (COD)',
+    description: 'Thanh toán bằng tiền mặt khi nhận hàng',
+    icon: Banknote,
   },
   {
-    code: "MOMO",
-    name: "Ví điện tử MoMo",
-    description: "Thanh toán qua ứng dụng Ví MoMo",
-    icon: "◈",
+    code: 'MOMO',
+    name: 'Ví điện tử MoMo',
+    description: 'Thanh toán qua ứng dụng Ví MoMo',
+    icon: Wallet,
   },
 ];
 
 const dayOfWeekLabels: Record<string, string> = {
-  MONDAY: "Thứ 2",
-  TUESDAY: "Thứ 3",
-  WEDNESDAY: "Thứ 4",
-  THURSDAY: "Thứ 5",
-  FRIDAY: "Thứ 6",
-  SATURDAY: "Thứ 7",
-  SUNDAY: "Chủ nhật",
+  MONDAY: 'Thứ 2',
+  TUESDAY: 'Thứ 3',
+  WEDNESDAY: 'Thứ 4',
+  THURSDAY: 'Thứ 5',
+  FRIDAY: 'Thứ 6',
+  SATURDAY: 'Thứ 7',
+  SUNDAY: 'Chủ nhật',
 };
 
 const formatPrice = (value: number) =>
-  new Intl.NumberFormat("vi-VN").format(Math.max(0, Math.round(value)));
+  new Intl.NumberFormat('vi-VN').format(Math.max(0, Math.round(value)));
 
 const toNumber = (value: unknown) => {
   const number = Number(value);
@@ -201,7 +219,7 @@ function calculatePromotionDiscount(
 
   if (subtotal < minOrderValue) return 0;
 
-  if (promotion.discountType === "FIXED_AMOUNT") {
+  if (promotion.discountType === 'FIXED_AMOUNT') {
     return Math.min(toNumber(promotion.discountValue), subtotal);
   }
 
@@ -227,7 +245,7 @@ export default function CartPage() {
   const [cart, setCart] = useState<Cart | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState('');
   const [deletingSku, setDeletingSku] = useState<string | null>(null);
   const [clearing, setClearing] = useState(false);
   const [updatingSkus, setUpdatingSkus] = useState<Set<string>>(new Set());
@@ -236,36 +254,36 @@ export default function CartPage() {
     Record<string, DirectPromotion | null>
   >({});
   const [promotionLoading, setPromotionLoading] = useState(false);
-  const [promotionError, setPromotionError] = useState("");
+  const [promotionError, setPromotionError] = useState('');
 
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [couponLoading, setCouponLoading] = useState(false);
-  const [couponError, setCouponError] = useState("");
+  const [couponError, setCouponError] = useState('');
   const [isCouponModalOpen, setIsCouponModalOpen] = useState(false);
   const [selectedCoupon, setSelectedCoupon] = useState<Coupon | null>(null);
 
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [customerLoading, setCustomerLoading] = useState(false);
-  const [customerError, setCustomerError] = useState("");
+  const [customerError, setCustomerError] = useState('');
 
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loadingBranches, setLoadingBranches] = useState(false);
-  const [branchError, setBranchError] = useState("");
+  const [branchError, setBranchError] = useState('');
   const [selectedBranch, setSelectedBranch] = useState<Branch | null>(null);
   const [businessHourBranch, setBusinessHourBranch] = useState<Branch | null>(
     null,
   );
 
   const [isDeliveryModalOpen, setIsDeliveryModalOpen] = useState(false);
-  const [deliveryTab, setDeliveryTab] = useState<"DELIVERY" | "PICKUP">(
-    "DELIVERY",
+  const [deliveryTab, setDeliveryTab] = useState<'DELIVERY' | 'PICKUP'>(
+    'DELIVERY',
   );
   const [deliveryInfo, setDeliveryInfo] = useState<DeliveryInfo | null>(null);
-  const [receiverPhone, setReceiverPhone] = useState("");
+  const [receiverPhone, setReceiverPhone] = useState('');
   const [selectedAddress, setSelectedAddress] =
     useState<CustomerAddress | null>(null);
 
-  const [paymentMethod, setPaymentMethod] = useState("COD");
+  const [paymentMethod, setPaymentMethod] = useState('COD');
   const [checkingOut, setCheckingOut] = useState(false);
 
   const items = useMemo(() => cart?.items ?? [], [cart]);
@@ -329,7 +347,7 @@ export default function CartPage() {
 
       if (subtotal < minOrderValue) return 0;
 
-      if (coupon.discountType === "FIXED_AMOUNT") {
+      if (coupon.discountType === 'FIXED_AMOUNT') {
         return Math.min(discountValue, subtotal);
       }
 
@@ -353,7 +371,7 @@ export default function CartPage() {
   const fetchCustomer = useCallback(async () => {
     try {
       setCustomerLoading(true);
-      setCustomerError("");
+      setCustomerError('');
 
       const response = await customerCustomerService.getCustomerInformation();
 
@@ -365,7 +383,7 @@ export default function CartPage() {
         response;
 
       if (!data) {
-        throw new Error("Không tìm thấy thông tin khách hàng");
+        throw new Error('Không tìm thấy thông tin khách hàng');
       }
 
       setCustomer(data);
@@ -380,7 +398,7 @@ export default function CartPage() {
       setCustomerError(
         err instanceof Error
           ? err.message
-          : "Đã xảy ra lỗi khi tải thông tin khách hàng",
+          : 'Đã xảy ra lỗi khi tải thông tin khách hàng',
       );
     } finally {
       setCustomerLoading(false);
@@ -394,7 +412,7 @@ export default function CartPage() {
     }
 
     setPromotionLoading(true);
-    setPromotionError("");
+    setPromotionError('');
 
     try {
       const results = await Promise.all(
@@ -441,7 +459,7 @@ export default function CartPage() {
       setPromotionError(
         err instanceof Error
           ? err.message
-          : "Không thể tải khuyến mãi sản phẩm",
+          : 'Không thể tải khuyến mãi sản phẩm',
       );
     } finally {
       setPromotionLoading(false);
@@ -451,7 +469,7 @@ export default function CartPage() {
   const fetchCoupons = useCallback(async () => {
     try {
       setCouponLoading(true);
-      setCouponError("");
+      setCouponError('');
 
       const response = await customerPromotionService.getAllCoupons();
       const data: Coupon[] = response?.coupons ?? response?.data ?? response;
@@ -461,7 +479,7 @@ export default function CartPage() {
       setCouponError(
         err instanceof Error
           ? err.message
-          : "Đã xảy ra lỗi khi tải mã giảm giá",
+          : 'Đã xảy ra lỗi khi tải mã giảm giá',
       );
     } finally {
       setCouponLoading(false);
@@ -474,11 +492,12 @@ export default function CartPage() {
 
       const loadCart = async (isRefresh = false) => {
         try {
-          if (isRefresh) setRefreshing(true); else setLoading(true);
-          setError("");
+          if (isRefresh) setRefreshing(true);
+          else setLoading(true);
+          setError('');
           const { userId } = await getStoredUser();
           if (!userId) {
-            router.replace("/customer/login");
+            router.replace('/customer/login');
             return;
           }
           await fetchCustomer();
@@ -495,11 +514,14 @@ export default function CartPage() {
             setError(
               err instanceof Error
                 ? err.message
-                : "Đã xảy ra lỗi khi tải dữ liệu",
+                : 'Đã xảy ra lỗi khi tải dữ liệu',
             );
           }
         } finally {
-          if (!cancelled) { setLoading(false); setRefreshing(false); }
+          if (!cancelled) {
+            setLoading(false);
+            setRefreshing(false);
+          }
         }
       };
 
@@ -517,15 +539,15 @@ export default function CartPage() {
   const fetchBranches = async () => {
     try {
       setLoadingBranches(true);
-      setBranchError("");
+      setBranchError('');
 
-      const data = await customerBranchService.getBranchList("ACTIVE");
+      const data = await customerBranchService.getBranchList('ACTIVE');
       setBranches(data);
     } catch (err) {
       setBranchError(
         err instanceof Error
           ? err.message
-          : "Đã xảy ra lỗi khi tải danh sách cửa hàng",
+          : 'Đã xảy ra lỗi khi tải danh sách cửa hàng',
       );
     } finally {
       setLoadingBranches(false);
@@ -537,27 +559,27 @@ export default function CartPage() {
     if (branches.length === 0) void fetchBranches();
   };
 
-  const handleChangeDeliveryTab = (tab: "DELIVERY" | "PICKUP") => {
+  const handleChangeDeliveryTab = (tab: 'DELIVERY' | 'PICKUP') => {
     setDeliveryTab(tab);
-    if (tab === "PICKUP" && branches.length === 0) void fetchBranches();
+    if (tab === 'PICKUP' && branches.length === 0) void fetchBranches();
   };
 
   const handleConfirmDelivery = () => {
     if (!customer?.customer_full_name.trim()) {
-      Alert.alert("Giỏ hàng", "Không tìm thấy tên người nhận.");
+      Alert.alert('Giỏ hàng', 'Không tìm thấy tên người nhận.');
       return;
     }
     if (!receiverPhone.trim()) {
-      Alert.alert("Giỏ hàng", "Vui lòng nhập số điện thoại.");
+      Alert.alert('Giỏ hàng', 'Vui lòng nhập số điện thoại.');
       return;
     }
     if (!selectedAddress) {
-      Alert.alert("Giỏ hàng", "Vui lòng chọn địa chỉ nhận hàng.");
+      Alert.alert('Giỏ hàng', 'Vui lòng chọn địa chỉ nhận hàng.');
       return;
     }
 
     setDeliveryInfo({
-      type: "DELIVERY",
+      type: 'DELIVERY',
       fullName: customer.customer_full_name,
       phone: receiverPhone.trim(),
       addressId: selectedAddress.customer_address_id,
@@ -568,24 +590,24 @@ export default function CartPage() {
 
   const handleConfirmPickup = () => {
     if (!customer?.customer_full_name.trim()) {
-      Alert.alert("Giỏ hàng", "Không tìm thấy tên người nhận.");
+      Alert.alert('Giỏ hàng', 'Không tìm thấy tên người nhận.');
       return;
     }
     if (!receiverPhone.trim()) {
-      Alert.alert("Giỏ hàng", "Vui lòng nhập số điện thoại.");
+      Alert.alert('Giỏ hàng', 'Vui lòng nhập số điện thoại.');
       return;
     }
     if (!selectedBranch) {
-      Alert.alert("Giỏ hàng", "Vui lòng chọn cửa hàng nhận hàng.");
+      Alert.alert('Giỏ hàng', 'Vui lòng chọn cửa hàng nhận hàng.');
       return;
     }
     if (!selectedBranch.address) {
-      Alert.alert("Giỏ hàng", "Cửa hàng chưa có thông tin địa chỉ.");
+      Alert.alert('Giỏ hàng', 'Cửa hàng chưa có thông tin địa chỉ.');
       return;
     }
 
     setDeliveryInfo({
-      type: "PICKUP",
+      type: 'PICKUP',
       fullName: customer.customer_full_name,
       phone: receiverPhone.trim(),
       branch: selectedBranch,
@@ -605,7 +627,7 @@ export default function CartPage() {
 
   const handleUpdateQuantity = async (
     sku: string,
-    action: "increase" | "decrease",
+    action: 'increase' | 'decrease',
   ) => {
     if (mutationLock.current) return;
     mutationLock.current = true;
@@ -615,13 +637,14 @@ export default function CartPage() {
         sku,
         action,
       });
+      DeviceEventEmitter.emit('cart-updated');
       const cartData = updatedCart.cart ?? updatedCart;
       setCart(cartData);
       await fetchDirectPromotions(cartData.items ?? []);
     } catch (err) {
       Alert.alert(
-        "Giỏ hàng",
-        getErrorMessage(err, "Có lỗi xảy ra khi cập nhật số lượng"),
+        'Giỏ hàng',
+        getErrorMessage(err, 'Có lỗi xảy ra khi cập nhật số lượng'),
       );
     } finally {
       mutationLock.current = false;
@@ -635,7 +658,7 @@ export default function CartPage() {
 
   const handleRemoveItem = async (sku: string) => {
     if (
-      !(await confirmAction("Bạn có chắc muốn xóa sản phẩm này khỏi giỏ hàng?"))
+      !(await confirmAction('Bạn có chắc muốn xóa sản phẩm này khỏi giỏ hàng?'))
     ) {
       return;
     }
@@ -645,13 +668,14 @@ export default function CartPage() {
     try {
       setDeletingSku(sku);
       const updatedCart = await customerCartService.removeItem(sku);
+      DeviceEventEmitter.emit('cart-updated');
       const cartData = updatedCart.cart ?? updatedCart;
       setCart(cartData);
       await fetchDirectPromotions(cartData.items ?? []);
     } catch (err) {
       Alert.alert(
-        "Giỏ hàng",
-        getErrorMessage(err, "Có lỗi xảy ra khi xóa sản phẩm"),
+        'Giỏ hàng',
+        getErrorMessage(err, 'Có lỗi xảy ra khi xóa sản phẩm'),
       );
     } finally {
       mutationLock.current = false;
@@ -662,7 +686,7 @@ export default function CartPage() {
   const handleClearCart = async () => {
     if (
       !(await confirmAction(
-        "Bạn có chắc muốn xóa tất cả sản phẩm trong giỏ hàng?",
+        'Bạn có chắc muốn xóa tất cả sản phẩm trong giỏ hàng?',
       ))
     ) {
       return;
@@ -673,14 +697,15 @@ export default function CartPage() {
     try {
       setClearing(true);
       const updatedCart = await customerCartService.clearCart();
+      DeviceEventEmitter.emit('cart-updated');
       const cartData = updatedCart.cart ?? updatedCart;
       setCart(cartData);
       setDirectPromotions({});
       setSelectedCoupon(null);
     } catch (err) {
       Alert.alert(
-        "Giỏ hàng",
-        getErrorMessage(err, "Có lỗi xảy ra khi làm trống giỏ hàng"),
+        'Giỏ hàng',
+        getErrorMessage(err, 'Có lỗi xảy ra khi làm trống giỏ hàng'),
       );
     } finally {
       mutationLock.current = false;
@@ -692,11 +717,11 @@ export default function CartPage() {
     const { userId } = await getStoredUser();
 
     if (!userId) {
-      router.push("/customer/login");
+      router.push('/customer/login');
       return;
     }
     if (!cart || cart.items.length === 0) {
-      Alert.alert("Giỏ hàng", "Giỏ hàng đang trống.");
+      Alert.alert('Giỏ hàng', 'Giỏ hàng đang trống.');
       return;
     }
     if (!deliveryInfo) {
@@ -704,34 +729,34 @@ export default function CartPage() {
       return;
     }
     if (!deliveryInfo.fullName?.trim() || !deliveryInfo.phone?.trim()) {
-      Alert.alert("Giỏ hàng", "Vui lòng cung cấp đầy đủ thông tin người nhận.");
+      Alert.alert('Giỏ hàng', 'Vui lòng cung cấp đầy đủ thông tin người nhận.');
       return;
     }
 
-    let addressLine = "";
-    let ward = "";
-    let province = "";
-    let fulfillmentType: "HOME_DELIVERY" | "STORE_PICKUP";
+    let addressLine = '';
+    let ward = '';
+    let province = '';
+    let fulfillmentType: 'HOME_DELIVERY' | 'STORE_PICKUP';
 
-    if (deliveryInfo.type === "DELIVERY") {
+    if (deliveryInfo.type === 'DELIVERY') {
       const address = deliveryInfo.address;
       if (!address) {
-        Alert.alert("Giỏ hàng", "Vui lòng chọn địa chỉ nhận hàng.");
+        Alert.alert('Giỏ hàng', 'Vui lòng chọn địa chỉ nhận hàng.');
         return;
       }
 
-      fulfillmentType = "HOME_DELIVERY";
+      fulfillmentType = 'HOME_DELIVERY';
       addressLine = address.customer_address_line;
       ward = address.customer_address_ward;
       province = address.customer_address_province;
     } else {
       const branch = deliveryInfo.branch;
       if (!branch?.address) {
-        Alert.alert("Giỏ hàng", "Vui lòng chọn cửa hàng nhận hàng.");
+        Alert.alert('Giỏ hàng', 'Vui lòng chọn cửa hàng nhận hàng.');
         return;
       }
 
-      fulfillmentType = "STORE_PICKUP";
+      fulfillmentType = 'STORE_PICKUP';
       addressLine = branch.address.branch_address_address_line;
       ward = branch.address.branch_address_ward;
       province = branch.address.branch_address_province;
@@ -755,7 +780,7 @@ export default function CartPage() {
     });
 
     const branchId =
-      deliveryInfo.type === "PICKUP"
+      deliveryInfo.type === 'PICKUP'
         ? Number(deliveryInfo.branch?.branch_id)
         : 10; // Kho tổng
 
@@ -788,17 +813,20 @@ export default function CartPage() {
       setCheckingOut(true);
 
       await customerOrderService.createOrder(orderData);
+      DeviceEventEmitter.emit('order-updated');
+      DeviceEventEmitter.emit('cart-updated');
+      DeviceEventEmitter.emit('warranty-updated');
 
-      Alert.alert("Giỏ hàng", "Đặt hàng thành công!");
+      Alert.alert('Giỏ hàng', 'Đặt hàng thành công!');
 
       setDeliveryInfo(null);
       setSelectedCoupon(null);
       await refreshCart().catch(() => retryCart.current());
-      router.push("/customer/order" as Href);
+      router.push('/customer/order' as Href);
     } catch (err) {
       Alert.alert(
-        "Giỏ hàng",
-        err instanceof Error ? err.message : "Có lỗi xảy ra khi đặt hàng.",
+        'Giỏ hàng',
+        err instanceof Error ? err.message : 'Có lỗi xảy ra khi đặt hàng.',
       );
     } finally {
       mutationLock.current = false;
@@ -822,8 +850,21 @@ export default function CartPage() {
     return (
       <StoreScrollView
         alwaysBounceVertical
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { if (!refreshing) retryCart.current(true); }} tintColor="#168b87" />}
-        contentContainerStyle={{ flexGrow: 1, alignItems: "center", justifyContent: "center", padding: 24 }}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              if (!refreshing) retryCart.current(true);
+            }}
+            tintColor="#168b87"
+          />
+        }
+        contentContainerStyle={{
+          flexGrow: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 24,
+        }}
         className="flex-1 bg-slate-50"
       >
         <Text className="text-center text-red-600" accessibilityRole="alert">
@@ -844,7 +885,15 @@ export default function CartPage() {
     <View className="flex-1 bg-[#f8fafc]">
       <StoreScrollView
         alwaysBounceVertical
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { if (!busy && !refreshing) retryCart.current(true); }} tintColor="#168b87" />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              if (!busy && !refreshing) retryCart.current(true);
+            }}
+            tintColor="#168b87"
+          />
+        }
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{
           padding: 16,
@@ -854,23 +903,35 @@ export default function CartPage() {
         <View className="mb-5 flex-row items-center justify-between gap-3">
           <Pressable
             accessibilityRole="button"
-            onPress={() => router.replace("/customer/home")}
+            onPress={() => router.replace('/customer/home')}
             className="min-h-11 justify-center"
           >
-            <Text className="text-sm font-medium text-slate-500">
-              ← Tiếp tục mua sắm
-            </Text>
+            <View className="flex-row items-center gap-2">
+              <ChevronLeft size={16} color="#64748b" />
+              <Text
+                style={{ flexShrink: 1 }}
+                className="text-sm font-medium text-slate-500"
+              >
+                Tiếp tục mua sắm
+              </Text>
+            </View>
           </Pressable>
           {items.length > 0 && (
             <Pressable
               accessibilityRole="button"
               disabled={busy}
               onPress={handleClearCart}
-              className={`min-h-11 justify-center ${busy ? "opacity-40" : ""}`}
+              className={`min-h-11 justify-center ${busy ? 'opacity-40' : ''}`}
             >
-              <Text className="text-sm font-semibold text-red-600">
-                {clearing ? "Đang xóa..." : "Xóa tất cả"}
-              </Text>
+              <View className="flex-row items-center gap-2">
+                <Trash2 size={16} color="#dc2626" />
+                <Text
+                  style={{ flexShrink: 1 }}
+                  className="text-sm font-semibold text-red-600"
+                >
+                  {clearing ? 'Đang xóa...' : 'Xóa tất cả'}
+                </Text>
+              </View>
             </Pressable>
           )}
         </View>
@@ -886,7 +947,9 @@ export default function CartPage() {
 
         {items.length === 0 ? (
           <View className="items-center rounded-3xl border border-slate-200 bg-white px-5 py-10">
-            <Text className="rounded-2xl bg-[#e6f5f4] p-4 text-3xl">🛒</Text>
+            <View className="rounded-2xl bg-[#e6f5f4] p-4">
+              <ShoppingBag size={32} color="#168b87" />
+            </View>
             <Text className="mt-4 text-center text-lg font-bold text-slate-800">
               Giỏ hàng của bạn đang trống
             </Text>
@@ -895,7 +958,7 @@ export default function CartPage() {
             </Text>
             <Pressable
               accessibilityRole="button"
-              onPress={() => router.replace("/customer/home")}
+              onPress={() => router.replace('/customer/home')}
               className="mt-6 rounded-xl bg-[#168b87] px-6 py-3"
             >
               <Text className="font-bold text-white">Khám phá sản phẩm</Text>
@@ -973,7 +1036,7 @@ export default function CartPage() {
                           </Text>
                           <Text className="mt-1 text-xs text-green-700">
                             {pricing.promotion?.promotionName ||
-                              "Đã áp dụng khuyến mãi trực tiếp"}{" "}
+                              'Đã áp dụng khuyến mãi trực tiếp'}{' '}
                             · Tiết kiệm {formatPrice(pricing.discount)} ₫
                           </Text>
                         </>
@@ -987,28 +1050,28 @@ export default function CartPage() {
                         accessibilityLabel={`Giảm số lượng ${item.productName}`}
                         disabled={busy || item.quantity <= 1}
                         onPress={() =>
-                          handleUpdateQuantity(item.sku, "decrease")
+                          handleUpdateQuantity(item.sku, 'decrease')
                         }
-                        className={`h-11 w-11 items-center justify-center ${busy || item.quantity <= 1 ? "opacity-30" : ""}`}
+                        className={`h-11 w-11 items-center justify-center ${busy || item.quantity <= 1 ? 'opacity-30' : ''}`}
                       >
-                        <Text className="text-xl text-slate-600">−</Text>
+                        <Minus size={20} color="#475569" />
                       </Pressable>
                       <Text
                         accessibilityLiveRegion="polite"
                         className="min-w-7 text-center font-semibold"
                       >
-                        {isUpdating ? "..." : item.quantity}
+                        {isUpdating ? '...' : item.quantity}
                       </Text>
                       <Pressable
                         accessibilityRole="button"
                         accessibilityLabel={`Tăng số lượng ${item.productName}`}
                         disabled={busy}
                         onPress={() =>
-                          handleUpdateQuantity(item.sku, "increase")
+                          handleUpdateQuantity(item.sku, 'increase')
                         }
-                        className={`h-11 w-11 items-center justify-center ${busy ? "opacity-30" : ""}`}
+                        className={`h-11 w-11 items-center justify-center ${busy ? 'opacity-30' : ''}`}
                       >
-                        <Text className="text-xl text-slate-600">+</Text>
+                        <Plus size={20} color="#475569" />
                       </Pressable>
                     </View>
                     <View className="ml-auto items-end">
@@ -1028,9 +1091,15 @@ export default function CartPage() {
                       onPress={() => handleRemoveItem(item.sku)}
                       className="min-h-11 min-w-11 items-center justify-center"
                     >
-                      <Text className="text-xs font-semibold text-red-500">
-                        {deletingSku === item.sku ? "..." : "Xóa"}
-                      </Text>
+                      <View className="flex-row items-center gap-2">
+                        <Trash2 size={16} color="#dc2626" />
+                        <Text
+                          style={{ flexShrink: 1 }}
+                          className="text-xs font-semibold text-red-500"
+                        >
+                          {deletingSku === item.sku ? '...' : 'Xóa'}
+                        </Text>
+                      </View>
                     </Pressable>
                   </View>
                 </View>
@@ -1089,7 +1158,7 @@ export default function CartPage() {
                 <Text className="text-sm font-semibold text-[#168b87]">
                   {selectedCoupon
                     ? `Coupon #${selectedCoupon.couponId}`
-                    : "Áp dụng mã giảm giá"}{" "}
+                    : 'Áp dụng mã giảm giá'}{' '}
                   ›
                 </Text>
               </Pressable>
@@ -1131,20 +1200,32 @@ export default function CartPage() {
                   onPress={handleOpenDeliveryModal}
                   className="rounded-xl border border-dashed border-[#168b87] bg-[#f0faf9] p-4"
                 >
-                  <Text className="font-bold text-slate-800">
-                    {deliveryInfo
-                      ? deliveryInfo.type === "DELIVERY"
-                        ? "Giao tận nơi"
-                        : "Nhận tại cửa hàng"
-                      : "Cung cấp thông tin nhận hàng"}
-                  </Text>
+                  <View className="flex-row items-center gap-2">
+                    {!deliveryInfo ? (
+                      <MapPin size={20} color="#168b87" />
+                    ) : deliveryInfo.type === 'DELIVERY' ? (
+                      <Truck size={18} color="#168b87" />
+                    ) : (
+                      <Store size={18} color="#168b87" />
+                    )}
+                    <Text
+                      style={{ flexShrink: 1 }}
+                      className="font-bold text-slate-800"
+                    >
+                      {deliveryInfo
+                        ? deliveryInfo.type === 'DELIVERY'
+                          ? 'Giao tận nơi'
+                          : 'Nhận tại cửa hàng'
+                        : 'Cung cấp thông tin nhận hàng'}
+                    </Text>
+                  </View>
                   {deliveryInfo ? (
                     <>
                       <Text className="mt-2 text-sm text-slate-600">
                         {deliveryInfo.fullName} · {deliveryInfo.phone}
                       </Text>
                       <Text className="mt-1 text-sm text-slate-600">
-                        {deliveryInfo.type === "DELIVERY"
+                        {deliveryInfo.type === 'DELIVERY'
                           ? `${deliveryInfo.address?.customer_address_line}, ${deliveryInfo.address?.customer_address_ward}, ${deliveryInfo.address?.customer_address_province}`
                           : `${deliveryInfo.branch?.branch_name} — ${deliveryInfo.branch?.address?.branch_address_address_line}, ${deliveryInfo.branch?.address?.branch_address_ward}, ${deliveryInfo.branch?.address?.branch_address_province}`}
                       </Text>
@@ -1165,6 +1246,7 @@ export default function CartPage() {
                 </Text>
                 {PAYMENT_METHODS.map((method) => {
                   const selected = paymentMethod === method.code;
+                  const Icon = method.icon;
                   return (
                     <Pressable
                       key={method.code}
@@ -1172,11 +1254,9 @@ export default function CartPage() {
                       accessibilityState={{ checked: selected, disabled: busy }}
                       disabled={busy}
                       onPress={() => setPaymentMethod(method.code)}
-                      className={`mb-2 flex-row items-center gap-3 rounded-xl border p-3 ${selected ? "border-[#168b87] bg-[#f0faf9]" : "border-slate-200"}`}
+                      className={`mb-2 flex-row items-center gap-3 rounded-xl border p-3 ${selected ? 'border-[#168b87] bg-[#f0faf9]' : 'border-slate-200'}`}
                     >
-                      <Text className="text-xl text-[#168b87]">
-                        {method.icon}
-                      </Text>
+                      <Icon size={20} color="#168b87" />
                       <View className="flex-1">
                         <Text className="text-xs font-bold text-slate-800">
                           {method.name}
@@ -1185,9 +1265,11 @@ export default function CartPage() {
                           {method.description}
                         </Text>
                       </View>
-                      <Text className="text-lg text-[#168b87]">
-                        {selected ? "◉" : "○"}
-                      </Text>
+                      {selected ? (
+                        <CircleDot size={20} color="#168b87" />
+                      ) : (
+                        <Circle size={20} color="#168b87" />
+                      )}
                     </Pressable>
                   );
                 })}
@@ -1196,10 +1278,10 @@ export default function CartPage() {
                 accessibilityRole="button"
                 disabled={busy || promotionLoading}
                 onPress={handleCheckout}
-                className={`mt-4 min-h-12 items-center justify-center rounded-xl bg-[#168b87] px-4 py-4 ${busy || promotionLoading ? "opacity-50" : ""}`}
+                className={`mt-4 min-h-12 items-center justify-center rounded-xl bg-[#168b87] px-4 py-4 ${busy || promotionLoading ? 'opacity-50' : ''}`}
               >
                 <Text className="text-sm font-bold text-white">
-                  {checkingOut ? "Đang đặt hàng..." : "Tiến hành đặt hàng"}
+                  {checkingOut ? 'Đang đặt hàng...' : 'Tiến hành đặt hàng'}
                 </Text>
               </Pressable>
             </View>
@@ -1216,17 +1298,356 @@ export default function CartPage() {
           if (businessHourBranch) setBusinessHourBranch(null);
           else setIsDeliveryModalOpen(false);
         }}
+        statusBarTranslucent
+        navigationBarTranslucent
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
-          style={{ flex: 1, paddingTop: insets.top + 16 }}
-        >
-          <View className="flex-1 justify-end bg-black/50">
+        <View className="flex-1 bg-black/50">
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1, paddingTop: insets.top + 16 }}
+          >
+            <View className="flex-1 justify-end">
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Đóng thông tin nhận hàng"
+                className="flex-1"
+                onPress={() => setIsDeliveryModalOpen(false)}
+              />
+              <View
+                className="max-h-[90%] rounded-t-3xl bg-white"
+                style={{ paddingBottom: Math.max(insets.bottom, 16) }}
+              >
+                <View className="flex-row items-center justify-between border-b border-slate-100 px-5 py-3">
+                  <View className="flex-1">
+                    <Text
+                      accessibilityRole="header"
+                      className="text-lg font-bold"
+                    >
+                      Thông tin nhận hàng
+                    </Text>
+                    <Text className="mt-1 text-xs text-slate-500">
+                      Vui lòng cung cấp thông tin người nhận
+                    </Text>
+                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Đóng thông tin nhận hàng"
+                    onPress={() => setIsDeliveryModalOpen(false)}
+                    className="h-11 w-11 items-center justify-center"
+                  >
+                    <X size={20} color="#94a3b8" />
+                  </Pressable>
+                </View>
+                <ScrollView
+                  keyboardShouldPersistTaps="handled"
+                  contentContainerStyle={{ padding: 20 }}
+                >
+                  <Text className="font-bold">1. Thông tin người nhận</Text>
+                  {customerLoading ? (
+                    <ActivityIndicator className="my-4" color="#168b87" />
+                  ) : customerError ? (
+                    <View className="mt-3">
+                      <Text className="text-sm text-red-600">
+                        {customerError}
+                      </Text>
+                      <Pressable
+                        accessibilityRole="button"
+                        onPress={fetchCustomer}
+                        className="min-h-11 justify-center"
+                      >
+                        <Text className="font-semibold text-[#168b87]">
+                          Thử lại
+                        </Text>
+                      </Pressable>
+                    </View>
+                  ) : (
+                    <>
+                      <TextInput
+                        value={customer?.customer_full_name ?? ''}
+                        editable={false}
+                        accessibilityLabel="Tên người nhận"
+                        className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800"
+                      />
+                      <TextInput
+                        value={receiverPhone}
+                        onChangeText={setReceiverPhone}
+                        keyboardType="phone-pad"
+                        accessibilityLabel="Số điện thoại người nhận"
+                        placeholder="Số điện thoại người nhận"
+                        placeholderTextColor="#94a3b8"
+                        className="mt-3 rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800"
+                      />
+                    </>
+                  )}
+                  <Text className="mt-6 font-bold">2. Hình thức nhận hàng</Text>
+                  <View className="mt-4 flex-row rounded-xl bg-slate-100 p-1">
+                    {(['DELIVERY', 'PICKUP'] as const).map((tab) => (
+                      <Pressable
+                        key={tab}
+                        accessibilityRole="tab"
+                        accessibilityState={{ selected: deliveryTab === tab }}
+                        onPress={() => handleChangeDeliveryTab(tab)}
+                        className={`min-h-12 flex-1 items-center justify-center rounded-lg px-2 py-3 ${deliveryTab === tab ? 'bg-white' : ''}`}
+                      >
+                        <View className="flex-row items-center gap-2">
+                          {tab === 'DELIVERY' ? (
+                            <Truck size={17} color="#168b87" />
+                          ) : (
+                            <Store size={17} color="#168b87" />
+                          )}
+                          <Text
+                            style={{ flexShrink: 1 }}
+                            className={`text-center text-sm font-semibold ${deliveryTab === tab ? 'text-[#168b87]' : 'text-slate-500'}`}
+                          >
+                            {tab === 'DELIVERY'
+                              ? 'Giao tận nơi'
+                              : 'Nhận tại cửa hàng'}
+                          </Text>
+                        </View>
+                      </Pressable>
+                    ))}
+                  </View>
+                  {deliveryTab === 'DELIVERY' ? (
+                    <View className="mt-4 gap-3">
+                      {!customerLoading &&
+                        !customerError &&
+                        !customer?.addresses?.length && (
+                          <>
+                            <Text className="rounded-xl border border-dashed border-slate-200 p-4 text-sm text-slate-500">
+                              Bạn chưa có địa chỉ. Vui lòng thêm địa chỉ trong
+                              trang thông tin cá nhân.
+                            </Text>
+                            <Pressable
+                              accessibilityRole="button"
+                              onPress={() => {
+                                setIsDeliveryModalOpen(false);
+                                router.push(
+                                  '/customer/profile/customer-information',
+                                );
+                              }}
+                              className="min-h-11 justify-center"
+                            >
+                              <Text className="font-semibold text-[#168b87]">
+                                Thêm địa chỉ ›
+                              </Text>
+                            </Pressable>
+                          </>
+                        )}
+                      {customer?.addresses?.map((address) => {
+                        const selected =
+                          selectedAddress?.customer_address_id ===
+                          address.customer_address_id;
+                        return (
+                          <Pressable
+                            key={address.customer_address_id}
+                            accessibilityRole="radio"
+                            accessibilityState={{ checked: selected }}
+                            onPress={() => setSelectedAddress(address)}
+                            className={`rounded-xl border p-4 ${selected ? 'border-[#168b87] bg-[#f0faf9]' : 'border-slate-200'}`}
+                          >
+                            <Text className="text-sm font-semibold">
+                              {address.customer_address_line}
+                            </Text>
+                            {address.customer_address_default && (
+                              <Text className="mt-1 text-xs text-[#168b87]">
+                                Mặc định
+                              </Text>
+                            )}
+                            <Text className="mt-1 text-sm text-slate-600">
+                              {address.customer_address_ward},{' '}
+                              {address.customer_address_province}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={
+                          !selectedAddress ||
+                          !receiverPhone.trim() ||
+                          !customer?.customer_full_name?.trim()
+                        }
+                        onPress={handleConfirmDelivery}
+                        className={`items-center rounded-xl bg-[#168b87] p-4 ${!selectedAddress || !receiverPhone.trim() || !customer?.customer_full_name?.trim() ? 'opacity-40' : ''}`}
+                      >
+                        <Text className="font-bold text-white">
+                          Xác nhận thông tin
+                        </Text>
+                      </Pressable>
+                    </View>
+                  ) : (
+                    <View className="mt-4 gap-3">
+                      {loadingBranches ? (
+                        <ActivityIndicator color="#168b87" />
+                      ) : branchError ? (
+                        <View className="rounded-xl bg-red-50 p-4">
+                          <Text className="text-sm text-red-600">
+                            {branchError}
+                          </Text>
+                          <Pressable
+                            accessibilityRole="button"
+                            onPress={fetchBranches}
+                            className="min-h-11 justify-center"
+                          >
+                            <Text className="font-semibold text-[#168b87]">
+                              Thử lại
+                            </Text>
+                          </Pressable>
+                        </View>
+                      ) : (
+                        <>
+                          {branches.length === 0 && (
+                            <Text className="py-4 text-sm text-slate-500">
+                              Hiện không có cửa hàng nhận hàng.
+                            </Text>
+                          )}
+                          {branches.map((branch) => {
+                            const selected =
+                              selectedBranch?.branch_id === branch.branch_id;
+                            return (
+                              <View
+                                key={branch.branch_id}
+                                className={`rounded-xl border p-4 ${selected ? 'border-[#168b87] bg-[#f0faf9]' : 'border-slate-200'}`}
+                              >
+                                <Pressable
+                                  accessibilityRole="radio"
+                                  accessibilityState={{ checked: selected }}
+                                  onPress={() => setSelectedBranch(branch)}
+                                >
+                                  <Text className="font-bold">
+                                    {branch.branch_name}
+                                  </Text>
+                                  <Text className="mt-1 text-xs text-slate-500">
+                                    {branch.branch_code}
+                                  </Text>
+                                  {branch.address && (
+                                    <Text className="mt-2 text-sm text-slate-600">
+                                      {
+                                        branch.address
+                                          .branch_address_address_line
+                                      }
+                                      , {branch.address.branch_address_ward},{' '}
+                                      {branch.address.branch_address_province}
+                                    </Text>
+                                  )}
+                                  <View className="flex-row items-center gap-2">
+                                    <Phone size={16} color="#168b87" />
+                                    <Text
+                                      style={{ flexShrink: 1 }}
+                                      className="mt-2 text-xs text-slate-500"
+                                    >
+                                      Điện thoại: {branch.branch_phone}
+                                    </Text>
+                                  </View>
+                                </Pressable>
+                                <Pressable
+                                  accessibilityRole="button"
+                                  onPress={() => setBusinessHourBranch(branch)}
+                                  className="min-h-11 justify-center"
+                                >
+                                  <View className="flex-row items-center gap-2">
+                                    <Clock size={16} color="#168b87" />
+                                    <Text
+                                      style={{ flexShrink: 1 }}
+                                      className="text-xs font-semibold text-[#168b87]"
+                                    >
+                                      Giờ hoạt động ›
+                                    </Text>
+                                  </View>
+                                </Pressable>
+                              </View>
+                            );
+                          })}
+                        </>
+                      )}
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={
+                          !selectedBranch?.address ||
+                          !receiverPhone.trim() ||
+                          !customer?.customer_full_name?.trim()
+                        }
+                        onPress={handleConfirmPickup}
+                        className={`items-center rounded-xl bg-[#168b87] p-4 ${!selectedBranch?.address || !receiverPhone.trim() || !customer?.customer_full_name?.trim() ? 'opacity-40' : ''}`}
+                      >
+                        <Text className="font-bold text-white">
+                          Xác nhận cửa hàng
+                        </Text>
+                      </Pressable>
+                    </View>
+                  )}
+                </ScrollView>
+              </View>
+            </View>
+          </KeyboardAvoidingView>
+
+          {/* Đặt giờ hoạt động cùng modal để không chồng native modal trên iOS. */}
+          {businessHourBranch && (
+            <View className="absolute inset-0 justify-center bg-black/50 p-5">
+              <View className="max-h-[90%] rounded-2xl bg-white p-5">
+                <View className="flex-row items-center justify-between">
+                  <Text
+                    accessibilityRole="header"
+                    className="flex-1 text-lg font-bold"
+                  >
+                    Giờ hoạt động
+                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Đóng giờ hoạt động"
+                    onPress={() => setBusinessHourBranch(null)}
+                    className="h-11 w-11 items-center justify-center"
+                  >
+                    <X size={20} color="#64748b" />
+                  </Pressable>
+                </View>
+                <Text className="mb-4 text-xs text-slate-500">
+                  {businessHourBranch.branch_name}
+                </Text>
+                <ScrollView>
+                  {businessHourBranch.businessHours.map((hour) => (
+                    <View
+                      key={hour.branch_business_hour_id}
+                      className="mb-2 flex-row flex-wrap justify-between gap-2 rounded-lg bg-slate-50 p-3"
+                    >
+                      <Text className="text-sm">
+                        {dayOfWeekLabels[
+                          hour.branch_business_hour_day_of_week
+                        ] ?? hour.branch_business_hour_day_of_week}
+                      </Text>
+                      <Text className="text-sm font-semibold">
+                        {hour.branch_business_hour_is_closed
+                          ? 'Đóng cửa'
+                          : `${hour.branch_business_hour_open_time} - ${hour.branch_business_hour_close_time}`}
+                      </Text>
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            </View>
+          )}
+        </View>
+      </Modal>
+
+      {/* Modal coupon */}
+      <Modal
+        visible={isCouponModalOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsCouponModalOpen(false)}
+        statusBarTranslucent
+        navigationBarTranslucent
+      >
+        <View className="flex-1 bg-black/50">
+          <View
+            className="flex-1 justify-end"
+            style={{ paddingTop: insets.top + 16 }}
+          >
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Đóng thông tin nhận hàng"
+              accessibilityLabel="Đóng mã giảm giá"
               className="flex-1"
-              onPress={() => setIsDeliveryModalOpen(false)}
+              onPress={() => setIsCouponModalOpen(false)}
             />
             <View
               className="max-h-[90%] rounded-t-3xl bg-white"
@@ -1238,36 +1659,30 @@ export default function CartPage() {
                     accessibilityRole="header"
                     className="text-lg font-bold"
                   >
-                    Thông tin nhận hàng
+                    Chọn mã giảm giá
                   </Text>
                   <Text className="mt-1 text-xs text-slate-500">
-                    Vui lòng cung cấp thông tin người nhận
+                    Chỉ áp dụng một coupon cho mỗi đơn hàng
                   </Text>
                 </View>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Đóng thông tin nhận hàng"
-                  onPress={() => setIsDeliveryModalOpen(false)}
+                  accessibilityLabel="Đóng mã giảm giá"
+                  onPress={() => setIsCouponModalOpen(false)}
                   className="h-11 w-11 items-center justify-center"
                 >
-                  <Text className="text-2xl text-slate-400">×</Text>
+                  <X size={20} color="#94a3b8" />
                 </Pressable>
               </View>
-              <ScrollView
-                keyboardShouldPersistTaps="handled"
-                contentContainerStyle={{ padding: 20 }}
-              >
-                <Text className="font-bold">1. Thông tin người nhận</Text>
-                {customerLoading ? (
-                  <ActivityIndicator className="my-4" color="#168b87" />
-                ) : customerError ? (
-                  <View className="mt-3">
-                    <Text className="text-sm text-red-600">
-                      {customerError}
-                    </Text>
+              <ScrollView contentContainerStyle={{ padding: 20 }}>
+                {couponLoading ? (
+                  <ActivityIndicator color="#168b87" />
+                ) : couponError ? (
+                  <View className="rounded-xl bg-red-50 p-4">
+                    <Text className="text-sm text-red-600">{couponError}</Text>
                     <Pressable
                       accessibilityRole="button"
-                      onPress={fetchCustomer}
+                      onPress={fetchCoupons}
                       className="min-h-11 justify-center"
                     >
                       <Text className="font-semibold text-[#168b87]">
@@ -1275,359 +1690,62 @@ export default function CartPage() {
                       </Text>
                     </Pressable>
                   </View>
+                ) : coupons.length === 0 ? (
+                  <Text className="py-8 text-center text-sm text-slate-500">
+                    Hiện không có mã giảm giá.
+                  </Text>
                 ) : (
-                  <>
-                    <TextInput
-                      value={customer?.customer_full_name ?? ""}
-                      editable={false}
-                      accessibilityLabel="Tên người nhận"
-                      className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800"
-                    />
-                    <TextInput
-                      value={receiverPhone}
-                      onChangeText={setReceiverPhone}
-                      keyboardType="phone-pad"
-                      accessibilityLabel="Số điện thoại người nhận"
-                      placeholder="Số điện thoại người nhận"
-                      placeholderTextColor="#94a3b8"
-                      className="mt-3 rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800"
-                    />
-                  </>
-                )}
-                <Text className="mt-6 font-bold">2. Hình thức nhận hàng</Text>
-                <View className="mt-4 flex-row rounded-xl bg-slate-100 p-1">
-                  {(["DELIVERY", "PICKUP"] as const).map((tab) => (
-                    <Pressable
-                      key={tab}
-                      accessibilityRole="tab"
-                      accessibilityState={{ selected: deliveryTab === tab }}
-                      onPress={() => handleChangeDeliveryTab(tab)}
-                      className={`min-h-12 flex-1 items-center justify-center rounded-lg px-2 py-3 ${deliveryTab === tab ? "bg-white" : ""}`}
-                    >
-                      <Text
-                        className={`text-center text-sm font-semibold ${deliveryTab === tab ? "text-[#168b87]" : "text-slate-500"}`}
+                  coupons.map((coupon) => {
+                    const eligible = subtotal >= toNumber(coupon.minOrderValue);
+                    const discount = calculateCouponDiscount(coupon);
+                    const selected =
+                      selectedCoupon?.couponId === coupon.couponId;
+                    return (
+                      <View
+                        key={coupon.couponId}
+                        className={`mb-3 rounded-xl border p-4 ${selected ? 'border-[#168b87] bg-[#f0faf9]' : 'border-slate-200'} ${eligible ? '' : 'opacity-60'}`}
                       >
-                        {tab === "DELIVERY"
-                          ? "Giao tận nơi"
-                          : "Nhận tại cửa hàng"}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-                {deliveryTab === "DELIVERY" ? (
-                  <View className="mt-4 gap-3">
-                    {!customerLoading &&
-                      !customerError &&
-                      !customer?.addresses?.length && (
-                        <>
-                          <Text className="rounded-xl border border-dashed border-slate-200 p-4 text-sm text-slate-500">
-                            Bạn chưa có địa chỉ. Vui lòng thêm địa chỉ trong
-                            trang thông tin cá nhân.
-                          </Text>
-                          <Pressable
-                            accessibilityRole="button"
-                            onPress={() => {
-                              setIsDeliveryModalOpen(false);
-                              router.push(
-                                "/customer/profile/customer-information",
-                              );
-                            }}
-                            className="min-h-11 justify-center"
-                          >
-                            <Text className="font-semibold text-[#168b87]">
-                              Thêm địa chỉ ›
-                            </Text>
-                          </Pressable>
-                        </>
-                      )}
-                    {customer?.addresses?.map((address) => {
-                      const selected =
-                        selectedAddress?.customer_address_id ===
-                        address.customer_address_id;
-                      return (
-                        <Pressable
-                          key={address.customer_address_id}
-                          accessibilityRole="radio"
-                          accessibilityState={{ checked: selected }}
-                          onPress={() => setSelectedAddress(address)}
-                          className={`rounded-xl border p-4 ${selected ? "border-[#168b87] bg-[#f0faf9]" : "border-slate-200"}`}
-                        >
-                          <Text className="text-sm font-semibold">
-                            {address.customer_address_line}
-                          </Text>
-                          {address.customer_address_default && (
-                            <Text className="mt-1 text-xs text-[#168b87]">
-                              Mặc định
-                            </Text>
-                          )}
-                          <Text className="mt-1 text-sm text-slate-600">
-                            {address.customer_address_ward},{" "}
-                            {address.customer_address_province}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                    <Pressable
-                      accessibilityRole="button"
-                      disabled={
-                        !selectedAddress ||
-                        !receiverPhone.trim() ||
-                        !customer?.customer_full_name?.trim()
-                      }
-                      onPress={handleConfirmDelivery}
-                      className={`items-center rounded-xl bg-[#168b87] p-4 ${!selectedAddress || !receiverPhone.trim() || !customer?.customer_full_name?.trim() ? "opacity-40" : ""}`}
-                    >
-                      <Text className="font-bold text-white">
-                        Xác nhận thông tin
-                      </Text>
-                    </Pressable>
-                  </View>
-                ) : (
-                  <View className="mt-4 gap-3">
-                    {loadingBranches ? (
-                      <ActivityIndicator color="#168b87" />
-                    ) : branchError ? (
-                      <View className="rounded-xl bg-red-50 p-4">
-                        <Text className="text-sm text-red-600">
-                          {branchError}
+                        <Text className="font-bold">
+                          Coupon #{coupon.couponId}
                         </Text>
+                        <Text className="mt-1 text-sm font-semibold text-red-600">
+                          {coupon.discountType === 'PERCENTAGE'
+                            ? `Giảm ${coupon.discountValue}%`
+                            : `Giảm ${formatPrice(toNumber(coupon.discountValue))} ₫`}
+                        </Text>
+                        <Text className="mt-1 text-xs text-slate-500">
+                          Đơn tối thiểu{' '}
+                          {formatPrice(toNumber(coupon.minOrderValue))} ₫
+                        </Text>
+                        {!eligible && (
+                          <Text className="mt-1 text-xs text-red-500">
+                            Chưa đủ điều kiện áp dụng
+                          </Text>
+                        )}
+                        {eligible && (
+                          <Text className="mt-3 text-xs text-green-700">
+                            Được giảm {formatPrice(discount)} ₫
+                          </Text>
+                        )}
                         <Pressable
                           accessibilityRole="button"
-                          onPress={fetchBranches}
-                          className="min-h-11 justify-center"
+                          disabled={!eligible}
+                          onPress={() => {
+                            setSelectedCoupon(coupon);
+                            setIsCouponModalOpen(false);
+                          }}
+                          className={`mt-3 items-center rounded-lg bg-[#168b87] p-3 ${eligible ? '' : 'opacity-40'}`}
                         >
-                          <Text className="font-semibold text-[#168b87]">
-                            Thử lại
+                          <Text className="text-xs font-bold text-white">
+                            {selected ? 'Đã chọn' : 'Áp dụng'}
                           </Text>
                         </Pressable>
                       </View>
-                    ) : (
-                      <>
-                        {branches.length === 0 && (
-                          <Text className="py-4 text-sm text-slate-500">
-                            Hiện không có cửa hàng nhận hàng.
-                          </Text>
-                        )}
-                        {branches.map((branch) => {
-                          const selected =
-                            selectedBranch?.branch_id === branch.branch_id;
-                          return (
-                            <View
-                              key={branch.branch_id}
-                              className={`rounded-xl border p-4 ${selected ? "border-[#168b87] bg-[#f0faf9]" : "border-slate-200"}`}
-                            >
-                              <Pressable
-                                accessibilityRole="radio"
-                                accessibilityState={{ checked: selected }}
-                                onPress={() => setSelectedBranch(branch)}
-                              >
-                                <Text className="font-bold">
-                                  {branch.branch_name}
-                                </Text>
-                                <Text className="mt-1 text-xs text-slate-500">
-                                  {branch.branch_code}
-                                </Text>
-                                {branch.address && (
-                                  <Text className="mt-2 text-sm text-slate-600">
-                                    {branch.address.branch_address_address_line}
-                                    , {branch.address.branch_address_ward},{" "}
-                                    {branch.address.branch_address_province}
-                                  </Text>
-                                )}
-                                <Text className="mt-2 text-xs text-slate-500">
-                                  Điện thoại: {branch.branch_phone}
-                                </Text>
-                              </Pressable>
-                              <Pressable
-                                accessibilityRole="button"
-                                onPress={() => setBusinessHourBranch(branch)}
-                                className="min-h-11 justify-center"
-                              >
-                                <Text className="text-xs font-semibold text-[#168b87]">
-                                  Giờ hoạt động ›
-                                </Text>
-                              </Pressable>
-                            </View>
-                          );
-                        })}
-                      </>
-                    )}
-                    <Pressable
-                      accessibilityRole="button"
-                      disabled={
-                        !selectedBranch?.address ||
-                        !receiverPhone.trim() ||
-                        !customer?.customer_full_name?.trim()
-                      }
-                      onPress={handleConfirmPickup}
-                      className={`items-center rounded-xl bg-[#168b87] p-4 ${!selectedBranch?.address || !receiverPhone.trim() || !customer?.customer_full_name?.trim() ? "opacity-40" : ""}`}
-                    >
-                      <Text className="font-bold text-white">
-                        Xác nhận cửa hàng
-                      </Text>
-                    </Pressable>
-                  </View>
+                    );
+                  })
                 )}
               </ScrollView>
             </View>
-            {/* Đặt giờ hoạt động cùng modal để không chồng native modal trên iOS. */}
-            {businessHourBranch && (
-              <View className="absolute inset-0 justify-center bg-black/50 p-5">
-                <View className="max-h-[90%] rounded-2xl bg-white p-5">
-                  <View className="flex-row items-center justify-between">
-                    <Text
-                      accessibilityRole="header"
-                      className="flex-1 text-lg font-bold"
-                    >
-                      Giờ hoạt động
-                    </Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Đóng giờ hoạt động"
-                      onPress={() => setBusinessHourBranch(null)}
-                      className="h-11 w-11 items-center justify-center"
-                    >
-                      <Text className="text-2xl">×</Text>
-                    </Pressable>
-                  </View>
-                  <Text className="mb-4 text-xs text-slate-500">
-                    {businessHourBranch.branch_name}
-                  </Text>
-                  <ScrollView>
-                    {businessHourBranch.businessHours.map((hour) => (
-                      <View
-                        key={hour.branch_business_hour_id}
-                        className="mb-2 flex-row flex-wrap justify-between gap-2 rounded-lg bg-slate-50 p-3"
-                      >
-                        <Text className="text-sm">
-                          {dayOfWeekLabels[
-                            hour.branch_business_hour_day_of_week
-                          ] ?? hour.branch_business_hour_day_of_week}
-                        </Text>
-                        <Text className="text-sm font-semibold">
-                          {hour.branch_business_hour_is_closed
-                            ? "Đóng cửa"
-                            : `${hour.branch_business_hour_open_time} - ${hour.branch_business_hour_close_time}`}
-                        </Text>
-                      </View>
-                    ))}
-                  </ScrollView>
-                </View>
-              </View>
-            )}
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      {/* Modal coupon */}
-      <Modal
-        visible={isCouponModalOpen}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setIsCouponModalOpen(false)}
-      >
-        <View
-          className="flex-1 justify-end bg-black/50"
-          style={{ paddingTop: insets.top + 16 }}
-        >
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Đóng mã giảm giá"
-            className="flex-1"
-            onPress={() => setIsCouponModalOpen(false)}
-          />
-          <View
-            className="max-h-[90%] rounded-t-3xl bg-white"
-            style={{ paddingBottom: Math.max(insets.bottom, 16) }}
-          >
-            <View className="flex-row items-center justify-between border-b border-slate-100 px-5 py-3">
-              <View className="flex-1">
-                <Text accessibilityRole="header" className="text-lg font-bold">
-                  Chọn mã giảm giá
-                </Text>
-                <Text className="mt-1 text-xs text-slate-500">
-                  Chỉ áp dụng một coupon cho mỗi đơn hàng
-                </Text>
-              </View>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Đóng mã giảm giá"
-                onPress={() => setIsCouponModalOpen(false)}
-                className="h-11 w-11 items-center justify-center"
-              >
-                <Text className="text-2xl text-slate-400">×</Text>
-              </Pressable>
-            </View>
-            <ScrollView contentContainerStyle={{ padding: 20 }}>
-              {couponLoading ? (
-                <ActivityIndicator color="#168b87" />
-              ) : couponError ? (
-                <View className="rounded-xl bg-red-50 p-4">
-                  <Text className="text-sm text-red-600">{couponError}</Text>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={fetchCoupons}
-                    className="min-h-11 justify-center"
-                  >
-                    <Text className="font-semibold text-[#168b87]">
-                      Thử lại
-                    </Text>
-                  </Pressable>
-                </View>
-              ) : coupons.length === 0 ? (
-                <Text className="py-8 text-center text-sm text-slate-500">
-                  Hiện không có mã giảm giá.
-                </Text>
-              ) : (
-                coupons.map((coupon) => {
-                  const eligible = subtotal >= toNumber(coupon.minOrderValue);
-                  const discount = calculateCouponDiscount(coupon);
-                  const selected = selectedCoupon?.couponId === coupon.couponId;
-                  return (
-                    <View
-                      key={coupon.couponId}
-                      className={`mb-3 rounded-xl border p-4 ${selected ? "border-[#168b87] bg-[#f0faf9]" : "border-slate-200"} ${eligible ? "" : "opacity-60"}`}
-                    >
-                      <Text className="font-bold">
-                        Coupon #{coupon.couponId}
-                      </Text>
-                      <Text className="mt-1 text-sm font-semibold text-red-600">
-                        {coupon.discountType === "PERCENTAGE"
-                          ? `Giảm ${coupon.discountValue}%`
-                          : `Giảm ${formatPrice(toNumber(coupon.discountValue))} ₫`}
-                      </Text>
-                      <Text className="mt-1 text-xs text-slate-500">
-                        Đơn tối thiểu{" "}
-                        {formatPrice(toNumber(coupon.minOrderValue))} ₫
-                      </Text>
-                      {!eligible && (
-                        <Text className="mt-1 text-xs text-red-500">
-                          Chưa đủ điều kiện áp dụng
-                        </Text>
-                      )}
-                      {eligible && (
-                        <Text className="mt-3 text-xs text-green-700">
-                          Được giảm {formatPrice(discount)} ₫
-                        </Text>
-                      )}
-                      <Pressable
-                        accessibilityRole="button"
-                        disabled={!eligible}
-                        onPress={() => {
-                          setSelectedCoupon(coupon);
-                          setIsCouponModalOpen(false);
-                        }}
-                        className={`mt-3 items-center rounded-lg bg-[#168b87] p-3 ${eligible ? "" : "opacity-40"}`}
-                      >
-                        <Text className="text-xs font-bold text-white">
-                          {selected ? "Đã chọn" : "Áp dụng"}
-                        </Text>
-                      </Pressable>
-                    </View>
-                  );
-                })
-              )}
-            </ScrollView>
           </View>
         </View>
       </Modal>

@@ -8,7 +8,6 @@ import {
   View,
 } from 'react-native';
 import { router, type Href } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useProductCompare } from '@/components/product-compare-provider';
 import ProductCompareImage from '@/components/product-compare-image';
@@ -483,7 +482,7 @@ export default function ProductLaptopComparePage() {
 
   // RENDER
   return (
-    <SafeAreaView className="flex-1 bg-[#F5F8FA]" edges={['bottom']}>
+    <View className="flex-1 bg-[#F5F8FA]">
       <StoreScrollView
         contentContainerStyle={{ padding: 16, paddingBottom: 100 }}
         refreshControl={
@@ -745,7 +744,7 @@ export default function ProductLaptopComparePage() {
           </View>
         ) : null}
       </StoreScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 // ============================================================

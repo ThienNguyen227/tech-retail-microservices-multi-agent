@@ -1,12 +1,14 @@
-import { CUSTOMER_URLS } from "@/constants/api";
-import { customerAxios } from "../../customer-axios";
+import { CUSTOMER_URLS } from '@/constants/api';
+import { customerAxios } from '../../customer-axios';
 
 export const customerOrderService = {
   // CUSTOMR-SESSION
 
   // 1. (GET) ORDER-LIST
   async getOrderList() {
-    const response = await customerAxios.get(`${CUSTOMER_URLS.order}/order-list`);
+    const response = await customerAxios.get(
+      `${CUSTOMER_URLS.order}/order-list`,
+    );
     return response.data;
   },
 
@@ -15,7 +17,6 @@ export const customerOrderService = {
     const response = await customerAxios.patch(
       `${CUSTOMER_URLS.order}/${orderId}/cancel`,
     );
-
     return response.data;
   },
 
@@ -25,7 +26,6 @@ export const customerOrderService = {
       `${CUSTOMER_URLS.order}/order`,
       orderData,
     );
-
     return response.data;
   },
 };
