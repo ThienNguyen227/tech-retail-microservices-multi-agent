@@ -4,6 +4,8 @@ import {
   ActivityIndicator,
   Pressable,
   RefreshControl,
+  ScrollView,
+  type LayoutChangeEvent,
   Text,
   View,
 } from 'react-native';
@@ -368,6 +370,254 @@ function buildSpecificationRows(
 }
 
 // ============================================================
+// COMPARISON TABLE
+// ============================================================
+
+function ComparisonTable({
+  comparisonColumns,
+  onRemove,
+}: {
+  comparisonColumns: ComparisonColumn[];
+  onRemove: (productId: string) => void;
+}) {
+  const [rowHeights, setRowHeights] = useState<Record<string, number>>({});
+  const columnWidth = 164;
+  const labelWidth = 104;
+  const groups = SPEC_GROUPS.map((group) => ({
+    ...group,
+    rows: buildSpecificationRows(group.key, comparisonColumns),
+  }));
+
+  // Hai phía dùng chiều cao lớn nhất của cùng một hàng để không lệch thông số.
+  const measureRow = (key: string, event: LayoutChangeEvent) => {
+    const height = event.nativeEvent.layout.height;
+    setRowHeights((current) =>
+      height > (current[key] ?? 0) + 0.5
+        ? { ...current, [key]: height }
+        : current,
+    );
+  };
+
+  return (
+    <View>
+      <View className="border-y border-slate-200 bg-slate-50 px-4 py-3">
+        <Text className="text-sm font-bold text-slate-900">
+          Thông số kỹ thuật
+        </Text>
+        <Text className="mt-1 text-xs leading-5 text-slate-500">
+          Vuốt ngang để đối chiếu sản phẩm. Cột thông số được giữ cố định bên
+          trái.
+        </Text>
+      </View>
+      <View className="flex-row items-start">
+        {/* FIXED SPECIFICATION COLUMN */}
+        <View
+          style={{ width: labelWidth }}
+          className="border-r border-slate-200 bg-white"
+        >
+          <View
+            style={{ minHeight: rowHeights.products ?? 240 }}
+            onLayout={(event) => measureRow('products', event)}
+            className="justify-center border-b border-slate-200 bg-slate-100 px-3 py-4"
+          >
+            <Text className="text-xs font-bold leading-5 text-slate-700">
+              Sản phẩm so sánh
+            </Text>
+          </View>
+          {groups.map((group) => (
+            <View key={group.key}>
+              <View
+                style={{ minHeight: rowHeights[group.key] ?? 96 }}
+                onLayout={(event) => measureRow(group.key, event)}
+                className="justify-center border-b border-slate-200 bg-teal-50 px-3 py-3"
+              >
+                <Text
+                  accessibilityRole="header"
+                  className="text-xs font-bold leading-5 text-teal-800"
+                >
+                  {group.title}
+                </Text>
+              </View>
+              {group.rows.length ? (
+                group.rows.map((row, index) => (
+                  <View
+                    key={row.key}
+                    style={{
+                      minHeight: rowHeights[`${group.key}-${row.key}`] ?? 64,
+                    }}
+                    onLayout={(event) =>
+                      measureRow(`${group.key}-${row.key}`, event)
+                    }
+                    className={`justify-center border-b border-slate-200 px-3 py-3 ${index % 2 ? 'bg-slate-50' : 'bg-white'}`}
+                  >
+                    <Text className="text-xs font-semibold leading-5 text-slate-700">
+                      {row.label}
+                    </Text>
+                  </View>
+                ))
+              ) : (
+                <View
+                  style={{ minHeight: rowHeights[`${group.key}-empty`] ?? 64 }}
+                  onLayout={(event) => measureRow(`${group.key}-empty`, event)}
+                  className="border-b border-slate-200"
+                />
+              )}
+            </View>
+          ))}
+        </View>
+        {/* ONE HORIZONTAL SCROLLER KEEPS ALL PRODUCT COLUMNS ALIGNED */}
+        <ScrollView
+          horizontal
+          nestedScrollEnabled
+          style={{ flex: 1 }}
+          showsHorizontalScrollIndicator
+          contentContainerStyle={{ flexGrow: 0 }}
+        >
+          <View style={{ width: columnWidth * comparisonColumns.length }}>
+            {/* PRODUCT HEADERS */}
+            <View
+              style={{ minHeight: rowHeights.products ?? 240 }}
+              onLayout={(event) => measureRow('products', event)}
+              className="flex-row items-stretch border-b border-slate-200 bg-white"
+            >
+              {comparisonColumns.map(({ product, variant }) => (
+                <View
+                  key={product._id}
+                  style={{ width: columnWidth }}
+                  className="border-r border-slate-200 p-3"
+                >
+                  <View className="items-end">
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Xóa ${product.name} khỏi danh sách so sánh`}
+                      onPress={() => onRemove(product._id)}
+                      className="h-11 w-11 items-center justify-center rounded-full bg-slate-50"
+                    >
+                      <ProductCompareIcon
+                        name="close"
+                        color="#64748b"
+                        size={18}
+                      />
+                    </Pressable>
+                  </View>
+                  <Pressable
+                    accessibilityRole="link"
+                    accessibilityLabel={`Xem chi tiết ${product.name}`}
+                    onPress={() =>
+                      router.push(
+                        `/customer/product-detail/${variant.slug || product.slug}` as Href,
+                      )
+                    }
+                  >
+                    <View className="mb-2 h-24 rounded-xl bg-teal-50/50 p-2">
+                      <ProductCompareImage
+                        image={variant.images?.[0] || product.image}
+                        name={product.name}
+                        kind="laptop"
+                      />
+                    </View>
+                    <Text className="text-sm font-bold leading-5 text-slate-900">
+                      {product.name}
+                    </Text>
+                  </Pressable>
+                  <View className="mt-2">
+                    {variant.ram || product.ram ? (
+                      <Text className="text-xs leading-5 text-slate-600">
+                        RAM: {variant.ram || product.ram}
+                      </Text>
+                    ) : null}
+                    {variant.ssd || product.ssd ? (
+                      <Text className="text-xs leading-5 text-slate-600">
+                        SSD: {variant.ssd || product.ssd}
+                      </Text>
+                    ) : null}
+                    {variant.color ? (
+                      <Text className="text-xs leading-5 text-teal-700">
+                        {variant.color}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <Text className="mt-2 text-sm font-bold text-teal-700">
+                    {typeof variant.price === 'number' && variant.price > 0
+                      ? formatPrice(variant.price)
+                      : 'Liên hệ'}
+                  </Text>
+                </View>
+              ))}
+            </View>
+            {/* SPECIFICATION GROUPS AND ROWS */}
+            {groups.map((group) => (
+              <View key={group.key}>
+                <View
+                  style={{ minHeight: rowHeights[group.key] ?? 96 }}
+                  onLayout={(event) => measureRow(group.key, event)}
+                  className="justify-center border-b border-slate-200 bg-teal-50"
+                >
+                  <Text className="px-3 py-2 text-xs leading-5 text-teal-700">
+                    {group.description}
+                  </Text>
+                  <View className="flex-row">
+                    {comparisonColumns.map(({ product }) => (
+                      <View
+                        key={product._id}
+                        style={{ width: columnWidth }}
+                        className="border-r border-teal-100 px-3 pb-3"
+                      >
+                        <Text className="text-xs font-semibold leading-5 text-teal-800">
+                          {product.name}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+                {group.rows.length ? (
+                  group.rows.map((row, index) => (
+                    <View
+                      key={row.key}
+                      style={{
+                        minHeight: rowHeights[`${group.key}-${row.key}`] ?? 64,
+                      }}
+                      onLayout={(event) =>
+                        measureRow(`${group.key}-${row.key}`, event)
+                      }
+                      className={`flex-row items-stretch border-b border-slate-200 ${index % 2 ? 'bg-slate-50' : 'bg-white'}`}
+                    >
+                      {row.values.map((value, columnIndex) => (
+                        <View
+                          key={comparisonColumns[columnIndex].product._id}
+                          style={{ width: columnWidth }}
+                          className="border-r border-slate-200 px-3 py-3"
+                        >
+                          <SpecificationValue value={value} />
+                        </View>
+                      ))}
+                    </View>
+                  ))
+                ) : (
+                  <View
+                    style={{
+                      minHeight: rowHeights[`${group.key}-empty`] ?? 64,
+                    }}
+                    onLayout={(event) =>
+                      measureRow(`${group.key}-empty`, event)
+                    }
+                    className="justify-center border-b border-slate-200 px-3 py-3"
+                  >
+                    <Text className="text-sm italic text-slate-400">
+                      Chưa có thông số trong nhóm này.
+                    </Text>
+                  </View>
+                )}
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+      </View>
+    </View>
+  );
+}
+
+// ============================================================
 // MAIN PAGE
 // ============================================================
 
@@ -603,139 +853,11 @@ export default function ProductLaptopComparePage() {
                 Đang so sánh {comparisonColumns.length} laptop
               </Text>
             </View>
-            {/* PRODUCT CARDS */}
-            <View className="gap-3 p-4">
-              {comparisonColumns.map(({ product, variant }) => (
-                <View
-                  key={product._id}
-                  className="rounded-2xl border border-slate-200 p-3"
-                >
-                  <View className="flex-row items-start gap-3">
-                    <Pressable
-                      accessibilityRole="link"
-                      accessibilityLabel={`Xem chi tiết ${product.name}`}
-                      onPress={() =>
-                        router.push(
-                          `/customer/product-detail/${variant.slug || product.slug}` as Href,
-                        )
-                      }
-                      className="h-24 w-24 rounded-xl bg-teal-50/50 p-2"
-                    >
-                      <ProductCompareImage
-                        image={variant.images?.[0] || product.image}
-                        name={product.name}
-                        kind="laptop"
-                      />
-                    </Pressable>
-                    <View className="flex-1">
-                      <Pressable
-                        accessibilityRole="link"
-                        onPress={() =>
-                          router.push(
-                            `/customer/product-detail/${variant.slug || product.slug}` as Href,
-                          )
-                        }
-                        className="min-h-11 justify-center"
-                      >
-                        <Text className="text-sm font-bold leading-5 text-slate-900">
-                          {product.name}
-                        </Text>
-                      </Pressable>
-                      <View className="mt-2 flex-row flex-wrap gap-1.5">
-                        {variant.ram || product.ram ? (
-                          <Text className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600">
-                            RAM: {variant.ram || product.ram}
-                          </Text>
-                        ) : null}
-                        {variant.ssd || product.ssd ? (
-                          <Text className="rounded-md bg-slate-100 px-2 py-1 text-xs text-slate-600">
-                            SSD: {variant.ssd || product.ssd}
-                          </Text>
-                        ) : null}
-                        {variant.color ? (
-                          <Text className="rounded-md bg-teal-50 px-2 py-1 text-xs text-teal-700">
-                            {variant.color}
-                          </Text>
-                        ) : null}
-                      </View>
-                      <Text className="mt-3 text-base font-bold text-teal-700">
-                        {typeof variant.price === 'number' && variant.price > 0
-                          ? formatPrice(variant.price)
-                          : 'Liên hệ'}
-                      </Text>
-                    </View>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`Xóa ${product.name} khỏi danh sách so sánh`}
-                      onPress={() => removeLaptop(product._id)}
-                      className="min-h-11 w-11 items-center justify-center rounded-full bg-slate-50"
-                    >
-                      <ProductCompareIcon
-                        name="close"
-                        color="#64748b"
-                        size={18}
-                      />
-                    </Pressable>
-                  </View>
-                </View>
-              ))}
-            </View>
-            {/* SPECIFICATIONS */}
-            <View className="border-y border-slate-200 bg-slate-50 px-5 py-4">
-              <Text className="text-sm font-bold text-slate-900">
-                Thông số kỹ thuật
-              </Text>
-              <Text className="mt-1 text-xs leading-5 text-slate-500">
-                Đối chiếu chi tiết từng thông số của sản phẩm
-              </Text>
-            </View>
-            {SPEC_GROUPS.map((group) => {
-              const rows = buildSpecificationRows(group.key, comparisonColumns);
-              return (
-                <View key={group.key}>
-                  <View className="border-y border-slate-200 bg-teal-50 px-5 py-4">
-                    <Text
-                      accessibilityRole="header"
-                      className="text-sm font-bold text-teal-800"
-                    >
-                      {group.title}
-                    </Text>
-                    <Text className="mt-1 text-xs leading-5 text-teal-700">
-                      {group.description}
-                    </Text>
-                  </View>
-                  {rows.length ? (
-                    rows.map((row) => (
-                      <View
-                        key={row.key}
-                        className="border-b border-slate-100 px-4 py-4"
-                      >
-                        <Text className="mb-3 text-sm font-bold text-slate-800">
-                          {row.label}
-                        </Text>
-                        <View className="gap-3">
-                          {row.values.map((value, index) => (
-                            <View
-                              key={comparisonColumns[index].product._id}
-                              className="rounded-xl bg-slate-50/70 p-3"
-                            >
-                              <Text className="mb-2 text-xs font-semibold leading-5 text-teal-700">
-                                {comparisonColumns[index].product.name}
-                              </Text>
-                              <SpecificationValue value={value} />
-                            </View>
-                          ))}
-                        </View>
-                      </View>
-                    ))
-                  ) : (
-                    <Text className="p-5 text-center text-sm italic text-slate-400">
-                      Chưa có thông số trong nhóm này.
-                    </Text>
-                  )}
-                </View>
-              );
-            })}
+            <ComparisonTable
+              key={`${idsKey}-${retryCount}`}
+              comparisonColumns={comparisonColumns}
+              onRemove={removeLaptop}
+            />
             <Text className="bg-slate-50 px-5 py-4 text-xs leading-5 text-slate-500">
               Lưu ý: Thông số được hiển thị dựa trên dữ liệu sản phẩm hiện có
               trong hệ thống. Một số thông tin có thể chưa được nhà sản xuất
