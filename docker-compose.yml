@@ -56,16 +56,38 @@ services:
     volumes:
       - redisdb_data:/data
 
+  # user-service:
+  #   image: user-service:v1
+  #   build:
+  #     context: ./backend/user-service
+  #     dockerfile: Dockerfile
+  #     target: production
+  #   container_name: user-service
+  #   restart: unless-stopped
+  #   ports:
+  #     - "3001:3001"
+  #   env_file:
+  #     - ./backend/user-service/.env
+  #   environment:
+  #     DATABASE_URL: "postgresql://postgres:password@postgresdb:5432/user_service"
+  #     REDIS_HOST: "redisdb"
+  #     REDIS_PORT: "6379"
+  #   depends_on:
+  #     postgresdb:
+  #       condition: service_healthy
+  #     redisdb:
+  #       condition: service_started
+
+
   user-service:
     image: user-service:v1
     build:
       context: ./backend/user-service
       dockerfile: Dockerfile
       target: production
-    container_name: user-service
     restart: unless-stopped
-    ports:
-      - "3001:3001"
+    expose:
+      - "3001"
     env_file:
       - ./backend/user-service/.env
     environment:
@@ -77,6 +99,7 @@ services:
         condition: service_healthy
       redisdb:
         condition: service_started
+
 
   customer-service:
     image: customer-service:v1
@@ -96,16 +119,33 @@ services:
       postgresdb:
         condition: service_healthy
 
+  # product-service:
+  #   image: product-service:v1
+  #   build:
+  #     context: ./backend/product-service
+  #     dockerfile: Dockerfile
+  #     target: production
+  #   container_name: product-service
+  #   restart: unless-stopped
+  #   ports:
+  #     - "3003:3003"
+  #   env_file:
+  #     - ./backend/product-service/.env
+  #   environment:
+  #     DATABASE_URL: "mongodb://root:password@mongodb:27017/product_service?authSource=admin"
+  #   depends_on:
+  #     mongodb:
+  #       condition: service_healthy
+  
   product-service:
     image: product-service:v1
     build:
       context: ./backend/product-service
       dockerfile: Dockerfile
       target: production
-    container_name: product-service
     restart: unless-stopped
-    ports:
-      - "3003:3003"
+    expose:
+      - "3003"
     env_file:
       - ./backend/product-service/.env
     environment:
@@ -113,7 +153,7 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
-  
+
   cart-service:
     image: cart-service:v1
     build:
@@ -150,17 +190,59 @@ services:
       postgresdb:
         condition: service_healthy
 
+  # inventory-service:
+  #   image: inventory-service:v1
+  #   build:
+  #     context: ./backend/inventory-service
+  #     dockerfile: Dockerfile
+  #     target: production
+  #   container_name: inventory-service
+  #   restart: unless-stopped
+  #   ports:
+  #     - "3006:3006"
+  #     - "50051:50051"
+  #   env_file:
+  #     - ./backend/inventory-service/.env
+  #   environment:
+  #     PORT: 3006
+  #     DATABASE_URL: "postgresql://postgres:password@postgresdb:5432/inventory_service?schema=public"
+  #     RABBITMQ_URL: "amqp://admin:password@rabbitmq:5672"
+  #   depends_on:
+  #     postgresdb:
+  #       condition: service_healthy
+
+  # order-service:
+  #   image: order-service:v1
+  #   build:
+  #     context: ./backend/order-service
+  #     dockerfile: Dockerfile
+  #     target: production
+  #   container_name: order-service
+  #   restart: unless-stopped
+  #   ports:
+  #     - "3007:3007"
+  #   env_file:
+  #     - ./backend/order-service/.env
+  #   environment:
+  #     PORT: 3007
+  #     DATABASE_URL: "postgresql://postgres:password@postgresdb:5432/order_service?schema=public"
+  #     RABBITMQ_URL: "amqp://admin:password@rabbitmq:5672"
+  #     INVENTORY_GRPC_URL: "inventory-service:50051"
+  #     CART_SERVICE_URL: "http://cart-service:3004"
+  #   depends_on:
+  #     postgresdb:
+  #       condition: service_healthy
+
   inventory-service:
     image: inventory-service:v1
     build:
       context: ./backend/inventory-service
       dockerfile: Dockerfile
       target: production
-    container_name: inventory-service
     restart: unless-stopped
-    ports:
-      - "3006:3006"
-      - "50051:50051"
+    expose:
+      - "3006"
+      - "50051"
     env_file:
       - ./backend/inventory-service/.env
     environment:
@@ -177,10 +259,9 @@ services:
       context: ./backend/order-service
       dockerfile: Dockerfile
       target: production
-    container_name: order-service
     restart: unless-stopped
-    ports:
-      - "3007:3007"
+    expose:
+      - "3007"
     env_file:
       - ./backend/order-service/.env
     environment:
