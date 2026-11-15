@@ -41,6 +41,18 @@ model Customer_Address {
   @@index([customer_address_customer_id], name: "idx_address_customer_id")
 }
 
+// ========================================
+// 3. ProcessedEvent
+// ========================================
+model ProcessedEvent {
+  processed_event_id         Int      @id @default(autoincrement())
+  processed_event_event_id   Int      @unique
+  processed_event_event_type String
+  processed_event_created_at DateTime @default(now())
+
+  @@map("processed_event")
+}
+
 model Membership_tiers {
   membership_tier_id               BigInt                @id @default(autoincrement())
   membership_tier_name             String                @unique @db.VarChar(50)
