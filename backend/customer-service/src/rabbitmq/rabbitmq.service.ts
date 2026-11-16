@@ -6,14 +6,22 @@ import {
 
 import * as amqp from 'amqplib';
 
+import { CreateCustomerService } from '../customer-session/create_customer/create_customer.service';
+
 @Injectable()
-export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
+export class RabbitMQService
+  implements OnModuleInit, OnModuleDestroy
+{
+  constructor(
+    private readonly createCustomerService: CreateCustomerService,
+  ) {}
+
   // ======================================================
-  // RABBITMQ CONNECTION
+  // RABBITMQ
   // ======================================================
 
   private connection?: amqp.ChannelModel;
-  private channel?: amqp.ConfirmChannel;
+  private channel?: amqp.Channel;
 
   // ======================================================
   // RECONNECT STATE
@@ -28,10 +36,15 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
   // ======================================================
 
   private readonly rabbitmqUrl =
-    process.env.RABBITMQ_URL || 'amqp://admin:password@localhost:5672';
+    process.env.RABBITMQ_URL ||
+    'amqp://admin:password@localhost:5672';
 
-  // User-Service (Producer) -> Customer-Service (Consumer)
-  private readonly userExchange = 'user.events';
+  // User-Service -> Customer-Service
+  private readonly exchangeName = 'user.events';
+
+  private readonly queueName = 'customer.user.queue';
+
+  private readonly routingKey = 'user.created';
 
   private readonly reconnectDelay = 5000;
 
@@ -39,7 +52,7 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
   // MODULE INIT
   // ======================================================
 
-  async onModuleInit(): Promise<void> {
+  async onModuleInit() {
     await this.connect();
   }
 
@@ -52,12 +65,12 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    // Đã kết nối và có channel
+    // Đã connected
     if (this.connection && this.channel) {
       return;
     }
 
-    // Tránh nhiều lần connect đồng thời
+    // Đang reconnect
     if (this.reconnecting) {
       return;
     }
@@ -65,16 +78,19 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
     this.reconnecting = true;
 
     let connection: amqp.ChannelModel | undefined;
-    let channel: amqp.ConfirmChannel | undefined;
+    let channel: amqp.Channel | undefined;
 
     try {
       console.log('Connecting RabbitMQ...');
 
       // ======================================================
-      // CONNECT
+      // CONNECTION
       // ======================================================
 
-      connection = await amqp.connect(this.rabbitmqUrl);
+      connection = await amqp.connect(
+        this.rabbitmqUrl,
+      );
+
       this.connection = connection;
 
       console.log('RabbitMQ connected');
@@ -86,7 +102,9 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
       connection.on('error', (error) => {
         console.error(
           'RabbitMQ connection error:',
-          error instanceof Error ? error.message : error,
+          error instanceof Error
+            ? error.message
+            : error,
         );
       });
 
@@ -108,45 +126,67 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
       });
 
       // ======================================================
-      // CREATE CONFIRM CHANNEL
-      //
-      // ConfirmChannel cho phép Producer nhận xác nhận ACK/NACK
-      // từ RabbitMQ cho từng message publish.
+      // CHANNEL
       // ======================================================
 
-      channel = await connection.createConfirmChannel();
+      channel = await connection.createChannel();
+
       this.channel = channel;
 
-      console.log('RabbitMQ confirm channel created');
-
-      channel.on('error', (error) => {
-        console.error(
-          'RabbitMQ channel error:',
-          error instanceof Error ? error.message : error,
-        );
-      });
-
-      channel.on('close', () => {
-        console.error('RabbitMQ channel closed');
-
-        if (this.channel === channel) {
-          this.channel = undefined;
-        }
-
-        if (!this.isDestroyed) {
-          this.scheduleReconnect();
-        }
-      });
+      console.log('RabbitMQ channel created');
 
       // ======================================================
-      // USER EXCHANGE
+      // EXCHANGE
       // ======================================================
 
-      await channel.assertExchange(this.userExchange, 'direct', {
-        durable: true,
-      });
+      await channel.assertExchange(
+        this.exchangeName,
+        'direct',
+        {
+          durable: true,
+        },
+      );
 
-      console.log(`Exchange "${this.userExchange}" ready`);
+      console.log(
+        `Exchange "${this.exchangeName}" ready`,
+      );
+
+      // ======================================================
+      // QUEUE
+      // ======================================================
+
+      await channel.assertQueue(
+        this.queueName,
+        {
+          durable: true,
+        },
+      );
+
+      console.log(
+        `Queue "${this.queueName}" ready`,
+      );
+
+      // ======================================================
+      // BINDING
+      // ======================================================
+
+      await channel.bindQueue(
+        this.queueName,
+        this.exchangeName,
+        this.routingKey,
+      );
+
+      console.log(
+        `Binding "${this.routingKey}" ready`,
+      );
+
+      // ======================================================
+      // CONSUMER
+      // ======================================================
+
+      await this.consume(channel);
+
+      console.log('Consumer ready');
 
       // ======================================================
       // CONNECT SUCCESS
@@ -154,11 +194,16 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
 
       this.reconnecting = false;
 
-      console.log('RabbitMQ Producer setup completed');
+      console.log(
+        'RabbitMQ setup completed',
+      );
+
     } catch (error) {
       console.error(
         'RabbitMQ connection failed:',
-        error instanceof Error ? error.message : error,
+        error instanceof Error
+          ? error.message
+          : error,
       );
 
       if (this.channel === channel) {
@@ -171,7 +216,7 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
 
       this.reconnecting = false;
 
-      // Dọn kết nối/channel nếu quá trình setup bị lỗi
+      // Dọn channel và connection nếu setup thất bại
       try {
         await channel?.close();
       } catch {
@@ -195,134 +240,172 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
   // ======================================================
 
   private scheduleReconnect(): void {
-    if (this.isDestroyed || this.reconnectTimer) {
+    if (this.isDestroyed) {
+      return;
+    }
+
+    if (this.reconnectTimer) {
       return;
     }
 
     console.log(
-      `RabbitMQ will reconnect in ${this.reconnectDelay / 1000} seconds...`,
+      `RabbitMQ will reconnect in ${
+        this.reconnectDelay / 1000
+      } seconds...`,
     );
 
-    this.reconnectTimer = setTimeout(async () => {
-      this.reconnectTimer = undefined;
-      await this.connect();
-    }, this.reconnectDelay);
+    this.reconnectTimer = setTimeout(
+      async () => {
+        this.reconnectTimer = undefined;
+
+        await this.connect();
+      },
+      this.reconnectDelay,
+    );
   }
 
   // ======================================================
-  // PUBLISH
+  // CONSUMER
   // ======================================================
 
-  /**
-   * Publish một event lên user.events.
-   *
-   * Hàm chỉ resolve khi RabbitMQ xác nhận publish thành công.
-   * Outbox Worker chỉ nên cập nhật OutboxEvent sang PUBLISHED
-   * sau khi hàm này resolve thành công.
-   *
-   * Ví dụ routingKey:
-   * - user.created
-   * - user.updated
-   * - user.deleted
-   */
-  async publish(routingKey: string, message: unknown): Promise<void> {
-    const channel = this.channel;
+  private async consume(
+    channel: amqp.Channel,
+  ): Promise<void> {
 
-    if (!channel) {
-      throw new Error('RabbitMQ confirm channel is not available');
-    }
+    await channel.consume(
+      this.queueName,
+      async (message) => {
+        if (!message) {
+          return;
+        }
 
-    if (!routingKey?.trim()) {
-      throw new Error('RabbitMQ routingKey is required');
-    }
+        try {
+          // ======================================================
+          // PARSE MESSAGE
+          // ======================================================
 
-    let content: Buffer;
+          const routingKey =
+            message.fields.routingKey;
 
-    try {
-      const serializedMessage = JSON.stringify(message);
+          const payload = JSON.parse(
+            message.content.toString(),
+          );
 
-      if (serializedMessage === undefined) {
-        throw new Error('Message cannot be serialized to JSON');
-      }
+          console.log(
+            'Received event:',
+            {
+              routingKey,
+              payload,
+            },
+          );
 
-      content = Buffer.from(serializedMessage);
-    } catch (error) {
-      throw new Error(
-        `Cannot serialize RabbitMQ message: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
-      );
-    }
+          // ======================================================
+          // USER CREATED
+          // ======================================================
 
-    // Publisher Confirm: chờ RabbitMQ ACK/NACK message này
-    await new Promise<void>((resolve, reject) => {
-      try {
-        channel.publish(
-          this.userExchange,
-          routingKey,
-          content,
-          {
-            persistent: true,
-            contentType: 'application/json',
-          },
-          (error) => {
-            if (error) {
-              reject(error);
-              return;
-            }
+          if (
+            routingKey ===
+            'user.created'
+          ) {
+            await this.createCustomerService.createCustomer(
+              payload.eventId,
+              payload.eventType,
+              payload.data,
+            );
 
-            resolve();
-          },
-        );
-      } catch (error) {
-        reject(error);
-      }
-    });
+            console.log(
+              `Customer được tạo thành công cho User ID: ${payload.data.user_id}`,
+            );
+          }
 
-    console.log('Published RabbitMQ event:', {
-      exchange: this.userExchange,
-      routingKey,
-    });
+          // ======================================================
+          // ACK
+          // ======================================================
+
+          channel.ack(message);
+
+        } catch (error) {
+          console.error(
+            'Error processing RabbitMQ message:',
+            error instanceof Error
+              ? error.message
+              : error,
+          );
+
+          // ======================================================
+          // NACK + REQUEUE
+          // ======================================================
+
+          try {
+            channel.nack(
+              message,
+              false,
+              true,
+            );
+          } catch (ackError) {
+            console.error(
+              'Failed to nack RabbitMQ message:',
+              ackError instanceof Error
+                ? ackError.message
+                : ackError,
+            );
+          }
+        }
+      },
+    );
+
+    console.log(
+      'Consumer is listening...',
+    );
   }
 
   // ======================================================
   // MODULE DESTROY
   // ======================================================
 
-  async onModuleDestroy(): Promise<void> {
+  async onModuleDestroy() {
     this.isDestroyed = true;
 
     // Không reconnect nữa
     if (this.reconnectTimer) {
-      clearTimeout(this.reconnectTimer);
+      clearTimeout(
+        this.reconnectTimer,
+      );
+
       this.reconnectTimer = undefined;
     }
 
-    // Lưu reference rồi xóa state trước khi close
-    const channel = this.channel;
-    const connection = this.connection;
+    // ======================================================
+    // CLOSE CHANNEL
+    // ======================================================
 
-    this.channel = undefined;
-    this.connection = undefined;
-
-    // Close channel
     try {
-      await channel?.close();
+      await this.channel?.close();
     } catch (error) {
       console.error(
         'Error closing RabbitMQ channel:',
-        error instanceof Error ? error.message : error,
+        error instanceof Error
+          ? error.message
+          : error,
       );
     }
 
-    // Close connection
+    // ======================================================
+    // CLOSE CONNECTION
+    // ======================================================
+
     try {
-      await connection?.close();
+      await this.connection?.close();
     } catch (error) {
       console.error(
         'Error closing RabbitMQ connection:',
-        error instanceof Error ? error.message : error,
+        error instanceof Error
+          ? error.message
+          : error,
       );
     }
+
+    this.channel = undefined;
+    this.connection = undefined;
   }
 }
