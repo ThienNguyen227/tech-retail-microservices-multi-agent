@@ -92,6 +92,7 @@ services:
       - ./backend/user-service/.env
     environment:
       DATABASE_URL: "postgresql://postgres:password@postgresdb:5432/user_service"
+      RABBITMQ_URL: "amqp://admin:password@rabbitmq:5672"
       REDIS_HOST: "redisdb"
       REDIS_PORT: "6379"
     depends_on:
@@ -115,6 +116,7 @@ services:
       - ./backend/customer-service/.env
     environment:
       DATABASE_URL: "postgresql://postgres:password@postgresdb:5432/customer_service"
+      RABBITMQ_URL: "amqp://admin:password@rabbitmq:5672"
     depends_on:
       postgresdb:
         condition: service_healthy
