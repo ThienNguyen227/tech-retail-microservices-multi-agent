@@ -94,14 +94,32 @@ export class RegisterService {
     // Thời gian hết hạn để trả về client
     const expiresAt = new Date(Date.now() + 60 * 1000);
 
-    // 7. Gửi OTP qua email
+    // // 7. Gửi OTP qua email
+    // try {
+    //   await this.emailService.sendOtpEmail(dto.user_email, otp);
+    // } catch (error) {
+    //   // Gửi email thất bại → xóa OTP trong Redis
+    //   await this.redisService.delete(redisKey);
+
+    //   throw new InternalServerErrorException('Không thể gửi OTP. Vui lòng thử lại sau!');
+    // }
     try {
       await this.emailService.sendOtpEmail(dto.user_email, otp);
     } catch (error) {
-      // Gửi email thất bại → xóa OTP trong Redis
-      await this.redisService.delete(redisKey);
 
-      throw new InternalServerErrorException('Không thể gửi OTP. Vui lòng thử lại sau!');
+      // Ghi nhận lỗi gốc từ Email Service
+      console.error('SEND OTP EMAIL ERROR:', error);
+
+      // Gửi email thất bại → cố gắng xóa OTP trong Redis
+      try {
+        await this.redisService.delete(redisKey);
+      } catch (redisError) {
+        console.error('DELETE OTP FROM REDIS ERROR:', redisError);
+      }
+
+      throw new InternalServerErrorException(
+        'Không thể gửi OTP. Vui lòng thử lại sau!',
+      );
     }
 
     return {message: 'OTP đã được gửi đến email của người dùng!', otp_expires_at: expiresAt};
@@ -146,6 +164,159 @@ export class RegisterService {
   }
 
   // 3. (POST) VERIFY OTP FOR REGISTRATION
+  // async verifyOtp(dto: VerifyOtpDto): Promise<{ message: string }> {
+
+  //   // 1. Kiểm tra email đã tồn tại chưa
+  //   const existedUser = await this.findByEmail(dto.user_email);
+
+  //   if (existedUser) {
+  //     throw new BadRequestException('Email đã tồn tại!');
+  //   }
+
+  //   // 2. Kiểm tra số điện thoại đã tồn tại chưa
+  //   const existedPhone = await this.findByPhone(dto.user_phone);
+
+  //   if (existedPhone) {
+  //     throw new BadRequestException('Số điện thoại đã tồn tại!');
+  //   }
+
+  //   // 3. Key OTP và số lần nhập sai
+  //   const redisKey = `register:otp:${dto.user_email}`;
+  //   const attemptsKey = `register:otp:attempts:${dto.user_email}`;
+
+  //   // 4. Lấy OTP hash từ Redis
+  //   const otpCodeHash = await this.redisService.get(redisKey);
+
+  //   if (!otpCodeHash) {
+  //     throw new BadRequestException(
+  //       'OTP không tồn tại hoặc đã hết hạn. Vui lòng yêu cầu OTP mới!',
+  //     );
+  //   }
+
+  //   // 5. Kiểm tra OTP
+  //   const isOtpValid = await bcrypt.compare(dto.otp_code, otpCodeHash);
+
+  //   if (!isOtpValid) {
+
+  //     // Lấy số lần sai hiện tại
+  //     const attemptsValue = await this.redisService.get(attemptsKey);
+
+  //     const attempts = attemptsValue ? Number(attemptsValue) : 0;
+
+  //     const newAttempts = attempts + 1;
+
+  //     // Đã sai đủ 5 lần
+  //     if (newAttempts >= 5) {
+
+  //       // Xóa OTP và số lần sai
+  //       await this.redisService.delete(redisKey);
+  //       await this.redisService.delete(attemptsKey);
+
+  //       throw new UnauthorizedException('Bạn đã nhập sai OTP quá 5 lần. Vui lòng yêu cầu OTP mới!');
+  //     }
+
+  //     // Lưu số lần sai
+  //     await this.redisService.set(attemptsKey, newAttempts.toString(), 60);
+
+  //     throw new UnauthorizedException(`OTP không đúng. Bạn còn ${5 - newAttempts} lần thử!`);
+  //   }
+
+  //   // 6. OTP đúng → xóa số lần sai
+  //   await this.redisService.delete(attemptsKey);
+
+  //   // 7. Hash password
+  //   const hashedPassword = await bcrypt.hash(dto.user_password_hash, 10);
+
+  //   let user: any;
+
+  //   try {
+
+  //     // 8. Tạo User + Role trong transaction
+  //     user = await this.prisma.$transaction(async (tx) => {
+
+  //       const createdUser = await tx.users.create({
+  //         data: {
+  //           user_name: dto.user_name,
+  //           user_phone: dto.user_phone,
+  //           user_email: dto.user_email,
+  //           user_password_hash: hashedPassword,
+  //           user_type: 'CUSTOMER',
+  //           user_status: 'ACTIVE',
+  //         },
+  //       });
+
+  //       const customerRole = await tx.roles.findUnique({
+  //         where: {
+  //           role_name: 'CUSTOMER',
+  //         },
+  //         select: {
+  //           role_id: true,
+  //         },
+  //       });
+
+  //       if (!customerRole) {
+  //         throw new InternalServerErrorException(
+  //           'Vai trò CUSTOMER chưa được cấu hình',
+  //         );
+  //       }
+
+  //       await tx.user_Roles.create({
+  //         data: {
+  //           user_id: createdUser.user_id,
+  //           role_id: customerRole.role_id,
+  //         },
+  //       });
+
+  //       return createdUser;
+  //     });
+
+  //     // 9. OTP đã sử dụng → xóa khỏi Redis
+  //     await this.redisService.delete(redisKey);
+
+  //     // 10. Tạo Customer
+  //     await axios.post(
+  //       'http://localhost:3002/api/v1/internal/customer',
+  //       {
+  //         customer_user_id: user.user_id.toString(),
+  //       },
+  //       {
+  //         timeout: 10_000,
+  //       },
+  //     );
+
+  //     return {
+  //       message: 'Đăng ký tài khoản thành công',
+  //     };
+
+  //   } catch (error) {
+
+  //     // 11. Compensation
+  //     if (user) {
+  //       await this.prisma.$transaction(async (tx) => {
+
+  //         await tx.user_Roles.deleteMany({
+  //           where: {
+  //             user_id: user.user_id,
+  //           },
+  //         });
+
+  //         await tx.users.delete({
+  //           where: {
+  //             user_id: user.user_id,
+  //           },
+  //         });
+  //       });
+  //     }
+
+  //     if (error instanceof HttpException) {
+  //       throw error;
+  //     }
+
+  //     throw new InternalServerErrorException(
+  //       'Đăng ký tài khoản thất bại!',
+  //     );
+  //   }
+  // }
   async verifyOtp(dto: VerifyOtpDto): Promise<{ message: string }> {
 
     // 1. Kiểm tra email đã tồn tại chưa
@@ -176,7 +347,10 @@ export class RegisterService {
     }
 
     // 5. Kiểm tra OTP
-    const isOtpValid = await bcrypt.compare(dto.otp_code, otpCodeHash);
+    const isOtpValid = await bcrypt.compare(
+      dto.otp_code,
+      otpCodeHash,
+    );
 
     if (!isOtpValid) {
 
@@ -190,32 +364,41 @@ export class RegisterService {
       // Đã sai đủ 5 lần
       if (newAttempts >= 5) {
 
-        // Xóa OTP và số lần sai
         await this.redisService.delete(redisKey);
         await this.redisService.delete(attemptsKey);
 
-        throw new UnauthorizedException('Bạn đã nhập sai OTP quá 5 lần. Vui lòng yêu cầu OTP mới!');
+        throw new UnauthorizedException(
+          'Bạn đã nhập sai OTP quá 5 lần. Vui lòng yêu cầu OTP mới!',
+        );
       }
 
       // Lưu số lần sai
-      await this.redisService.set(attemptsKey, newAttempts.toString(), 60);
+      await this.redisService.set(
+        attemptsKey,
+        newAttempts.toString(),
+        60,
+      );
 
-      throw new UnauthorizedException(`OTP không đúng. Bạn còn ${5 - newAttempts} lần thử!`);
+      throw new UnauthorizedException(
+        `OTP không đúng. Bạn còn ${5 - newAttempts} lần thử!`,
+      );
     }
 
     // 6. OTP đúng → xóa số lần sai
     await this.redisService.delete(attemptsKey);
 
     // 7. Hash password
-    const hashedPassword = await bcrypt.hash(dto.user_password_hash, 10);
-
-    let user: any;
+    const hashedPassword = await bcrypt.hash(
+      dto.user_password_hash,
+      10,
+    );
 
     try {
 
-      // 8. Tạo User + Role trong transaction
-      user = await this.prisma.$transaction(async (tx) => {
+      // 8. Tạo User + Role + OutboxEvent trong cùng transaction
+      await this.prisma.$transaction(async (tx) => {
 
+        // 8.1 Tạo User
         const createdUser = await tx.users.create({
           data: {
             user_name: dto.user_name,
@@ -227,6 +410,7 @@ export class RegisterService {
           },
         });
 
+        // 8.2 Tìm Role CUSTOMER
         const customerRole = await tx.roles.findUnique({
           where: {
             role_name: 'CUSTOMER',
@@ -242,6 +426,7 @@ export class RegisterService {
           );
         }
 
+        // 8.3 Gán Role cho User
         await tx.user_Roles.create({
           data: {
             user_id: createdUser.user_id,
@@ -249,22 +434,28 @@ export class RegisterService {
           },
         });
 
-        return createdUser;
+        // 8.4 Tạo Outbox Event
+        await tx.outboxEvent.create({
+          data: {
+            outbox_event_type: 'user.created',
+            outbox_event_payload: {
+              user_id: createdUser.user_id.toString(),
+            },
+          },
+        });
+
       });
 
-      // 9. OTP đã sử dụng → xóa khỏi Redis
-      await this.redisService.delete(redisKey);
-
-      // 10. Tạo Customer
-      await axios.post(
-        'http://localhost:3002/api/v1/internal/customer',
-        {
-          customer_user_id: user.user_id.toString(),
-        },
-        {
-          timeout: 10_000,
-        },
-      );
+      // 9. Đăng ký thành công → xóa OTP khỏi Redis
+      // Nếu Redis cleanup thất bại thì không rollback User đã tạo.
+      try {
+        await this.redisService.delete(redisKey);
+      } catch (redisError) {
+        console.error(
+          'Failed to delete used OTP:',
+          redisError,
+        );
+      }
 
       return {
         message: 'Đăng ký tài khoản thành công',
@@ -272,27 +463,11 @@ export class RegisterService {
 
     } catch (error) {
 
-      // 11. Compensation
-      if (user) {
-        await this.prisma.$transaction(async (tx) => {
-
-          await tx.user_Roles.deleteMany({
-            where: {
-              user_id: user.user_id,
-            },
-          });
-
-          await tx.users.delete({
-            where: {
-              user_id: user.user_id,
-            },
-          });
-        });
-      }
-
       if (error instanceof HttpException) {
         throw error;
       }
+
+      console.error('REGISTER USER ERROR:', error);
 
       throw new InternalServerErrorException(
         'Đăng ký tài khoản thất bại!',
