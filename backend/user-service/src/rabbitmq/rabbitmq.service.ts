@@ -142,9 +142,13 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
       // USER EXCHANGE
       // ======================================================
 
-      await channel.assertExchange(this.userExchange, 'direct', {
-        durable: true,
-      });
+      await channel.assertExchange(
+        this.userExchange, 
+        'direct', 
+        {
+          durable: true,
+        }
+      );
 
       console.log(`Exchange "${this.userExchange}" ready`);
 
