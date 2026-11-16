@@ -1,8 +1,23 @@
+import {
+  UserRound,
+  Mail,
+  Phone,
+  CalendarDays,
+  ShieldCheck,
+  ChevronRight,
+  Hash,
+  Clock3,
+  Pencil,
+  X,
+  Save,
+  RefreshCw,
+  Check,
+} from 'lucide-react-native';
 import { StoreScrollView } from '@/components/store-scroll-to-top';
 import { isAxiosError } from 'axios';
 import { router } from 'expo-router';
 import type { Href } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -172,11 +187,10 @@ export default function AccountInformationScreen() {
         contentContainerClassName="px-4 pb-10 pt-5"
         showsVerticalScrollIndicator={false}
       >
-        <Breadcrumb title="Thông tin tài khoản" />
         <PageHeading
           title="Thông tin tài khoản"
           subtitle="Quản lý thông tin cá nhân và bảo mật tài khoản của bạn."
-          symbol="U"
+          icon={<UserRound size={25} color="#fff" />}
         />
         <ProfileNavigation active="account" />
 
@@ -221,7 +235,15 @@ export default function AccountInformationScreen() {
                 className="mt-5 self-start rounded-xl bg-white px-4 py-3"
                 onPress={startEditing}
               >
-                <Text className="font-bold text-[#116b68]">Chỉnh sửa</Text>
+                <View className="flex-row items-center gap-2">
+                  <Pencil size={16} color="#116b68" />
+                  <Text
+                    style={{ flexShrink: 1 }}
+                    className="font-bold text-[#116b68]"
+                  >
+                    Chỉnh sửa
+                  </Text>
+                </View>
               </Pressable>
             </View>
 
@@ -237,34 +259,34 @@ export default function AccountInformationScreen() {
               <InfoRow
                 label="Tên tài khoản"
                 value={profile.user_name}
-                symbol="U"
+                icon={<UserRound size={19} color="#168b87" />}
               />
               <InfoRow
                 label="Địa chỉ email"
                 value={profile.user_email}
-                symbol="@"
+                icon={<Mail size={19} color="#168b87" />}
               />
               <InfoRow
                 label="Số điện thoại"
                 value={profile.user_phone}
-                symbol="P"
+                icon={<Phone size={19} color="#168b87" />}
               />
               <InfoRow
                 label="Mã tài khoản"
                 value={profile.user_id}
-                symbol="#"
+                icon={<Hash size={19} color="#168b87" />}
               />
 
               <InfoRow
                 label="Ngày tạo tài khoản"
                 value={formatDate(profile.user_created_at)}
-                symbol="C"
+                icon={<CalendarDays size={19} color="#168b87" />}
               />
 
               <InfoRow
                 label="Cập nhật lần cuối"
                 value={formatDate(profile.user_updated_at)}
-                symbol="↻"
+                icon={<Clock3 size={19} color="#168b87" />}
                 last
               />
             </View>
@@ -390,7 +412,15 @@ function EditAccountPanel({
             onPress={onCancel}
             disabled={saving}
           >
-            <Text className="font-bold text-slate-600">Hủy bỏ</Text>
+            <View className="flex-row items-center gap-2">
+              <X size={16} color="#475569" />
+              <Text
+                style={{ flexShrink: 1 }}
+                className="font-bold text-slate-600"
+              >
+                Hủy bỏ
+              </Text>
+            </View>
           </Pressable>
           <Pressable
             className="flex-1 items-center rounded-xl bg-[#168b87] py-3"
@@ -400,7 +430,15 @@ function EditAccountPanel({
             {saving ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text className="font-bold text-white">Lưu thay đổi</Text>
+              <View className="flex-row items-center gap-2">
+                <Save size={16} color="#fff" />
+                <Text
+                  style={{ flexShrink: 1 }}
+                  className="font-bold text-white"
+                >
+                  Lưu thay đổi
+                </Text>
+              </View>
             )}
           </Pressable>
         </View>
@@ -416,6 +454,12 @@ function ProfileNavigation({ active }: { active: 'account' | 'customer' }) {
         Tài khoản của tôi
       </Text>
       <NavButton
+        icon={
+          <UserRound
+            size={19}
+            color={active === 'account' ? '#116b68' : '#64748b'}
+          />
+        }
         label="Thông tin tài khoản"
         active={active === 'account'}
         onPress={() =>
@@ -423,6 +467,12 @@ function ProfileNavigation({ active }: { active: 'account' | 'customer' }) {
         }
       />
       <NavButton
+        icon={
+          <ShieldCheck
+            size={19}
+            color={active === 'customer' ? '#116b68' : '#64748b'}
+          />
+        }
         label="Thông tin khách hàng"
         active={active === 'customer'}
         onPress={() =>
@@ -434,10 +484,12 @@ function ProfileNavigation({ active }: { active: 'account' | 'customer' }) {
 }
 
 function NavButton({
+  icon,
   label,
   active,
   onPress,
 }: {
+  icon: ReactNode;
   label: string;
   active: boolean;
   onPress: () => void;
@@ -447,39 +499,32 @@ function NavButton({
       className={`mb-1 flex-row items-center justify-between rounded-xl px-3 py-3 ${active ? 'bg-[#e6f5f4]' : 'bg-white'}`}
       onPress={onPress}
     >
-      <Text
-        className={`text-sm font-semibold ${active ? 'text-[#116b68]' : 'text-slate-600'}`}
-      >
-        {label}
-      </Text>
-      <Text className={active ? 'text-[#168b87]' : 'text-slate-400'}>›</Text>
+      <View className="flex-1 flex-row items-center gap-2">
+        {icon}
+        <Text
+          className={`text-sm font-semibold ${active ? 'text-[#116b68]' : 'text-slate-600'}`}
+        >
+          {label}
+        </Text>
+      </View>
+      <ChevronRight size={16} color={active ? '#168b87' : '#94a3b8'} />
     </Pressable>
-  );
-}
-
-function Breadcrumb({ title }: { title: string }) {
-  return (
-    <View className="mb-5 flex-row items-center gap-2">
-      <Text className="text-sm text-slate-500">Trang chủ</Text>
-      <Text className="text-slate-400">›</Text>
-      <Text className="text-sm font-semibold text-slate-800">{title}</Text>
-    </View>
   );
 }
 
 function PageHeading({
   title,
   subtitle,
-  symbol,
+  icon,
 }: {
   title: string;
   subtitle: string;
-  symbol: string;
+  icon: ReactNode;
 }) {
   return (
     <View className="mb-5 flex-row items-center gap-3">
       <View className="h-12 w-12 items-center justify-center rounded-2xl bg-[#168b87]">
-        <Text className="text-xl font-black text-white">{symbol}</Text>
+        {icon}
       </View>
       <View className="flex-1">
         <Text className="text-2xl font-bold text-slate-900">{title}</Text>
@@ -514,12 +559,12 @@ function SectionHeader({
 function InfoRow({
   label,
   value,
-  symbol,
+  icon,
   last = false,
 }: {
   label: string;
   value: string;
-  symbol: string;
+  icon: ReactNode;
   last?: boolean;
 }) {
   return (
@@ -527,7 +572,7 @@ function InfoRow({
       className={`flex-row gap-3 p-4 ${last ? '' : 'border-b border-slate-100'}`}
     >
       <View className="h-10 w-10 items-center justify-center rounded-xl bg-teal-50">
-        <Text className="font-bold text-[#168b87]">{symbol}</Text>
+        {icon}
       </View>
       <View className="flex-1">
         <Text className="text-xs text-slate-500">{label}</Text>
@@ -596,7 +641,13 @@ function ErrorPanel({
         className="mt-4 self-start rounded-xl bg-[#168b87] px-4 py-3"
         onPress={onRetry}
       >
-        <Text className="font-bold text-white">↻ Thử lại</Text>
+        <View className="flex-row items-center gap-2">
+          <RefreshCw size={16} color="#fff" />
+          <Text style={{ flexShrink: 1 }} className="font-bold text-white">
+            {' '}
+            Thử lại
+          </Text>
+        </View>
       </Pressable>
     </View>
   );
@@ -605,7 +656,16 @@ function ErrorPanel({
 function Notice({ message }: { message: string }) {
   return (
     <View className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-      <Text className="text-sm font-medium text-emerald-700">✓ {message}</Text>
+      <View className="flex-row items-center gap-2">
+        <Check size={16} color="#047857" />
+        <Text
+          style={{ flexShrink: 1 }}
+          className="text-sm font-medium text-emerald-700"
+        >
+          {' '}
+          {message}
+        </Text>
+      </View>
     </View>
   );
 }

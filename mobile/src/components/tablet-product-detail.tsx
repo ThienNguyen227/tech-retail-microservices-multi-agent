@@ -1,5 +1,21 @@
+import {
+  ChevronLeft,
+  ChevronDown,
+  ShoppingCart,
+  ShieldCheck,
+  Truck,
+  RotateCcw,
+  Sparkles,
+  Monitor,
+  Cpu,
+  MemoryStick,
+  Camera,
+  BatteryCharging,
+  Cable,
+  Laptop,
+} from 'lucide-react-native';
 import { StoreScrollView } from '@/components/store-scroll-to-top';
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Image,
@@ -9,13 +25,13 @@ import {
   Text,
   View,
   DeviceEventEmitter,
-} from "react-native";
-import { router } from "expo-router";
+} from 'react-native';
+import { router } from 'expo-router';
 
-import { FRONTEND_ASSET_URL } from "@/constants/api";
-import { customerCartService } from "@/lib/axios/services/customer-services/cart_service";
-import { customerPromotionService } from "@/lib/axios/services/customer-services/promotion_service";
-import { getStoredUser } from "@/lib/storage/secure_storage";
+import { FRONTEND_ASSET_URL } from '@/constants/api';
+import { customerCartService } from '@/lib/axios/services/customer-services/cart_service';
+import { customerPromotionService } from '@/lib/axios/services/customer-services/promotion_service';
+import { getStoredUser } from '@/lib/storage/secure_storage';
 
 export type TabletDetailVariant = {
   sku: string;
@@ -44,7 +60,13 @@ export type TabletDetailProduct = {
   batteryAndCharge?: Record<string, unknown>;
   designAndMaterials?: Record<string, unknown>;
 };
-type Props = { refreshing?: boolean; onRefresh?: () => void; refreshKey?: number; product: TabletDetailProduct; selectedSlug: string };
+type Props = {
+  refreshing?: boolean;
+  onRefresh?: () => void;
+  refreshKey?: number;
+  product: TabletDetailProduct;
+  selectedSlug: string;
+};
 type PromotionDiscount = {
   promotionId: number;
   promotionName: string;
@@ -53,22 +75,24 @@ type PromotionDiscount = {
   discountValue: string;
 };
 const money = (value: number) =>
-  new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
+  new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND',
     maximumFractionDigits: 0,
   }).format(value);
 const imageUrl = (image: string) =>
-  image.startsWith("http")
+  image.startsWith('http')
     ? image
     : `${FRONTEND_ASSET_URL}/product/tablet/${image}`;
 
 function Section({
   title,
+  icon,
   children,
   openByDefault = false,
 }: {
   title: string;
+  icon: React.ReactNode;
   children: React.ReactNode;
   openByDefault?: boolean;
 }) {
@@ -79,8 +103,15 @@ function Section({
         onPress={() => setOpen((value) => !value)}
         className="flex-row items-center justify-between p-4"
       >
-        <Text className="font-bold text-slate-800">{title}</Text>
-        <Text className="text-lg text-teal-700">{open ? "−" : "+"}</Text>
+        <View className="flex-1 flex-row items-center gap-2 pr-2">
+          {icon}
+          <Text className="flex-1 font-bold text-slate-800">{title}</Text>
+        </View>
+        <ChevronDown
+          size={18}
+          color="#0f766e"
+          style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }}
+        />
       </Pressable>
       {open ? (
         <View className="border-t border-slate-100 bg-slate-50 p-4">
@@ -91,13 +122,13 @@ function Section({
   );
 }
 function InfoRow({ label, value }: { label: string; value?: unknown }) {
-  if (value === undefined || value === null || value === "") return null;
+  if (value === undefined || value === null || value === '') return null;
   const display = Array.isArray(value)
-    ? value.join("\n")
-    : typeof value === "boolean"
+    ? value.join('\n')
+    : typeof value === 'boolean'
       ? value
-        ? "Có"
-        : "Không"
+        ? 'Có'
+        : 'Không'
       : String(value);
 
   return (
@@ -114,15 +145,31 @@ function InfoList({ label, value }: { label: string; value?: unknown }) {
   return <InfoRow label={label} value={value} />;
 }
 
-export default function TabletProductDetail({ product, selectedSlug, refreshing = false, onRefresh, refreshKey = 0 }: Props) {
+export default function TabletProductDetail({
+  product,
+  selectedSlug,
+  refreshing = false,
+  onRefresh,
+  refreshKey = 0,
+}: Props) {
   const initial =
     product.variants.find((variant) => variant.slug === selectedSlug) ??
     product.variants[0];
-  const [storage, setStorage] = useState(initial?.storage ?? "");
-  const [color, setColor] = useState(initial?.colorSlug ?? "");
+  const [storage, setStorage] = useState(initial?.storage ?? '');
+  const [color, setColor] = useState(initial?.colorSlug ?? '');
   const [imageIndex, setImageIndex] = useState(0);
   const [promotion, setPromotion] = useState<PromotionDiscount | null>(null);
   const [adding, setAdding] = useState(false);
+  const [previousSlug, setPreviousSlug] = useState(selectedSlug);
+  if (selectedSlug !== previousSlug) {
+    setPreviousSlug(selectedSlug);
+    if (initial) {
+      setStorage(initial.storage);
+      setColor(initial.colorSlug);
+      setImageIndex(0);
+    }
+  }
+
   const selected = useMemo(
     () =>
       product.variants.find(
@@ -158,7 +205,7 @@ export default function TabletProductDetail({ product, selectedSlug, refreshing 
           setPromotion(result ?? null);
         }
       } catch (error) {
-        console.error("Không thể lấy khuyến mãi:", error);
+        console.error('Không thể lấy khuyến mãi:', error);
 
         if (!cancelled) {
           setPromotion(null);
@@ -176,16 +223,16 @@ export default function TabletProductDetail({ product, selectedSlug, refreshing 
   const originalPrice = selected?.price ?? 0;
   const discountValue = Number(promotion?.discountValue ?? 0);
   const discountAmount =
-    promotion?.discountType === "PERCENTAGE"
+    promotion?.discountType === 'PERCENTAGE'
       ? Math.round((originalPrice * discountValue) / 100)
-      : promotion?.discountType === "FIXED_AMOUNT"
+      : promotion?.discountType === 'FIXED_AMOUNT'
         ? discountValue
         : 0;
   const savedAmount = Math.min(Math.max(discountAmount, 0), originalPrice);
   const finalPrice = Math.max(originalPrice - savedAmount, 0);
   const hasPromotion = Boolean(promotion && savedAmount > 0);
   const discountLabel =
-    promotion?.discountType === "PERCENTAGE"
+    promotion?.discountType === 'PERCENTAGE'
       ? `-${discountValue}%`
       : `-${money(savedAmount)}`;
   const images = selected?.images?.length ? selected.images : [product.image];
@@ -193,16 +240,17 @@ export default function TabletProductDetail({ product, selectedSlug, refreshing 
     setStorage(variant.storage);
     setColor(variant.colorSlug);
     setImageIndex(0);
+    router.setParams({ slug: variant.slug });
   };
   const addToCart = async () => {
     if (!selected) return;
     const user = await getStoredUser();
     if (!user.userId) {
       Alert.alert(
-        "Yêu cầu đăng nhập",
-        "Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng.",
+        'Yêu cầu đăng nhập',
+        'Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng.',
       );
-      router.push("/customer/(auth)/login" as never);
+      router.push('/customer/(auth)/login' as never);
       return;
     }
     setAdding(true);
@@ -220,11 +268,11 @@ export default function TabletProductDetail({ product, selectedSlug, refreshing 
         },
       });
       DeviceEventEmitter.emit('cart-updated');
-      Alert.alert("Thành công", "Đã thêm sản phẩm vào giỏ hàng.");
+      Alert.alert('Thành công', 'Đã thêm sản phẩm vào giỏ hàng.');
     } catch (error) {
       Alert.alert(
-        "Không thể thêm vào giỏ",
-        error instanceof Error ? error.message : "Vui lòng thử lại.",
+        'Không thể thêm vào giỏ',
+        error instanceof Error ? error.message : 'Vui lòng thử lại.',
       );
     } finally {
       setAdding(false);
@@ -233,23 +281,36 @@ export default function TabletProductDetail({ product, selectedSlug, refreshing 
   return (
     <StoreScrollView
       alwaysBounceVertical
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#168b87" />}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor="#168b87"
+        />
+      }
       contentContainerClassName="px-4 pb-10 pt-4"
       showsVerticalScrollIndicator={false}
     >
-      <Pressable onPress={() => router.back()} className="mb-3">
-        <Text className="text-sm font-semibold text-teal-700">‹ Quay lại</Text>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => router.back()}
+        className="mb-3 min-h-11 justify-center self-start"
+      >
+        <View className="flex-row items-center gap-2">
+          <ChevronLeft size={16} color="#64748b" />
+          <Text className="text-sm font-medium text-slate-500">Quay lại</Text>
+        </View>
       </Pressable>
       <Text className="mb-4 text-xs text-slate-500">
-        Màn hình:{" "}
+        Màn hình:{' '}
         {String(
-          product.screen?.screenSize ?? product.screenSize ?? "Đang cập nhật",
-        )}{" "}
-        · Công nghệ:{" "}
+          product.screen?.screenSize ?? product.screenSize ?? 'Đang cập nhật',
+        )}{' '}
+        · Công nghệ:{' '}
         {String(
           product.screen?.screenTechnology ??
             product.screenTech ??
-            "Đang cập nhật",
+            'Đang cập nhật',
         )}
       </Text>
       <View className="overflow-hidden rounded-3xl border border-slate-200 bg-white p-3">
@@ -274,7 +335,7 @@ export default function TabletProductDetail({ product, selectedSlug, refreshing 
             <Pressable
               key={`${image}-${index}`}
               onPress={() => setImageIndex(index)}
-              className={`mr-2 h-16 w-16 rounded-xl border-2 p-1 ${index === imageIndex ? "border-teal-600" : "border-slate-200"}`}
+              className={`mr-2 h-16 w-16 rounded-xl border-2 p-1 ${index === imageIndex ? 'border-teal-600' : 'border-slate-200'}`}
             >
               <Image
                 source={{ uri: imageUrl(image) }}
@@ -290,9 +351,12 @@ export default function TabletProductDetail({ product, selectedSlug, refreshing 
           <Text className="rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-700">
             Máy tính bảng
           </Text>
-          <Text className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
-            ✦ Sản phẩm nổi bật
-          </Text>
+          <View className="flex-row items-center gap-1 rounded-full bg-amber-50 px-3 py-1">
+            <Sparkles size={13} color="#b45309" />
+            <Text className="text-xs font-semibold text-amber-700">
+              Sản phẩm nổi bật
+            </Text>
+          </View>
         </View>
         <Text className="text-2xl font-extrabold text-slate-900">
           {product.name}
@@ -303,7 +367,7 @@ export default function TabletProductDetail({ product, selectedSlug, refreshing 
         <Text className="mt-2 text-3xl font-extrabold text-teal-700">
           {selected
             ? money(hasPromotion ? finalPrice : originalPrice)
-            : "Liên hệ"}
+            : 'Liên hệ'}
         </Text>
         {hasPromotion ? (
           <Text className="mt-1 text-sm text-slate-400 line-through">
@@ -331,7 +395,7 @@ export default function TabletProductDetail({ product, selectedSlug, refreshing 
                 key={value}
                 disabled={!variant}
                 onPress={() => variant && selectVariant(variant)}
-                className={`rounded-xl border px-4 py-2 ${value === storage ? "border-teal-600 bg-teal-50" : "border-slate-200"}`}
+                className={`rounded-xl border px-4 py-2 ${value === storage ? 'border-teal-600 bg-teal-50' : 'border-slate-200'}`}
               >
                 <Text className="text-slate-700">{value}</Text>
               </Pressable>
@@ -353,7 +417,7 @@ export default function TabletProductDetail({ product, selectedSlug, refreshing 
                 key={variant.colorSlug}
                 disabled={!available}
                 onPress={() => available && selectVariant(available)}
-                className={`rounded-xl border px-4 py-2 ${variant.colorSlug === color ? "border-teal-600 bg-teal-50" : "border-slate-200"}`}
+                className={`rounded-xl border px-4 py-2 ${variant.colorSlug === color ? 'border-teal-600 bg-teal-50' : 'border-slate-200'}`}
               >
                 <Text className="text-slate-700">{variant.color}</Text>
               </Pressable>
@@ -365,14 +429,17 @@ export default function TabletProductDetail({ product, selectedSlug, refreshing 
           disabled={adding}
           className="mt-6 items-center rounded-xl bg-teal-700 py-3"
         >
-          <Text className="font-bold text-white">
-            {adding ? "Đang thêm..." : "Thêm vào giỏ hàng"}
-          </Text>
+          <View className="flex-row items-center gap-2">
+            <ShoppingCart size={19} color="#ffffff" />
+            <Text className="font-bold text-white">
+              {adding ? 'Đang thêm...' : 'Thêm vào giỏ hàng'}
+            </Text>
+          </View>
         </Pressable>
         <View className="mt-5 flex-row flex-wrap gap-y-3 border-t border-slate-100 pt-5">
           <View className="w-1/2 flex-row items-center gap-2 pr-2">
             <View className="h-6 w-6 items-center justify-center rounded-full bg-teal-50">
-              <Text className="text-sm font-bold text-teal-700">✓</Text>
+              <ShieldCheck size={17} color="#0f766e" />
             </View>
             <Text className="flex-1 text-xs text-slate-500">
               Bảo hành chính hãng
@@ -380,7 +447,7 @@ export default function TabletProductDetail({ product, selectedSlug, refreshing 
           </View>
           <View className="w-1/2 flex-row items-center gap-2">
             <View className="h-6 w-6 items-center justify-center rounded-full bg-teal-50">
-              <Text className="text-sm font-bold text-teal-700">✓</Text>
+              <Truck size={17} color="#0f766e" />
             </View>
             <Text className="flex-1 text-xs text-slate-500">
               Giao hàng toàn quốc
@@ -388,7 +455,7 @@ export default function TabletProductDetail({ product, selectedSlug, refreshing 
           </View>
           <View className="w-1/2 flex-row items-center gap-2 pr-2">
             <View className="h-6 w-6 items-center justify-center rounded-full bg-teal-50">
-              <Text className="text-sm font-bold text-teal-700">✓</Text>
+              <RotateCcw size={17} color="#0f766e" />
             </View>
             <Text className="flex-1 text-xs text-slate-500">
               Hỗ trợ đổi trả
@@ -399,7 +466,11 @@ export default function TabletProductDetail({ product, selectedSlug, refreshing 
       <Text className="mb-3 mt-6 text-xl font-extrabold text-slate-900">
         Thông số kỹ thuật
       </Text>
-      <Section title="Màn hình" openByDefault>
+      <Section
+        title="Màn hình"
+        icon={<Monitor size={18} color="#0f766e" />}
+        openByDefault
+      >
         <InfoRow
           label="Công nghệ màn hình"
           value={product.screen?.screenTechnology ?? product.screenTech}
@@ -409,7 +480,10 @@ export default function TabletProductDetail({ product, selectedSlug, refreshing 
           value={product.screen?.screenSize ?? product.screenSize}
         />
       </Section>
-      <Section title="Hệ điều hành và CPU">
+      <Section
+        title="Hệ điều hành và CPU"
+        icon={<Cpu size={18} color="#0f766e" />}
+      >
         <InfoRow
           label="Hệ điều hành"
           value={product.operatingSystemAndCpu?.operatingSystem}
@@ -421,7 +495,10 @@ export default function TabletProductDetail({ product, selectedSlug, refreshing 
         />
         <InfoRow label="GPU" value={product.operatingSystemAndCpu?.gpu} />
       </Section>
-      <Section title="Bộ nhớ và lưu trữ">
+      <Section
+        title="Bộ nhớ và lưu trữ"
+        icon={<MemoryStick size={18} color="#0f766e" />}
+      >
         <InfoRow
           label="RAM"
           value={product.memoryAndStorage?.randomAccessMemory}
@@ -436,7 +513,7 @@ export default function TabletProductDetail({ product, selectedSlug, refreshing 
           value={product.memoryAndStorage?.externalMemoryCard}
         />
       </Section>
-      <Section title="Camera sau">
+      <Section title="Camera sau" icon={<Camera size={18} color="#0f766e" />}>
         <InfoRow
           label="Độ phân giải"
           value={product.rearCamera?.rearCameraResolution}
@@ -451,7 +528,7 @@ export default function TabletProductDetail({ product, selectedSlug, refreshing 
         />
         <InfoRow label="Đèn flash" value={product.rearCamera?.rearFlash} />
       </Section>
-      <Section title="Camera trước">
+      <Section title="Camera trước" icon={<Camera size={18} color="#0f766e" />}>
         <InfoRow
           label="Độ phân giải"
           value={product.frontCamera?.frontCameraResolution}
@@ -461,7 +538,10 @@ export default function TabletProductDetail({ product, selectedSlug, refreshing 
           value={product.frontCamera?.frontCameraFeatures}
         />
       </Section>
-      <Section title="Pin và sạc">
+      <Section
+        title="Pin và sạc"
+        icon={<BatteryCharging size={18} color="#0f766e" />}
+      >
         <InfoRow
           label="Dung lượng pin"
           value={product.batteryAndCharge?.batteryCapacity}
@@ -483,7 +563,7 @@ export default function TabletProductDetail({ product, selectedSlug, refreshing 
           value={product.batteryAndCharge?.chargerIncluded}
         />
       </Section>
-      <Section title="Kết nối">
+      <Section title="Kết nối" icon={<Cable size={18} color="#0f766e" />}>
         <InfoRow
           label="Mạng di động"
           value={product.connectivity?.mobileNetwork}
@@ -509,7 +589,7 @@ export default function TabletProductDetail({ product, selectedSlug, refreshing 
           value={product.connectivity?.otherConnectivity}
         />
       </Section>
-      <Section title="Tiện ích">
+      <Section title="Tiện ích" icon={<Laptop size={18} color="#0f766e" />}>
         <InfoList
           label="Tính năng đặc biệt"
           value={product.utilities?.specialFeatures}
@@ -521,7 +601,10 @@ export default function TabletProductDetail({ product, selectedSlug, refreshing 
         <InfoRow label="Ghi âm" value={product.utilities?.audioRecording} />
         <InfoRow label="Radio" value={product.utilities?.radio} />
       </Section>
-      <Section title="Thiết kế và chất liệu">
+      <Section
+        title="Thiết kế và chất liệu"
+        icon={<Laptop size={18} color="#0f766e" />}
+      >
         <InfoRow
           label="Chất liệu"
           value={product.designAndMaterials?.materials}

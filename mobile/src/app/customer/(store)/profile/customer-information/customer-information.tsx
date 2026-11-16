@@ -1,8 +1,27 @@
+import {
+  UserRound,
+  CalendarDays,
+  ShieldCheck,
+  ChevronRight,
+  Check,
+  Hash,
+  Clock3,
+  MapPin,
+  Plus,
+  Save,
+  User,
+  VenusAndMars,
+  Pencil,
+  Star,
+  Trash2,
+  X,
+  RefreshCw,
+} from 'lucide-react-native';
 import { StoreScrollView } from '@/components/store-scroll-to-top';
 import { isAxiosError } from 'axios';
 import { router } from 'expo-router';
 import type { Href } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -267,11 +286,10 @@ export default function CustomerInformationScreen() {
         contentContainerClassName="px-4 pb-10 pt-5"
         showsVerticalScrollIndicator={false}
       >
-        <Breadcrumb title="Thông tin khách hàng" />
         <PageHeading
           title="Thông tin khách hàng"
           subtitle="Quản lý hồ sơ cá nhân và địa chỉ nhận hàng của bạn."
-          symbol="✓"
+          icon={<ShieldCheck size={25} color="#fff" />}
         />
         <ProfileNavigation active="customer" />
         {loading ? <Loading label="Đang tải thông tin khách hàng..." /> : null}
@@ -311,9 +329,15 @@ export default function CustomerInformationScreen() {
                 onPress={startEditing}
                 disabled={editing}
               >
-                <Text className="font-bold text-[#116b68]">
-                  {editing ? 'Đang chỉnh sửa' : 'Chỉnh sửa'}
-                </Text>
+                <View className="flex-row items-center gap-2">
+                  <Pencil size={16} color="#116b68" />
+                  <Text
+                    style={{ flexShrink: 1 }}
+                    className="font-bold text-[#116b68]"
+                  >
+                    {editing ? 'Đang chỉnh sửa' : 'Chỉnh sửa'}
+                  </Text>
+                </View>
               </Pressable>
             </View>
             {success ? <Notice message={success} /> : null}
@@ -327,37 +351,37 @@ export default function CustomerInformationScreen() {
                 <InfoRow
                   label="Mã khách hàng"
                   value={profile.customer_code}
-                  symbol="#"
+                  icon={<Hash size={19} color="#168b87" />}
                 />
                 <InfoRow
                   label="Họ và tên khách hàng"
                   value={profile.customer_full_name || ''}
-                  symbol="U"
+                  icon={<User size={19} color="#168b87" />}
                 />
                 <InfoRow
                   label="Ngày sinh"
                   value={formatDate(profile.customer_date_of_birth)}
-                  symbol="D"
+                  icon={<CalendarDays size={19} color="#168b87" />}
                 />
                 <InfoRow
                   label="Giới tính"
                   value={genderLabel(profile.customer_gender)}
-                  symbol="G"
+                  icon={<VenusAndMars size={19} color="#168b87" />}
                 />
                 <InfoRow
                   label="Trạng thái"
                   value={status?.label || ''}
-                  symbol="✓"
+                  icon={<ShieldCheck size={19} color="#168b87" />}
                 />
                 <InfoRow
                   label="Ngày tạo hồ sơ"
                   value={formatDate(profile.customer_created_at)}
-                  symbol="C"
+                  icon={<Clock3 size={19} color="#168b87" />}
                 />
                 <InfoRow
                   label="Cập nhật lần cuối"
                   value={formatDate(profile.customer_updated_at)}
-                  symbol="↻"
+                  icon={<Clock3 size={19} color="#168b87" />}
                   last
                 />
               </View>
@@ -381,7 +405,7 @@ export default function CustomerInformationScreen() {
                     })
                   }
                 >
-                  <Text className="text-lg font-bold text-white">+</Text>
+                  <Plus size={18} color="#fff" />
                   <Text className="font-bold text-white">Thêm địa chỉ</Text>
                 </Pressable>
                 {profile.addresses.length === 0 ? (
@@ -402,7 +426,7 @@ export default function CustomerInformationScreen() {
                   >
                     <View className="flex-row items-start gap-3">
                       <View className="h-11 w-11 items-center justify-center rounded-xl bg-teal-50">
-                        <Text className="text-xl text-[#168b87]">⌂</Text>
+                        <MapPin size={20} color="#168b87" />
                       </View>
                       <View className="flex-1">
                         <View className="flex-row flex-wrap items-center gap-2">
@@ -410,9 +434,15 @@ export default function CustomerInformationScreen() {
                             {address.customer_address_line}
                           </Text>
                           {address.customer_address_default ? (
-                            <Text className="rounded-full bg-teal-50 px-2 py-1 text-xs font-bold text-[#168b87]">
-                              ★ Mặc định
-                            </Text>
+                            <View className="flex-row items-center gap-2">
+                              <Star size={16} color="#168b87" />
+                              <Text
+                                style={{ flexShrink: 1 }}
+                                className="rounded-full bg-teal-50 px-2 py-1 text-xs font-bold text-[#168b87]"
+                              >
+                                Mặc định
+                              </Text>
+                            </View>
                           ) : null}
                         </View>
                         <Text className="mt-2 text-sm leading-6 text-slate-500">
@@ -437,9 +467,15 @@ export default function CustomerInformationScreen() {
                           })
                         }
                       >
-                        <Text className="font-semibold text-slate-600">
-                          ✎ Sửa
-                        </Text>
+                        <View className="flex-row items-center gap-2">
+                          <Pencil size={16} color="#475569" />
+                          <Text
+                            style={{ flexShrink: 1 }}
+                            className="font-semibold text-slate-600"
+                          >
+                            Sửa
+                          </Text>
+                        </View>
                       </Pressable>
                       <Pressable
                         className="flex-1 items-center rounded-xl border border-red-100 bg-white py-2.5"
@@ -447,9 +483,15 @@ export default function CustomerInformationScreen() {
                           deleteAddress(address.customer_address_id)
                         }
                       >
-                        <Text className="font-semibold text-red-600">
-                          ⌫ Xóa
-                        </Text>
+                        <View className="flex-row items-center gap-2">
+                          <Trash2 size={16} color="#dc2626" />
+                          <Text
+                            style={{ flexShrink: 1 }}
+                            className="font-semibold text-red-600"
+                          >
+                            Xóa
+                          </Text>
+                        </View>
                       </Pressable>
                     </View>
                   </View>
@@ -642,7 +684,9 @@ function CustomerEditPanel({
             onPress={() => setShowDatePicker(true)}
             disabled={saving}
           >
+            <CalendarDays size={18} color="#94a3b8" />
             <Text
+              style={{ flex: 1, marginLeft: 10 }}
               className={
                 dateOfBirth
                   ? 'text-sm text-slate-800'
@@ -652,7 +696,6 @@ function CustomerEditPanel({
               {displayDate}
             </Text>
 
-            <Text className="text-lg text-[#168b87]">▦</Text>
           </Pressable>
 
           {showDatePicker ? (
@@ -808,9 +851,7 @@ function AddressPanel({
                 : 'border-slate-300 bg-white'
             }`}
           >
-            {form.isDefault ? (
-              <Text className="text-xs font-bold text-white">✓</Text>
-            ) : null}
+            {form.isDefault ? <Check size={14} color="#fff" /> : null}
           </View>
 
           <Text className="flex-1 text-sm font-semibold text-slate-700">
@@ -847,7 +888,12 @@ function ActionButtons({
         onPress={onCancel}
         disabled={saving}
       >
-        <Text className="font-bold text-slate-600">Hủy bỏ</Text>
+        <View className="flex-row items-center gap-2">
+          <X size={16} color="#475569" />
+          <Text style={{ flexShrink: 1 }} className="font-bold text-slate-600">
+            Hủy bỏ
+          </Text>
+        </View>
       </Pressable>
       <Pressable
         className="flex-1 items-center rounded-xl bg-[#168b87] py-3"
@@ -857,7 +903,12 @@ function ActionButtons({
         {saving ? (
           <ActivityIndicator color="#fff" />
         ) : (
-          <Text className="font-bold text-white">{saveLabel}</Text>
+          <View className="flex-row items-center gap-2">
+            <Save size={16} color="#fff" />
+            <Text style={{ flexShrink: 1 }} className="font-bold text-white">
+              {saveLabel}
+            </Text>
+          </View>
         )}
       </Pressable>
     </View>
@@ -871,6 +922,12 @@ function ProfileNavigation({ active }: { active: 'account' | 'customer' }) {
         Tài khoản của tôi
       </Text>
       <NavButton
+        icon={
+          <UserRound
+            size={19}
+            color={active === 'account' ? '#116b68' : '#64748b'}
+          />
+        }
         label="Thông tin tài khoản"
         active={active === 'account'}
         onPress={() =>
@@ -878,6 +935,12 @@ function ProfileNavigation({ active }: { active: 'account' | 'customer' }) {
         }
       />
       <NavButton
+        icon={
+          <ShieldCheck
+            size={19}
+            color={active === 'customer' ? '#116b68' : '#64748b'}
+          />
+        }
         label="Thông tin khách hàng"
         active={active === 'customer'}
         onPress={() =>
@@ -889,10 +952,12 @@ function ProfileNavigation({ active }: { active: 'account' | 'customer' }) {
 }
 
 function NavButton({
+  icon,
   label,
   active,
   onPress,
 }: {
+  icon: ReactNode;
   label: string;
   active: boolean;
   onPress: () => void;
@@ -902,39 +967,32 @@ function NavButton({
       className={`mb-1 flex-row items-center justify-between rounded-xl px-3 py-3 ${active ? 'bg-[#e6f5f4]' : 'bg-white'}`}
       onPress={onPress}
     >
-      <Text
-        className={`text-sm font-semibold ${active ? 'text-[#116b68]' : 'text-slate-600'}`}
-      >
-        {label}
-      </Text>
-      <Text className={active ? 'text-[#168b87]' : 'text-slate-400'}>›</Text>
+      <View className="flex-1 flex-row items-center gap-2">
+        {icon}
+        <Text
+          className={`text-sm font-semibold ${active ? 'text-[#116b68]' : 'text-slate-600'}`}
+        >
+          {label}
+        </Text>
+      </View>
+      <ChevronRight size={16} color={active ? '#168b87' : '#94a3b8'} />
     </Pressable>
-  );
-}
-
-function Breadcrumb({ title }: { title: string }) {
-  return (
-    <View className="mb-5 flex-row items-center gap-2">
-      <Text className="text-sm text-slate-500">Trang chủ</Text>
-      <Text className="text-slate-400">›</Text>
-      <Text className="text-sm font-semibold text-slate-800">{title}</Text>
-    </View>
   );
 }
 
 function PageHeading({
   title,
   subtitle,
-  symbol,
+  icon,
 }: {
   title: string;
   subtitle: string;
-  symbol: string;
+  icon: ReactNode;
 }) {
   return (
     <View className="mb-5 flex-row items-center gap-3">
       <View className="h-12 w-12 items-center justify-center rounded-2xl bg-[#168b87]">
-        <Text className="text-xl font-black text-white">{symbol}</Text>
+        {icon}
       </View>
       <View className="flex-1">
         <Text className="text-2xl font-bold text-slate-900">{title}</Text>
@@ -969,12 +1027,12 @@ function SectionHeader({
 function InfoRow({
   label,
   value,
-  symbol,
+  icon,
   last = false,
 }: {
   label: string;
   value: string;
-  symbol: string;
+  icon: ReactNode;
   last?: boolean;
 }) {
   return (
@@ -982,7 +1040,7 @@ function InfoRow({
       className={`flex-row gap-3 p-4 ${last ? '' : 'border-b border-slate-100'}`}
     >
       <View className="h-10 w-10 items-center justify-center rounded-xl bg-teal-50">
-        <Text className="font-bold text-[#168b87]">{symbol}</Text>
+        {icon}
       </View>
       <View className="flex-1">
         <Text className="text-xs text-slate-500">{label}</Text>
@@ -1048,7 +1106,13 @@ function ErrorPanel({
         className="mt-4 self-start rounded-xl bg-[#168b87] px-4 py-3"
         onPress={onRetry}
       >
-        <Text className="font-bold text-white">↻ Thử lại</Text>
+        <View className="flex-row items-center gap-2">
+          <RefreshCw size={16} color="#fff" />
+          <Text style={{ flexShrink: 1 }} className="font-bold text-white">
+            {' '}
+            Thử lại
+          </Text>
+        </View>
       </Pressable>
     </View>
   );
@@ -1057,7 +1121,16 @@ function ErrorPanel({
 function Notice({ message }: { message: string }) {
   return (
     <View className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
-      <Text className="text-sm font-medium text-emerald-700">✓ {message}</Text>
+      <View className="flex-row items-center gap-2">
+        <Check size={16} color="#047857" />
+        <Text
+          style={{ flexShrink: 1 }}
+          className="text-sm font-medium text-emerald-700"
+        >
+          {' '}
+          {message}
+        </Text>
+      </View>
     </View>
   );
 }

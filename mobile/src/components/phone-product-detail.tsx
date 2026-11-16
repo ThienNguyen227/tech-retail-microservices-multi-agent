@@ -1,5 +1,20 @@
+import {
+  ChevronLeft,
+  ChevronDown,
+  ShoppingCart,
+  ShieldCheck,
+  Truck,
+  RotateCcw,
+  Sparkles,
+  Cpu,
+  Camera,
+  BatteryCharging,
+  Shield,
+  Wifi,
+  Smartphone,
+} from 'lucide-react-native';
 import { StoreScrollView } from '@/components/store-scroll-to-top';
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Image,
@@ -9,13 +24,13 @@ import {
   Text,
   View,
   DeviceEventEmitter,
-} from "react-native";
-import { router } from "expo-router";
+} from 'react-native';
+import { router } from 'expo-router';
 
-import { FRONTEND_ASSET_URL } from "@/constants/api";
-import { customerCartService } from "@/lib/axios/services/customer-services/cart_service";
-import { customerPromotionService } from "@/lib/axios/services/customer-services/promotion_service";
-import { getStoredUser } from "@/lib/storage/secure_storage";
+import { FRONTEND_ASSET_URL } from '@/constants/api';
+import { customerCartService } from '@/lib/axios/services/customer-services/cart_service';
+import { customerPromotionService } from '@/lib/axios/services/customer-services/promotion_service';
+import { getStoredUser } from '@/lib/storage/secure_storage';
 
 export type PhoneDetailVariant = {
   sku: string;
@@ -44,7 +59,13 @@ export type PhoneDetailProduct = {
   designAndMaterials?: Record<string, string | undefined>;
 };
 
-type Props = { refreshing?: boolean; onRefresh?: () => void; refreshKey?: number; product: PhoneDetailProduct; selectedSlug: string };
+type Props = {
+  refreshing?: boolean;
+  onRefresh?: () => void;
+  refreshKey?: number;
+  product: PhoneDetailProduct;
+  selectedSlug: string;
+};
 type PromotionDiscount = {
   promotionId: number;
   promotionName: string;
@@ -54,23 +75,25 @@ type PromotionDiscount = {
 };
 
 const money = (value: number) =>
-  new Intl.NumberFormat("vi-VN", {
-    style: "currency",
-    currency: "VND",
+  new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency: 'VND',
     maximumFractionDigits: 0,
   }).format(value);
 
 const imageUrl = (image: string) =>
-  image.startsWith("http")
+  image.startsWith('http')
     ? image
     : `${FRONTEND_ASSET_URL}/product/phone/${image}`;
 
 function Section({
   title,
+  icon,
   children,
   openByDefault = false,
 }: {
   title: string;
+  icon: React.ReactNode;
   children: React.ReactNode;
   openByDefault?: boolean;
 }) {
@@ -81,8 +104,15 @@ function Section({
         onPress={() => setOpen((value) => !value)}
         className="flex-row items-center justify-between p-4"
       >
-        <Text className="font-bold text-slate-800">{title}</Text>
-        <Text className="text-lg text-teal-700">{open ? "−" : "+"}</Text>
+        <View className="flex-1 flex-row items-center gap-2 pr-2">
+          {icon}
+          <Text className="flex-1 font-bold text-slate-800">{title}</Text>
+        </View>
+        <ChevronDown
+          size={18}
+          color="#0f766e"
+          style={{ transform: [{ rotate: open ? '180deg' : '0deg' }] }}
+        />
       </Pressable>
       {open ? (
         <View className="border-t border-slate-100 bg-slate-50 p-4">
@@ -94,13 +124,13 @@ function Section({
 }
 
 function InfoRow({ label, value }: { label: string; value?: unknown }) {
-  if (value === undefined || value === null || value === "") return null;
+  if (value === undefined || value === null || value === '') return null;
   const display = Array.isArray(value)
-    ? value.join("\n")
-    : typeof value === "boolean"
+    ? value.join('\n')
+    : typeof value === 'boolean'
       ? value
-        ? "Có"
-        : "Không"
+        ? 'Có'
+        : 'Không'
       : String(value);
 
   return (
@@ -117,15 +147,31 @@ function InfoList({ label, value }: { label: string; value?: unknown }) {
   return <InfoRow label={label} value={value} />;
 }
 
-export default function PhoneProductDetail({ product, selectedSlug, refreshing = false, onRefresh, refreshKey = 0 }: Props) {
+export default function PhoneProductDetail({
+  product,
+  selectedSlug,
+  refreshing = false,
+  onRefresh,
+  refreshKey = 0,
+}: Props) {
   const initial =
     product.variants.find((variant) => variant.slug === selectedSlug) ??
     product.variants[0];
-  const [storage, setStorage] = useState(initial?.storage ?? "");
-  const [color, setColor] = useState(initial?.colorSlug ?? "");
+  const [storage, setStorage] = useState(initial?.storage ?? '');
+  const [color, setColor] = useState(initial?.colorSlug ?? '');
   const [imageIndex, setImageIndex] = useState(0);
   const [promotion, setPromotion] = useState<PromotionDiscount | null>(null);
   const [adding, setAdding] = useState(false);
+  const [previousSlug, setPreviousSlug] = useState(selectedSlug);
+  if (selectedSlug !== previousSlug) {
+    setPreviousSlug(selectedSlug);
+    if (initial) {
+      setStorage(initial.storage);
+      setColor(initial.colorSlug);
+      setImageIndex(0);
+    }
+  }
+
   const selected = useMemo(
     () =>
       product.variants.find(
@@ -162,7 +208,7 @@ export default function PhoneProductDetail({ product, selectedSlug, refreshing =
           setPromotion(data ?? null);
         }
       } catch (error) {
-        console.error("Fetch promotion error:", error);
+        console.error('Fetch promotion error:', error);
 
         if (!cancelled) {
           setPromotion(null);
@@ -181,9 +227,9 @@ export default function PhoneProductDetail({ product, selectedSlug, refreshing =
   const discountValue = Number(promotion?.discountValue ?? 0);
 
   const finalPrice =
-    promotion?.discountType === "PERCENTAGE"
+    promotion?.discountType === 'PERCENTAGE'
       ? currentPrice * (1 - discountValue / 100)
-      : promotion?.discountType === "FIXED_AMOUNT"
+      : promotion?.discountType === 'FIXED_AMOUNT'
         ? Math.max(0, currentPrice - discountValue)
         : currentPrice;
 
@@ -191,7 +237,7 @@ export default function PhoneProductDetail({ product, selectedSlug, refreshing =
     Boolean(promotion) && discountValue > 0 && finalPrice < currentPrice;
   const savedAmount = Math.max(0, currentPrice - finalPrice);
   const discountLabel =
-    promotion?.discountType === "PERCENTAGE"
+    promotion?.discountType === 'PERCENTAGE'
       ? `-${discountValue}%`
       : `-${money(discountValue)}`;
   const images = selected?.images?.length ? selected.images : [product.image];
@@ -200,16 +246,17 @@ export default function PhoneProductDetail({ product, selectedSlug, refreshing =
     setStorage(variant.storage);
     setColor(variant.colorSlug);
     setImageIndex(0);
+    router.setParams({ slug: variant.slug });
   };
   const addToCart = async () => {
     if (!selected) return;
     const user = await getStoredUser();
     if (!user.userId) {
       Alert.alert(
-        "Yêu cầu đăng nhập",
-        "Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng.",
+        'Yêu cầu đăng nhập',
+        'Vui lòng đăng nhập để thêm sản phẩm vào giỏ hàng.',
       );
-      router.push("/customer/(auth)/login" as never);
+      router.push('/customer/(auth)/login' as never);
       return;
     }
     setAdding(true);
@@ -227,11 +274,11 @@ export default function PhoneProductDetail({ product, selectedSlug, refreshing =
         },
       });
       DeviceEventEmitter.emit('cart-updated');
-      Alert.alert("Thành công", "Đã thêm sản phẩm vào giỏ hàng.");
+      Alert.alert('Thành công', 'Đã thêm sản phẩm vào giỏ hàng.');
     } catch (error) {
       Alert.alert(
-        "Không thể thêm vào giỏ",
-        error instanceof Error ? error.message : "Vui lòng thử lại.",
+        'Không thể thêm vào giỏ',
+        error instanceof Error ? error.message : 'Vui lòng thử lại.',
       );
     } finally {
       setAdding(false);
@@ -241,12 +288,25 @@ export default function PhoneProductDetail({ product, selectedSlug, refreshing =
   return (
     <StoreScrollView
       alwaysBounceVertical
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#168b87" />}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor="#168b87"
+        />
+      }
       contentContainerClassName="px-4 pb-10 pt-4"
       showsVerticalScrollIndicator={false}
     >
-      <Pressable onPress={() => router.back()} className="mb-3">
-        <Text className="text-sm font-semibold text-teal-700">‹ Quay lại</Text>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => router.back()}
+        className="mb-3 min-h-11 justify-center self-start"
+      >
+        <View className="flex-row items-center gap-2">
+          <ChevronLeft size={16} color="#64748b" />
+          <Text className="text-sm font-medium text-slate-500">Quay lại</Text>
+        </View>
       </Pressable>
       <View className="overflow-hidden rounded-3xl border border-slate-200 bg-white p-3">
         <View className="relative h-72 items-center justify-center rounded-2xl bg-slate-50">
@@ -270,7 +330,7 @@ export default function PhoneProductDetail({ product, selectedSlug, refreshing =
             <Pressable
               key={`${image}-${index}`}
               onPress={() => setImageIndex(index)}
-              className={`mr-2 h-16 w-16 rounded-xl border-2 p-1 ${index === imageIndex ? "border-teal-600" : "border-slate-200"}`}
+              className={`mr-2 h-16 w-16 rounded-xl border-2 p-1 ${index === imageIndex ? 'border-teal-600' : 'border-slate-200'}`}
             >
               <Image
                 source={{ uri: imageUrl(image) }}
@@ -286,9 +346,12 @@ export default function PhoneProductDetail({ product, selectedSlug, refreshing =
           <Text className="rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-700">
             Điện thoại
           </Text>
-          <Text className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-amber-700">
-            ✦ Sản phẩm nổi bật
-          </Text>
+          <View className="flex-row items-center gap-1 rounded-full bg-amber-50 px-3 py-1">
+            <Sparkles size={13} color="#b45309" />
+            <Text className="text-xs font-semibold text-amber-700">
+              Sản phẩm nổi bật
+            </Text>
+          </View>
         </View>
         <Text className="text-2xl font-extrabold text-slate-900">
           {product.name}
@@ -299,7 +362,7 @@ export default function PhoneProductDetail({ product, selectedSlug, refreshing =
         <Text className="mt-2 text-3xl font-extrabold text-teal-700">
           {selected
             ? money(hasPromotion ? finalPrice : currentPrice)
-            : "Liên hệ"}
+            : 'Liên hệ'}
         </Text>
         {hasPromotion ? (
           <Text className="mt-1 text-sm text-slate-400 line-through">
@@ -327,9 +390,9 @@ export default function PhoneProductDetail({ product, selectedSlug, refreshing =
                 key={value}
                 disabled={!variant}
                 onPress={() => variant && selectVariant(variant)}
-                className={`rounded-xl border px-4 py-2 ${value === storage ? "border-teal-600 bg-teal-50" : variant ? "border-slate-200" : "border-slate-100 bg-slate-50"}`}
+                className={`rounded-xl border px-4 py-2 ${value === storage ? 'border-teal-600 bg-teal-50' : variant ? 'border-slate-200' : 'border-slate-100 bg-slate-50'}`}
               >
-                <Text className={variant ? "text-slate-700" : "text-slate-300"}>
+                <Text className={variant ? 'text-slate-700' : 'text-slate-300'}>
                   {value}
                 </Text>
               </Pressable>
@@ -351,7 +414,7 @@ export default function PhoneProductDetail({ product, selectedSlug, refreshing =
                 key={variant.colorSlug}
                 disabled={!available}
                 onPress={() => available && selectVariant(available)}
-                className={`rounded-xl border px-4 py-2 ${variant.colorSlug === color ? "border-teal-600 bg-teal-50" : "border-slate-200"}`}
+                className={`rounded-xl border px-4 py-2 ${variant.colorSlug === color ? 'border-teal-600 bg-teal-50' : 'border-slate-200'}`}
               >
                 <Text className="text-slate-700">{variant.color}</Text>
               </Pressable>
@@ -363,14 +426,17 @@ export default function PhoneProductDetail({ product, selectedSlug, refreshing =
           disabled={adding}
           className="mt-6 items-center rounded-xl bg-teal-700 py-3"
         >
-          <Text className="font-bold text-white">
-            {adding ? "Đang thêm..." : "Thêm vào giỏ hàng"}
-          </Text>
+          <View className="flex-row items-center gap-2">
+            <ShoppingCart size={19} color="#ffffff" />
+            <Text className="font-bold text-white">
+              {adding ? 'Đang thêm...' : 'Thêm vào giỏ hàng'}
+            </Text>
+          </View>
         </Pressable>
         <View className="mt-5 flex-row flex-wrap gap-y-3 border-t border-slate-100 pt-5">
           <View className="w-1/2 flex-row items-center gap-2 pr-2">
             <View className="h-6 w-6 items-center justify-center rounded-full bg-teal-50">
-              <Text className="text-sm font-bold text-teal-700">✓</Text>
+              <ShieldCheck size={17} color="#0f766e" />
             </View>
             <Text className="flex-1 text-xs text-slate-500">
               Bảo hành chính hãng
@@ -378,7 +444,7 @@ export default function PhoneProductDetail({ product, selectedSlug, refreshing =
           </View>
           <View className="w-1/2 flex-row items-center gap-2">
             <View className="h-6 w-6 items-center justify-center rounded-full bg-teal-50">
-              <Text className="text-sm font-bold text-teal-700">✓</Text>
+              <Truck size={17} color="#0f766e" />
             </View>
             <Text className="flex-1 text-xs text-slate-500">
               Giao hàng toàn quốc
@@ -386,7 +452,7 @@ export default function PhoneProductDetail({ product, selectedSlug, refreshing =
           </View>
           <View className="w-1/2 flex-row items-center gap-2 pr-2">
             <View className="h-6 w-6 items-center justify-center rounded-full bg-teal-50">
-              <Text className="text-sm font-bold text-teal-700">✓</Text>
+              <RotateCcw size={17} color="#0f766e" />
             </View>
             <Text className="flex-1 text-xs text-slate-500">
               Hỗ trợ đổi trả
@@ -397,7 +463,11 @@ export default function PhoneProductDetail({ product, selectedSlug, refreshing =
       <Text className="mb-3 mt-6 text-xl font-extrabold text-slate-900">
         Thông số kỹ thuật
       </Text>
-      <Section title="Cấu hình & Bộ nhớ" openByDefault>
+      <Section
+        title="Cấu hình & Bộ nhớ"
+        icon={<Cpu size={18} color="#0f766e" />}
+        openByDefault
+      >
         <InfoRow
           label="Hệ điều hành"
           value={product.performanceAndStorage?.os}
@@ -422,7 +492,10 @@ export default function PhoneProductDetail({ product, selectedSlug, refreshing =
           value={product.performanceAndStorage?.contactsStorage}
         />
       </Section>
-      <Section title="Camera & Màn hình">
+      <Section
+        title="Camera & Màn hình"
+        icon={<Camera size={18} color="#0f766e" />}
+      >
         <InfoRow
           label="Camera sau"
           value={product.cameraAndScreen?.rearCameraResolution}
@@ -472,7 +545,10 @@ export default function PhoneProductDetail({ product, selectedSlug, refreshing =
           value={product.cameraAndScreen?.rearFlashlight}
         />
       </Section>
-      <Section title="Pin & Sạc">
+      <Section
+        title="Pin & Sạc"
+        icon={<BatteryCharging size={18} color="#0f766e" />}
+      >
         <InfoRow
           label="Dung lượng pin"
           value={product.batteryAndCharge?.batteryLife}
@@ -490,7 +566,7 @@ export default function PhoneProductDetail({ product, selectedSlug, refreshing =
           value={product.batteryAndCharge?.batteryFeatures}
         />
       </Section>
-      <Section title="Tiện ích">
+      <Section title="Tiện ích" icon={<Shield size={18} color="#0f766e" />}>
         <InfoRow
           label="Bảo mật nâng cao"
           value={product.utilities?.advancedSecurity}
@@ -513,7 +589,7 @@ export default function PhoneProductDetail({ product, selectedSlug, refreshing =
           value={product.utilities?.supportedAudioFormats}
         />
       </Section>
-      <Section title="Kết nối">
+      <Section title="Kết nối" icon={<Wifi size={18} color="#0f766e" />}>
         <InfoRow
           label="Mạng di động"
           value={product.connectivity?.mobileNetwork}
@@ -535,7 +611,10 @@ export default function PhoneProductDetail({ product, selectedSlug, refreshing =
         <InfoList label="Wi-Fi" value={product.connectivity?.wifi} />
         <InfoList label="GPS" value={product.connectivity?.gps} />
       </Section>
-      <Section title="Thiết kế & Chất liệu">
+      <Section
+        title="Thiết kế & Chất liệu"
+        icon={<Smartphone size={18} color="#0f766e" />}
+      >
         <InfoRow
           label="Kiểu thiết kế"
           value={product.designAndMaterials?.designType}
