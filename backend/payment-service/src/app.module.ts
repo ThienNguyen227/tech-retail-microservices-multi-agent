@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
+import { OutboxModule } from './outbox/outbox.module';
 
 import { PrismaModule } from './prisma/prisma.module';
 
@@ -18,6 +19,9 @@ import { RabbitMQModule } from './rabbitmq/rabbitmq.module';
 
     // RabbitMQ
     RabbitMQModule,
+
+    // Worker
+    OutboxModule,
 
     // Payment
     CreatePaymentModule,
