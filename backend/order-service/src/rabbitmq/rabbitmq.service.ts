@@ -330,7 +330,7 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy{
           const routingKey =
             message.fields.routingKey;
 
-          const data = JSON.parse(
+          const payload = JSON.parse(
             message.content.toString(),
           );
 
@@ -338,7 +338,7 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy{
             'Received event:',
             {
               routingKey,
-              data,
+              payload,
             },
           );
 
@@ -350,12 +350,15 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy{
             routingKey ===
             'payment.succeeded'
           ) {
+
             await this.updateOrderStatusService.markAsPaid(
-              Number(data.orderId),
+              payload.eventId,
+              payload.eventType,
+              payload.data,
             );
 
             console.log(
-              `Order ${data.orderId} đã được cập nhật thành PAID`,
+              `Order ${payload.orderId} đã được cập nhật thành PAID`,
             );
           }
 
@@ -368,11 +371,10 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy{
             'payment.failed'
           ) {
             console.log(
-              `Payment failed for order ${data.orderId}`,
+              `Payment failed for order ${payload.data.orderId}`,
             );
 
-            // Sau này có thể xử lý Order
-            // khi payment failed.
+            // 
           }
 
           // ======================================================
