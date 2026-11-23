@@ -7,6 +7,9 @@ from datetime import datetime, timezone
 from .single_agent_database import conversations_collection, messages_collection
 from fastapi import Query, HTTPException
 
+from fastapi import Depends
+from auth.jwt_auth import get_current_auth
+
 from .single_agent_graph import single_agent
 
 app = FastAPI(title="AI Service")
@@ -23,13 +26,192 @@ app.add_middleware(
 class ChatRequest(BaseModel):
     message: str
 
+# 1. (POST) MESSAGES
+# @app.post("/api/v1/ai-service/product")
+# async def product_chat(
+#     message: str = Query(..., min_length=1),
+#     user_id: str = Query(...),
+#     conversation_id: str | None = Query(default=None),
+# ):
+#     message = message.strip()
+
+#     if not message:
+#         raise HTTPException(
+#             status_code=400,
+#             detail="Message không được để trống.",
+#         )
+
+#     is_new_conversation = conversation_id is None
+
+#     if is_new_conversation:
+#         conversation_id = str(uuid4())
+#     else:
+#         # Đảm bảo conversation tồn tại và thuộc về user
+#         conversation = conversations_collection.find_one({
+#             "_id": conversation_id,
+#             "user_id": user_id,
+#         })
+
+#         if not conversation:
+#             raise HTTPException(
+#                 status_code=404,
+#                 detail="Không tìm thấy conversation.",
+#             )
+
+#     config = {
+#         "configurable": {
+#             "thread_id": conversation_id,
+#         }
+#     }
+
+#     try:
+#         snapshot = await single_agent.aget_state(config)
+
+#         old_count = (
+#             len(snapshot.values.get("messages", []))
+#             if snapshot.values
+#             else 0
+#         )
+
+#         result = await single_agent.ainvoke(
+#             {
+#                 "messages": [
+#                     {
+#                         "role": "user",
+#                         "content": message,
+#                     }
+#                 ]
+#             },
+#             config=config,
+#         )
+
+#         new_messages = result["messages"][old_count:]
+
+#         # Debug token usage
+#         total_input = 0
+#         total_output = 0
+
+#         for msg in new_messages:
+#             usage = getattr(msg, "usage_metadata", None)
+
+#             if usage:
+#                 total_input += usage.get("input_tokens", 0)
+#                 total_output += usage.get("output_tokens", 0)
+
+#         print("\n========== TOKEN USAGE ==========")
+#         print(f"Input tokens:  {total_input}")
+#         print(f"Output tokens: {total_output}")
+#         print(f"Total tokens:  {total_input + total_output}")
+
+#         for msg in new_messages:
+#             print("\nTYPE:", type(msg).__name__)
+#             print("CONTENT:", msg.content)
+
+#             if hasattr(msg, "tool_calls") and msg.tool_calls:
+#                 print("TOOL CALLS:", msg.tool_calls)
+
+#         last_message = result["messages"][-1]
+#         content = last_message.content
+
+#         if isinstance(content, list):
+#             content = "".join(
+#                 item.get("text", "")
+#                 for item in content
+#                 if isinstance(item, dict)
+#                 and item.get("type") == "text"
+#             )
+
+#         if not isinstance(content, str) or not content.strip():
+#             content = "Xin lỗi, tôi chưa thể tạo câu trả lời. Bạn vui lòng thử lại nhé."
+
+#     except Exception as e:
+#         print(f"\n[PRODUCT AGENT ERROR] {type(e).__name__}: {e}")
+
+#         raise HTTPException(
+#             status_code=503,
+#             detail="AI đang gặp sự cố hoặc chưa thể trả lời. Bạn vui lòng thử lại sau nhé.",
+#         )
+
+#     now = datetime.now(timezone.utc)
+
+#     # Tạo conversation mới
+#     if is_new_conversation:
+#         conversations_collection.insert_one({
+#             "_id": conversation_id,
+#             "title": message[:50],
+#             "user_id": user_id,
+#             "created_at": now,
+#             "updated_at": now,
+#         })
+#     else:
+#         conversations_collection.update_one(
+#             {
+#                 "_id": conversation_id,
+#                 "user_id": user_id,
+#             },
+#             {"$set": {"updated_at": now}},
+#         )
+
+#     # Lưu tin nhắn user
+#     messages_collection.insert_one({
+#         "conversation_id": conversation_id,
+#         "role": "user",
+#         "content": message,
+#         "created_at": now,
+#     })
+
+#     # Lưu câu trả lời AI
+#     messages_collection.insert_one({
+#         "conversation_id": conversation_id,
+#         "role": "assistant",
+#         "content": content,
+#         "created_at": datetime.now(timezone.utc),
+#     })
+
+#     return {
+#         "conversation_id": conversation_id,
+#         "message": content,
+#     }
 
 @app.post("/api/v1/ai-service/product")
 async def product_chat(
     message: str = Query(..., min_length=1),
-    user_id: str = Query(...),
     conversation_id: str | None = Query(default=None),
+    auth: dict = Depends(get_current_auth),
 ):
+    # ========================================================
+    # 1. AUTHENTICATION
+    # ========================================================
+
+    user = auth.get("user")
+    access_token = auth.get("access_token")
+
+    if not isinstance(user, dict):
+        raise HTTPException(
+            status_code=401,
+            detail="Thông tin xác thực không hợp lệ.",
+        )
+
+    user_id = user.get("sub")
+
+    if not isinstance(user_id, str) or not user_id.strip():
+        raise HTTPException(
+            status_code=401,
+            detail="Không xác định được User ID.",
+        )
+
+    if not isinstance(access_token, str) or not access_token:
+        raise HTTPException(
+            status_code=401,
+            detail="Không tìm thấy Access Token.",
+        )
+
+    user_id = user_id.strip()
+
+    # ========================================================
+    # 2. VALIDATE MESSAGE
+    # ========================================================
+
     message = message.strip()
 
     if not message:
@@ -38,10 +220,15 @@ async def product_chat(
             detail="Message không được để trống.",
         )
 
+    # ========================================================
+    # 3. CONVERSATION MANAGEMENT
+    # ========================================================
+
     is_new_conversation = conversation_id is None
 
     if is_new_conversation:
         conversation_id = str(uuid4())
+
     else:
         # Đảm bảo conversation tồn tại và thuộc về user
         conversation = conversations_collection.find_one({
@@ -60,6 +247,10 @@ async def product_chat(
             "thread_id": conversation_id,
         }
     }
+
+    # ========================================================
+    # 4. INVOKE LANGGRAPH
+    # ========================================================
 
     try:
         snapshot = await single_agent.aget_state(config)
@@ -80,11 +271,21 @@ async def product_chat(
                 ]
             },
             config=config,
+
+            # Truyền Access Token vào Runtime Context
+            # Không đưa token vào MessagesState hoặc Checkpointer
+            context={
+                "user_id": user_id,
+                "access_token": access_token,
+            },
         )
 
         new_messages = result["messages"][old_count:]
 
-        # Debug token usage
+        # ====================================================
+        # 5. DEBUG TOKEN USAGE
+        # ====================================================
+
         total_input = 0
         total_output = 0
 
@@ -107,6 +308,10 @@ async def product_chat(
             if hasattr(msg, "tool_calls") and msg.tool_calls:
                 print("TOOL CALLS:", msg.tool_calls)
 
+        # ====================================================
+        # 6. GET FINAL RESPONSE
+        # ====================================================
+
         last_message = result["messages"][-1]
         content = last_message.content
 
@@ -119,19 +324,31 @@ async def product_chat(
             )
 
         if not isinstance(content, str) or not content.strip():
-            content = "Xin lỗi, tôi chưa thể tạo câu trả lời. Bạn vui lòng thử lại nhé."
+            content = (
+                "Xin lỗi, tôi chưa thể tạo câu trả lời. "
+                "Bạn vui lòng thử lại nhé."
+            )
 
     except Exception as e:
-        print(f"\n[PRODUCT AGENT ERROR] {type(e).__name__}: {e}")
+        print(
+            f"\n[PRODUCT AGENT ERROR] "
+            f"{type(e).__name__}: {e}"
+        )
 
         raise HTTPException(
             status_code=503,
-            detail="AI đang gặp sự cố hoặc chưa thể trả lời. Bạn vui lòng thử lại sau nhé.",
+            detail=(
+                "AI đang gặp sự cố hoặc chưa thể trả lời. "
+                "Bạn vui lòng thử lại sau nhé."
+            ),
         )
+
+    # ========================================================
+    # 7. SAVE CONVERSATION
+    # ========================================================
 
     now = datetime.now(timezone.utc)
 
-    # Tạo conversation mới
     if is_new_conversation:
         conversations_collection.insert_one({
             "_id": conversation_id,
@@ -140,16 +357,24 @@ async def product_chat(
             "created_at": now,
             "updated_at": now,
         })
+
     else:
         conversations_collection.update_one(
             {
                 "_id": conversation_id,
                 "user_id": user_id,
             },
-            {"$set": {"updated_at": now}},
+            {
+                "$set": {
+                    "updated_at": now,
+                }
+            },
         )
 
-    # Lưu tin nhắn user
+    # ========================================================
+    # 8. SAVE USER MESSAGE
+    # ========================================================
+
     messages_collection.insert_one({
         "conversation_id": conversation_id,
         "role": "user",
@@ -157,7 +382,10 @@ async def product_chat(
         "created_at": now,
     })
 
-    # Lưu câu trả lời AI
+    # ========================================================
+    # 9. SAVE AI RESPONSE
+    # ========================================================
+
     messages_collection.insert_one({
         "conversation_id": conversation_id,
         "role": "assistant",
@@ -165,12 +393,17 @@ async def product_chat(
         "created_at": datetime.now(timezone.utc),
     })
 
+    # ========================================================
+    # 10. RETURN RESPONSE
+    # ========================================================
+
     return {
         "conversation_id": conversation_id,
         "message": content,
     }
 
-# GET LIST CONVERSATION
+
+# 2. GET LIST CONVERSATION
 @app.get("/api/v1/ai-service/product/conversations")
 async def get_conversations(user_id: str = Query(...)):
     conversations = list(
@@ -231,7 +464,7 @@ async def get_conversation_messages(conversation_id: str):
         ],
     }
 
-# CREATE NEW CONVERSATION
+# 3. CREATE NEW CONVERSATION
 @app.post("/api/v1/ai-service/conversations")
 async def create_conversation(
     user_id: str = Query(...),
@@ -279,7 +512,7 @@ async def create_conversation(
         "message": "Tạo cuộc trò chuyện mới thành công.",
     }
 
-# DELETE CONVERSATION AND ITS MESSAGES
+# 4. DELETE CONVERSATION AND ITS MESSAGES
 @app.delete("/api/v1/ai-service/conversations/{conversation_id}")
 async def delete_conversation(
     conversation_id: str,
@@ -320,7 +553,7 @@ async def delete_conversation(
         "message": "Xóa conversation và toàn bộ message thành công.",
     }
 
-# RENAME CONVERSATION
+# 5. RENAME CONVERSATION
 @app.patch("/api/v1/ai-service/conversations/{conversation_id}/rename")
 async def rename_conversation(
     conversation_id: str,
