@@ -1,4 +1,3 @@
-
 from typing import Any, Literal
 import math
 
@@ -84,9 +83,6 @@ async def create_order(
     totalAmount: float,
     paymentMethod: Literal["COD", "MOMO", "VNPAY"],
 
-    # Địa chỉ bắt buộc cho cả hai hình thức nhận hàng.
-    # HOME_DELIVERY: lấy từ Customer Service.
-    # STORE_PICKUP: lấy từ Branch Service.
     addressLine: str,
     ward: str,
     province: str,
