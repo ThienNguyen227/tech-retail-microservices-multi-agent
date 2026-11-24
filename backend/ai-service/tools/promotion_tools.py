@@ -64,32 +64,14 @@ async def get_direct_discount(
     """
     TOOL: get_direct_discount
 
-    MÔ TẢ:
-    Lấy thông tin khuyến mãi trực tiếp của một sản phẩm
-    thông qua SKU.
+    Tra cứu thông tin khuyến mãi trực tiếp của một sản phẩm
+    theo SKU để trả lời các câu hỏi của người dùng.
 
-    KHI NÀO SỬ DỤNG:
-    - Người dùng muốn biết sản phẩm có đang được giảm giá không.
-    - Người dùng muốn xem mức giảm giá của một sản phẩm cụ thể.
-    - Khi cần kiểm tra khuyến mãi của sản phẩm trước khi tư vấn
-      hoặc tạo đơn hàng.
+    Chỉ sử dụng khi người dùng muốn tìm hiểu về chương trình
+    khuyến mãi của một sản phẩm cụ thể.
 
-    QUY TẮC:
-    - SKU phải là SKU thực tế của sản phẩm.
-    - Không tự tạo hoặc suy đoán SKU.
-    - Chỉ sử dụng thông tin khuyến mãi từ Promotion Service.
-    - Không tự tính toán giá bán cuối cùng nếu chưa có giá gốc
-      và chưa xác định đúng discountType.
-    - Nếu sản phẩm không có khuyến mãi, thông báo rõ ràng.
-    - Nếu xảy ra lỗi, thông báo theo kết quả trả về.
-
-    KẾT QUẢ:
-    Trả về thông tin:
-    - promotionId
-    - promotionName
-    - sku
-    - discountType
-    - discountValue
+    Không sử dụng Tool này để tính giá cuối cùng,
+    tính tiền đơn hàng hoặc xử lý checkout.
     """
 
     # 1. Lấy Access Token từ Runtime Context.
@@ -123,37 +105,17 @@ async def get_direct_discounts(
     """
     TOOL: get_direct_discounts
 
-    MÔ TẢ:
-    Lấy danh sách khuyến mãi trực tiếp của nhiều sản phẩm
-    thông qua danh sách SKU.
+    Tra cứu thông tin khuyến mãi trực tiếp của nhiều sản phẩm
+    theo danh sách SKU để trả lời các câu hỏi của người dùng.
 
-    KHI NÀO SỬ DỤNG:
-    - Người dùng muốn xem khuyến mãi của nhiều sản phẩm.
-    - Khi cần kiểm tra khuyến mãi của danh sách sản phẩm.
-    - Khi cần thu thập thông tin khuyến mãi để so sánh sản phẩm.
-    - Khi cần kiểm tra khuyến mãi các sản phẩm trong giỏ hàng
-      trước khi tư vấn hoặc tạo đơn hàng.
+    Chỉ sử dụng khi người dùng muốn tìm hiểu hoặc so sánh
+    khuyến mãi giữa nhiều sản phẩm.
 
-    QUY TẮC:
-    - Chỉ sử dụng các SKU thực tế đã được xác định.
-    - Không tự tạo hoặc suy đoán SKU.
-    - Truyền danh sách SKU vào một lần gọi Tool.
-    - Không gọi riêng lẻ nhiều lần get_direct_discount
-      khi có thể sử dụng Tool này.
-    - Chỉ những SKU có khuyến mãi mới xuất hiện trong kết quả.
-    - SKU không xuất hiện trong kết quả được hiểu là
-      không tìm thấy khuyến mãi trực tiếp.
-    - Không tự tính toán giá bán cuối cùng nếu chưa có giá gốc
-      và chưa xác định đúng discountType.
-    - Không tự tạo hoặc suy đoán thông tin khuyến mãi.
+    SKU không xuất hiện trong kết quả được hiểu là
+    không có khuyến mãi trực tiếp.
 
-    KẾT QUẢ:
-    Trả về danh sách thông tin:
-    - promotionId
-    - promotionName
-    - sku
-    - discountType
-    - discountValue
+    Không sử dụng Tool này để tính giá cuối cùng,
+    tính tiền đơn hàng hoặc xử lý checkout.
     """
 
     # 1. Lấy Access Token từ Runtime Context.

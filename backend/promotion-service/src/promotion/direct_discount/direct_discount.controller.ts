@@ -19,4 +19,20 @@ export class DirectDiscountController {
   getDirectDiscounts(@Body() dto: GetDirectDiscountsDto) {
     return this.directDiscountService.getDirectDiscounts(dto.skus);
   }
+
+  // 3. (GET) GET DIRECT DISCOUNTS BY MULTIPLE SKUS -> AI AGENT
+  @Get('direct-discounts')
+  getDirectDiscountValuesBySkus(
+    @Query('skus') skus: string | string[],
+  ) {
+    const normalizedSkus = Array.isArray(skus)
+      ? skus
+      : skus
+        ? [skus]
+        : [];
+
+    return this.directDiscountService.getDirectDiscountValues(
+      normalizedSkus,
+    );
+  }
 }

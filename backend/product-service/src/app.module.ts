@@ -16,6 +16,8 @@ import { ComparePhoneModule } from './ai_session/compare_product/compare_phone/c
 import { CompareLaptopModule } from './ai_session/compare_product/compare_laptop/compare_laptop.module';
 import { CompareTabletModule } from './ai_session/compare_product/compare_tablet/compare_tablet.module';
 
+import { GetProductPriceModule } from './ai_session/get_product_price/get_product_price.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -45,6 +47,9 @@ import { CompareTabletModule } from './ai_session/compare_product/compare_tablet
     ComparePhoneModule,
     CompareLaptopModule,
     CompareTabletModule,
+
+    /// 4. 
+    GetProductPriceModule,
 
 
   ],

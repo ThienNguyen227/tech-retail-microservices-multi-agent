@@ -1542,7 +1542,10 @@ from tools.product_tools import (
 from tools.branch_tools import get_branch_address
 
 # ORDER-SERVICE
-from tools.order_tools import create_order
+from tools.order_tools import (
+    calculate_final_price,
+    create_order,
+)
 
 # PROMOTION-SERVICE
 from tools.promotion_tools import (
@@ -1660,6 +1663,7 @@ tools = [
 
     # ORDER
     create_order,
+    calculate_final_price,
 
     # PROMOTION
     get_all_coupons,
