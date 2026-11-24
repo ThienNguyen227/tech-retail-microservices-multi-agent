@@ -1,4 +1,36 @@
 
+// import {
+//   Body,
+//   Controller,
+//   Post,
+// } from '@nestjs/common';
+
+// import {
+//   CalculateFinalPriceService,
+//   CalculateFinalPriceItem,
+// } from './calculate_final_price.service';
+
+// @Controller('api/v1/ai/order-service')
+// export class CalculateFinalPriceController {
+//   constructor(
+//     private readonly calculateFinalPriceService: CalculateFinalPriceService,
+//   ) {}
+
+//   // ==========================================
+//   // 1. (POST) CALCULATE FINAL PRICE BY SKU + QUANTITY
+//   // ==========================================
+
+//   @Post('calculate-final-price')
+//   async calculateFinalPrice(
+//     @Body('items') items: CalculateFinalPriceItem[],
+//   ) {
+//     return this.calculateFinalPriceService.calculateFinalPrice(
+//       items,
+//     );
+//   }
+// }
+
+
 import {
   Body,
   Controller,
@@ -7,7 +39,10 @@ import {
 
 import {
   CalculateFinalPriceService,
-  CalculateFinalPriceItem,
+} from './calculate_final_price.service';
+
+import type {
+  CalculateFinalPriceRequest,
 } from './calculate_final_price.service';
 
 @Controller('api/v1/ai/order-service')
@@ -17,15 +52,16 @@ export class CalculateFinalPriceController {
   ) {}
 
   // ==========================================
-  // 1. (POST) CALCULATE FINAL PRICE BY SKU + QUANTITY
+  // (POST) CALCULATE FINAL PRICE
   // ==========================================
 
   @Post('calculate-final-price')
   async calculateFinalPrice(
-    @Body('items') items: CalculateFinalPriceItem[],
+    @Body() body: CalculateFinalPriceRequest,
   ) {
     return this.calculateFinalPriceService.calculateFinalPrice(
-      items,
+      body?.items,
+      body?.couponId ?? null,
     );
   }
 }

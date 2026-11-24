@@ -142,19 +142,9 @@ async def create_order(
 async def calculate_final_price(
     items: list[dict],
     access_token: str | None = None,
+    coupon_id: int | None = None,
 ):
-    """
-    Gọi Order Service để tính giá sản phẩm theo SKU và quantity.
-
-    Order Service sẽ:
-    - Gọi Product Service lấy giá bán.
-    - Gọi Promotion Service lấy khuyến mãi trực tiếp.
-    - Tính tiền giảm giá theo quantity.
-    - Tính subtotal và totalAmount.
-
-    Không xử lý coupon và phí vận chuyển tại API này.
-    """
-
+    
     order_service_url = os.getenv(
         "ORDER_SERVICE_URL",
         "http://localhost:3007",
@@ -224,7 +214,25 @@ async def calculate_final_price(
         })
 
     # ========================================================
-    # 2. BUILD REQUEST
+    # 2. VALIDATE COUPON ID
+    # ========================================================
+
+    if coupon_id is not None:
+
+        if (
+            isinstance(coupon_id, bool)
+            or not isinstance(coupon_id, int)
+            or coupon_id < 1
+        ):
+            return {
+                "success": False,
+                "found": False,
+                "data": None,
+                "message": "coupon_id phải là số nguyên dương.",
+            }
+
+    # ========================================================
+    # 3. BUILD REQUEST
     # ========================================================
 
     url = (
@@ -236,11 +244,16 @@ async def calculate_final_price(
         "items": normalized_items,
     }
 
+    # Chỉ gửi couponId khi người dùng đã chọn coupon.
+    if coupon_id is not None:
+        payload["couponId"] = coupon_id
+
     headers = {
         "Content-Type": "application/json",
     }
 
     if isinstance(access_token, str) and access_token.strip():
+
         token = access_token.strip()
 
         if not token.startswith("Bearer "):
@@ -249,7 +262,7 @@ async def calculate_final_price(
         headers["Authorization"] = token
 
     # ========================================================
-    # 3. CALL ORDER SERVICE
+    # 4. CALL ORDER SERVICE
     # ========================================================
 
     try:
@@ -264,7 +277,7 @@ async def calculate_final_price(
             response.raise_for_status()
 
         # ====================================================
-        # 4. PARSE RESPONSE
+        # 5. PARSE RESPONSE
         # ====================================================
 
         try:
@@ -294,20 +307,57 @@ async def calculate_final_price(
                 "success": False,
                 "found": False,
                 "data": None,
-                "message": "Dữ liệu sản phẩm trả về không hợp lệ.",
+                "message": "Danh sách sản phẩm trả về không hợp lệ.",
+            }
+
+        if not isinstance(not_found_skus, list):
+            return {
+                "success": False,
+                "found": False,
+                "data": None,
+                "message": "Danh sách SKU không tìm thấy không hợp lệ.",
             }
 
         # ====================================================
-        # 5. RETURN RESULT
+        # 6. BUILD MESSAGE
         # ====================================================
 
         if not_found_skus:
+
             message = (
                 "Đã tính giá nhưng có SKU không tìm thấy. "
                 "Cần kiểm tra lại danh sách sản phẩm."
             )
+
+        elif coupon_id is not None:
+
+            coupon_result = data.get("coupon")
+
+            if isinstance(coupon_result, dict):
+
+                message = coupon_result.get(
+                    "message",
+                    "Đã tính giá và kiểm tra coupon thành công.",
+                )
+
+            elif data.get("couponApplied") is True:
+
+                message = "Áp dụng coupon thành công."
+
+            else:
+
+                message = (
+                    "Đã tính giá sản phẩm. "
+                    "Cần kiểm tra lại thông tin coupon trong kết quả."
+                )
+
         else:
+
             message = "Tính giá sản phẩm thành công."
+
+        # ====================================================
+        # 7. RETURN RESULT
+        # ====================================================
 
         return {
             "success": True,
