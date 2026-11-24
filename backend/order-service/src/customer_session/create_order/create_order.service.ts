@@ -201,49 +201,6 @@ export class CreateOrderService implements OnModuleInit {
 
           order_total_amount: totalAmount,
 
-          // ==========================================
-          // ORDER ITEMS
-          // ==========================================
-          // order_item: {
-          //   create: dto.items.map((item) => {
-          //     const unitPrice = Number(item.price) || 0;
-
-          //     const quantity = Number(item.quantity) || 1;
-
-          //     const itemSubtotal = Number(item.subtotal) || unitPrice * quantity;
-
-          //     // Tìm serial mà Inventory đã RESERVED
-          //     const reservedItem = reservedSerials.find((reserved) => reserved.sku === item.sku);
-
-          //     // Với thiết kế hiện tại:
-          //     // OrderItem chỉ lưu 1 serial_number
-          //     const serialNumber = reservedItem?.serial_numbers?.[0] ?? null;
-
-          //     console.log(`[ORDER ITEM] SKU=${item.sku}, Serial=${serialNumber}`);
-
-          //     return {
-          //       order_item_sku: item.sku,
-
-          //       order_item_product_name: item.productName || item.sku,
-
-          //       order_item_product_image: item.imageUrl || '',
-
-          //       order_item_unit_price: unitPrice,
-
-          //       order_item_quantity: quantity,
-
-          //       order_item_subtotal: itemSubtotal,
-
-          //       order_item_serial_number: serialNumber,
-
-          //       // Khuyến mãi trực tiếp theo SKU
-          //       order_item_promotion_id: item.promotionId ?? null,
-          //       order_item_promotion_name: item.promotionName ?? null,
-          //       order_item_direct_discount_amount: Number(item.directDiscountAmount) || 0,
-          //     };
-          //   }),
-          // },
-
           order_item: {
             create: dto.items.flatMap((item) => {
               const unitPrice = Number(item.price) || 0;
