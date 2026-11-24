@@ -15,32 +15,22 @@ async def get_all_coupons(
     """
     TOOL: get_all_coupons
 
-    MÔ TẢ:
-    Lấy danh sách các mã giảm giá (coupon) đang hoạt động
-    thông qua Promotion Service.
+    Lấy danh sách coupon đang hoạt động từ Promotion Service.
 
-    KHI NÀO SỬ DỤNG:
+    SỬ DỤNG KHI:
     - Người dùng muốn xem các mã giảm giá hiện có.
-    - Người dùng muốn biết có những coupon nào có thể áp dụng.
-    - Khi cần kiểm tra các chương trình giảm giá bằng coupon.
+    - Cần tìm coupon để áp dụng cho đơn hàng.
 
     QUY TẮC:
-    - Chỉ sử dụng dữ liệu trả về từ Promotion Service.
-    - Không tự tạo hoặc suy đoán mã coupon.
-    - Không tự khẳng định coupon áp dụng được cho đơn hàng
-      nếu chưa kiểm tra điều kiện áp dụng.
-    - Chú ý các thông tin minOrderValue và maxDiscountValue.
-    - Nếu không tìm thấy coupon, thông báo rõ ràng cho người dùng.
-    - Nếu xảy ra lỗi, thông báo theo kết quả trả về.
+    - Chỉ sử dụng dữ liệu từ Promotion Service.
+    - Không tự tạo hoặc lựa chọn coupon thay người dùng.
+    - Không khẳng định coupon áp dụng thành công
+    khi chưa xác minh điều kiện.
 
     KẾT QUẢ:
-    Trả về danh sách coupon gồm:
-    - couponId
-    - couponName
-    - discountValue
-    - minOrderValue
-    - maxDiscountValue
-    - discountType
+    Trả về thông tin coupon gồm couponId, couponName,
+    discountType, discountValue, minOrderValue
+    và maxDiscountValue.
     """
 
     # 1. Lấy Access Token từ Runtime Context.

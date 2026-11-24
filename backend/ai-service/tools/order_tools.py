@@ -97,105 +97,62 @@ async def create_order(
     """
     TOOL: create_order
 
-    MỤC ĐÍCH:
-    Tạo đơn hàng thông qua Order Service sau khi Agent đã
-    thu thập, xác minh dữ liệu và nhận xác nhận cuối cùng
-    từ người dùng.
+    Tạo đơn hàng thông qua Order Service sau khi đã xác minh
+    đầy đủ thông tin và được người dùng xác nhận.
 
-    1. THU THẬP THÔNG TIN
-
-    Agent phải xác định đầy đủ:
-
-    - Số điện thoại và thông tin người nhận.
-    - Sản phẩm, phiên bản, màu sắc và số lượng.
-    - Hình thức nhận hàng.
-    - Địa chỉ nhận hàng tương ứng.
+    THÔNG TIN BẮT BUỘC:
+    - Người nhận: recipientName, recipientPhone.
+    - Sản phẩm: SKU, biến thể, số lượng và thông tin sản phẩm.
+    - Hình thức nhận hàng và địa chỉ tương ứng.
     - Phương thức thanh toán.
+    - Các giá trị tài chính theo dữ liệu đã xác minh.
 
-    Nếu thiếu thông tin, phải hỏi người dùng.
-    Không tự suy đoán hoặc tạo dữ liệu thay thế.
+    QUY TẮC SẢN PHẨM VÀ KHÁCH HÀNG:
+    - SKU, tên, hình ảnh và giá phải lấy từ Product Service.
+    - Sử dụng Customer Tools khi cần tra cứu khách hàng
+    và địa chỉ giao hàng.
+    - Không tự tạo hoặc suy đoán dữ liệu.
 
-    2. XÁC MINH SẢN PHẨM
-
-    - Sử dụng Product Tools để xác minh sản phẩm và SKU.
-    - Sử dụng đúng biến thể người dùng lựa chọn.
-    - Lấy tên sản phẩm, hình ảnh và giá từ Product Service.
-    - Không tự tạo SKU, tên sản phẩm hoặc giá bán.
-    - Không tự lựa chọn biến thể khác với yêu cầu.
-
-    3. XÁC MINH KHÁCH HÀNG
-
-    - Sử dụng Customer Tools để tra cứu thông tin khách hàng
-      khi cần thiết.
-    - recipientName và recipientPhone phải hợp lệ.
-    - Không tự tạo thông tin người nhận.
-
-    4. QUY TẮC HÌNH THỨC NHẬN HÀNG
+    QUY TẮC NHẬN HÀNG:
 
     HOME_DELIVERY:
     - fulfillmentType = HOME_DELIVERY.
-    - branchId luôn bằng 10 (kho tổng).
-    - Lấy địa chỉ giao hàng từ Customer Service.
-    - addressLine, ward, province phải là địa chỉ
-      mà khách hàng đã lựa chọn.
-    - Không sử dụng địa chỉ cửa hàng thay cho địa chỉ nhà.
+    - branchId = 10 (kho tổng).
+    - Lấy địa chỉ từ Customer Service.
 
     STORE_PICKUP:
     - fulfillmentType = STORE_PICKUP.
-    - branchId luôn bằng 1.
-    - BẮT BUỘC gọi Tool get_branch_address với branchId = 1
-      trước khi gọi create_order.
-    - Lấy addressLine, ward, province từ kết quả
-      thực tế của Branch Service.
-    - Không sử dụng địa chỉ nhà của khách hàng.
-    - Không yêu cầu người dùng tự cung cấp địa chỉ cửa hàng.
-    - Không tự tạo hoặc suy đoán địa chỉ chi nhánh.
+    - branchId = 1.
+    - Bắt buộc gọi get_branch_address(branch_id=1)
+    để lấy địa chỉ chi nhánh.
 
-    CẢ HAI HÌNH THỨC:
-    - Đều phải truyền đầy đủ addressLine, ward, province.
-    - Nếu không có địa chỉ hợp lệ thì không được tạo đơn.
+    Cả hai hình thức đều phải có đầy đủ:
+    addressLine, ward, province.
+    Không có địa chỉ hợp lệ thì không tạo đơn.
 
-    5. QUY TẮC KHUYẾN MÃI VÀ TÀI CHÍNH
+    QUY TẮC TÀI CHÍNH:
+    - directDiscountAmount: Giảm giá trực tiếp từng sản phẩm.
+    - couponDiscountAmount: Giảm giá coupon toàn đơn.
+    - discountAmount: Tổng giảm giá trực tiếp và coupon.
+    - subtotal: Tổng tiền hàng sau Direct Discount,
+    trước coupon.
+    - totalAmount: Tổng tiền thanh toán đã xác minh.
+    - Không tự tính, tạo hoặc sửa đổi dữ liệu tài chính.
+    - Không áp dụng trùng các khoản giảm giá.
 
-    - Sử dụng Promotion Tools khi cần kiểm tra khuyến mãi.
-    - directDiscountAmount là giảm giá trực tiếp từng sản phẩm.
-    - couponDiscountAmount là giảm giá coupon toàn đơn.
-    - discountAmount bao gồm tổng giảm giá trực tiếp
-      và giảm giá coupon, không được tính trùng.
-    - subtotal là tổng tiền hàng sau khuyến mãi trực tiếp
-      nhưng trước coupon.
-    - totalAmount phải là tổng tiền cuối cùng đã xác minh.
-    - Không tự tạo hoặc sửa đổi dữ liệu tài chính.
+    THANH TOÁN:
+    Chỉ chấp nhận COD, MOMO hoặc VNPAY.
+    Không tự lựa chọn thay người dùng.
 
-    6. PHƯƠNG THỨC THANH TOÁN
-
-    Chỉ chấp nhận:
-    - COD
-    - MOMO
-    - VNPAY
-
-    Không tự lựa chọn phương thức thanh toán thay người dùng.
-
-    7. QUY TẮC XÁC NHẬN ĐƠN HÀNG
-
-    - Tổng hợp thông tin đơn hàng để người dùng kiểm tra.
-    - Chỉ gọi create_order sau khi người dùng xác nhận cuối cùng.
-    - Không xem việc hỏi giá hoặc quan tâm sản phẩm
-      là xác nhận đặt hàng.
-    - Không hỏi lại thông tin đã được xác định hợp lệ.
-    - Không gọi tạo đơn nhiều lần khi chưa xác định
-      kết quả của lần gọi trước.
-
-    8. XỬ LÝ KẾT QUẢ
-
-    - success = true: thông báo tạo đơn thành công và sử dụng
-      dữ liệu Order Service trả về.
-    - success = false: thông báo nguyên nhân dựa trên
-      message, status_code và detail.
-    - Timeout hoặc lỗi kết nối: không kết luận đơn hàng thất bại;
-      cần kiểm tra trạng thái đơn hàng trước khi thử lại.
-    - Không tự tạo mã đơn hàng hoặc trạng thái đơn hàng.
-    - Không thông báo thành công khi API chưa xác nhận.
+    XÁC NHẬN VÀ XỬ LÝ KẾT QUẢ:
+    - Chỉ gọi Tool sau khi người dùng xác nhận đơn hàng.
+    - Không xem yêu cầu tư vấn hoặc hỏi giá là xác nhận đặt hàng.
+    - success = true: Thông báo thành công theo dữ liệu trả về.
+    - success = false: Thông báo lỗi theo kết quả API.
+    - Timeout hoặc lỗi kết nối: Kiểm tra trạng thái đơn hàng
+    trước khi thử lại, không tự động tạo đơn lần nữa.
+    - Không tự tạo mã đơn hàng hoặc khẳng định thành công
+    khi chưa có xác nhận từ Order Service.
     """
 
     # ========================================================
@@ -417,135 +374,58 @@ class CalculateFinalPriceItemInput(BaseModel):
 async def calculate_final_price(
     items: list[CalculateFinalPriceItemInput],
     runtime: ToolRuntime,
+    coupon_id: int | None = None,
 ):
     """
     TOOL: calculate_final_price
 
-    MÔ TẢ:
+    Tính giá cuối cùng của danh sách sản phẩm thông qua Order Service.
 
-    Tính giá bán cuối cùng của danh sách sản phẩm
-    dựa trên SKU và số lượng.
+    1. THAM SỐ
 
-    Tool gọi Order Service để thực hiện tính toán.
-    Order Service sẽ kết nối Product Service và
-    Promotion Service để lấy dữ liệu giá bán
-    và khuyến mãi trực tiếp.
+    - items: Danh sách sản phẩm gồm sku và quantity.
+    SKU phải được xác minh từ Product Service.
+    - coupon_id: ID coupon người dùng đã chọn.
+    Để None nếu không sử dụng coupon.
 
-    1. KHI NÀO SỬ DỤNG
+    2. KHI NÀO SỬ DỤNG
 
-    Sử dụng Tool khi:
+    - Người dùng muốn kiểm tra tổng giá sản phẩm.
+    - Người dùng thay đổi SKU hoặc số lượng.
+    - Người dùng chọn coupon và cần tính lại giá.
+    - Trước khi tạo đơn hàng, cần xác minh giá mới nhất.
 
-    - Người dùng hỏi tổng giá tiền của nhiều sản phẩm.
-    - Người dùng muốn biết giá khi mua nhiều sản phẩm.
-    - Người dùng thay đổi số lượng sản phẩm.
-    - Agent đang chuẩn bị dữ liệu để tạo đơn hàng.
-    - Agent cần xác minh giá bán và khuyến mãi trực tiếp.
+    3. QUY TẮC
 
-    2. THAM SỐ ĐẦU VÀO
+    - Không tự tạo SKU hoặc suy đoán giá.
+    - Không tự tính khuyến mãi, coupon hoặc tổng tiền.
+    - Khi có coupon, truyền đúng coupon_id.
+    - Không tự chọn coupon thay người dùng.
+    - Khi SKU, quantity hoặc coupon thay đổi, phải tính lại giá.
+    - Không gọi lại Tool nếu dữ liệu đầu vào không thay đổi.
 
-    items:
-    Danh sách sản phẩm cần tính giá.
+    4. KẾT QUẢ
 
-    Mỗi phần tử gồm:
+    - products: Chi tiết giá và khuyến mãi từng sản phẩm.
+    - originalSubtotal: Tổng tiền trước giảm giá.
+    - subtotal: Tổng tiền sau khuyến mãi trực tiếp.
+    - totalDirectDiscountAmount: Tổng giảm giá trực tiếp.
+    - coupon: Thông tin coupon và trạng thái áp dụng.
+    - couponDiscountAmount: Số tiền giảm từ coupon.
+    - discountAmount: Tổng tiền được giảm.
+    - totalAmount: Tổng tiền sau tất cả giảm giá, chưa gồm phí vận chuyển.
 
-    - sku:
-      SKU chính xác được xác minh từ Product Service.
+    Chỉ sử dụng số liệu từ kết quả Order Service.
+    Nếu couponApplied = false, không được thông báo coupon đã áp dụng.
 
-    - quantity:
-      Số lượng sản phẩm người dùng yêu cầu.
+    5. XỬ LÝ LỖI
 
-    Ví dụ:
+    - success = false: Đọc message và detail để xử lý.
+    - notFoundSkus không rỗng: Thông báo SKU không tìm thấy.
+    - Coupon không hợp lệ: Thông báo theo lỗi trả về.
+    - Timeout hoặc lỗi kết nối: Thông báo chưa thể xác minh giá.
 
-    [
-        {
-            "sku": "IP17PM-256GB-CAM-VU-TRU",
-            "quantity": 2
-        },
-        {
-            "sku": "IP17PM-512GB-CAM-VU-TRU",
-            "quantity": 1
-        }
-    ]
-
-    3. QUY TẮC SỬ DỤNG
-
-    - SKU phải được xác minh từ Product Service.
-    - Quantity phải phản ánh chính xác yêu cầu của người dùng.
-    - Không tự tạo SKU.
-    - Không tự suy đoán giá bán.
-    - Không tự tính hoặc ước lượng khuyến mãi.
-    - Không tự tính subtotal hoặc totalAmount.
-    - Không sử dụng giá cũ trong lịch sử hội thoại
-      thay cho kết quả mới nhất từ Tool.
-    - Nếu người dùng thay đổi SKU hoặc quantity,
-      phải gọi lại Tool để tính giá.
-
-    - Khi chuẩn bị tạo đơn hàng, phải gọi Tool này
-      để xác minh giá và khuyến mãi trực tiếp
-      trước khi gọi create_order.
-
-    4. QUY TẮC ĐỌC KẾT QUẢ
-
-    Trong data.products, mỗi sản phẩm có:
-
-    - price:
-      Giá bán một sản phẩm trước khuyến mãi trực tiếp.
-
-    - directDiscountAmount:
-      Số tiền giảm trực tiếp trên một sản phẩm.
-
-    - totalDirectDiscountAmount:
-      Tổng tiền giảm trực tiếp theo quantity.
-
-    - subtotal:
-      Thành tiền của sản phẩm sau khuyến mãi trực tiếp,
-      đã tính theo quantity.
-
-    - promotionId:
-      ID chương trình khuyến mãi trực tiếp,
-      có thể null.
-
-    - promotionName:
-      Tên chương trình khuyến mãi trực tiếp,
-      có thể null.
-
-    Các trường tổng hợp:
-
-    - subtotal:
-      Tổng tiền hàng sau khuyến mãi trực tiếp.
-
-    - totalDirectDiscountAmount:
-      Tổng tiền giảm trực tiếp của toàn bộ sản phẩm.
-
-    - totalQuantity:
-      Tổng số lượng sản phẩm.
-
-    - totalAmount:
-      Tổng tiền hàng sau khuyến mãi trực tiếp.
-
-    LƯU Ý:
-
-    API này chưa tính coupon và phí vận chuyển.
-    Không được xem totalAmount trả về là tổng tiền
-    thanh toán cuối cùng của đơn hàng nếu vẫn còn
-    coupon hoặc phí vận chuyển cần áp dụng.
-
-    5. QUY TẮC XỬ LÝ LỖI
-
-    - Nếu success = false:
-      Đọc message, status_code và detail để xác định lỗi.
-
-    - Nếu notFoundSkus không rỗng:
-      Thông báo những SKU không tìm thấy.
-      Không tự thay thế SKU khác.
-
-    - Nếu không tìm thấy sản phẩm:
-      Không tự tạo giá bán hoặc tiếp tục sử dụng
-      giá cũ chưa được xác minh.
-
-    - Nếu gặp lỗi kết nối hoặc timeout:
-      Thông báo chưa thể xác minh giá.
-      Không tự suy đoán kết quả.
+    Không tạo đơn hàng khi chưa xác minh được giá thành công.
     """
 
     # ========================================================
@@ -569,7 +449,25 @@ async def calculate_final_price(
         }
 
     # ========================================================
-    # 2. GET RUNTIME CONTEXT
+    # 2. VALIDATE COUPON ID
+    # ========================================================
+
+    if coupon_id is not None:
+
+        if (
+            isinstance(coupon_id, bool)
+            or not isinstance(coupon_id, int)
+            or coupon_id < 1
+        ):
+            return {
+                "success": False,
+                "found": False,
+                "data": None,
+                "message": "coupon_id phải là số nguyên dương.",
+            }
+
+    # ========================================================
+    # 3. GET RUNTIME CONTEXT
     # ========================================================
 
     context = runtime.context or {}
@@ -577,7 +475,7 @@ async def calculate_final_price(
     access_token = context.get("access_token")
 
     # ========================================================
-    # 3. BUILD ITEMS PAYLOAD
+    # 4. BUILD ITEMS PAYLOAD
     # ========================================================
 
     items_payload = [
@@ -586,10 +484,11 @@ async def calculate_final_price(
     ]
 
     # ========================================================
-    # 4. CALL ORDER SERVICE
+    # 5. CALL ORDER SERVICE
     # ========================================================
 
     return await calculate_final_price_api(
         items=items_payload,
         access_token=access_token,
+        coupon_id=coupon_id,
     )
