@@ -16,6 +16,9 @@ import { CancelOrderModule } from './customer_session/cancel_order/cancel_order.
 import { OrderListModule } from './admin_session/order_list/order_list.module';
 import { OrderProcessingStatusModule } from './admin_session/order_processing_status/order_processing_status.module';
 
+// AI-SESSION
+import { CalculateFinalPriceModule } from './ai_session/calculate_final_price/calculate_final_price.module';
+
 @Module({
   imports: [
     // Scheduler
@@ -41,6 +44,8 @@ import { OrderProcessingStatusModule } from './admin_session/order_processing_st
     // ADMIN-SESSIO
     OrderListModule,
     OrderProcessingStatusModule,
+
+    CalculateFinalPriceModule,
 
   ],
 

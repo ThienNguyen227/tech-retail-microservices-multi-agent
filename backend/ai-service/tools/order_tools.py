@@ -4,8 +4,10 @@ import math
 from pydantic import BaseModel, ConfigDict, Field
 from langchain.tools import tool, ToolRuntime
 
-from services.order_service import create_order as create_order_api
-
+from services.order_service import (
+    create_order as create_order_api,
+    calculate_final_price as calculate_final_price_api,
+)
 
 # ============================================================
 # ORDER ITEM SCHEMA
@@ -372,5 +374,222 @@ async def create_order(
 
     return await create_order_api(
         order_data=payload,
+        access_token=access_token,
+    )
+
+
+# ============================================================
+# CALCULATE FINAL PRICE INPUT
+# ============================================================
+
+class CalculateFinalPriceItemInput(BaseModel):
+    """
+    Schema đầu vào cho từng sản phẩm cần tính giá.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+        str_strip_whitespace=True,
+    )
+
+    sku: str = Field(
+        min_length=1,
+        description=(
+            "SKU chính xác của biến thể sản phẩm "
+            "đã được Product Service xác nhận."
+        ),
+    )
+
+    quantity: int = Field(
+        ge=1,
+        description=(
+            "Số lượng sản phẩm người dùng muốn mua. "
+            "Phải là số nguyên dương."
+        ),
+    )
+
+
+# ============================================================
+# CALCULATE FINAL PRICE TOOL
+# ============================================================
+
+@tool
+async def calculate_final_price(
+    items: list[CalculateFinalPriceItemInput],
+    runtime: ToolRuntime,
+):
+    """
+    TOOL: calculate_final_price
+
+    MÔ TẢ:
+
+    Tính giá bán cuối cùng của danh sách sản phẩm
+    dựa trên SKU và số lượng.
+
+    Tool gọi Order Service để thực hiện tính toán.
+    Order Service sẽ kết nối Product Service và
+    Promotion Service để lấy dữ liệu giá bán
+    và khuyến mãi trực tiếp.
+
+    1. KHI NÀO SỬ DỤNG
+
+    Sử dụng Tool khi:
+
+    - Người dùng hỏi tổng giá tiền của nhiều sản phẩm.
+    - Người dùng muốn biết giá khi mua nhiều sản phẩm.
+    - Người dùng thay đổi số lượng sản phẩm.
+    - Agent đang chuẩn bị dữ liệu để tạo đơn hàng.
+    - Agent cần xác minh giá bán và khuyến mãi trực tiếp.
+
+    2. THAM SỐ ĐẦU VÀO
+
+    items:
+    Danh sách sản phẩm cần tính giá.
+
+    Mỗi phần tử gồm:
+
+    - sku:
+      SKU chính xác được xác minh từ Product Service.
+
+    - quantity:
+      Số lượng sản phẩm người dùng yêu cầu.
+
+    Ví dụ:
+
+    [
+        {
+            "sku": "IP17PM-256GB-CAM-VU-TRU",
+            "quantity": 2
+        },
+        {
+            "sku": "IP17PM-512GB-CAM-VU-TRU",
+            "quantity": 1
+        }
+    ]
+
+    3. QUY TẮC SỬ DỤNG
+
+    - SKU phải được xác minh từ Product Service.
+    - Quantity phải phản ánh chính xác yêu cầu của người dùng.
+    - Không tự tạo SKU.
+    - Không tự suy đoán giá bán.
+    - Không tự tính hoặc ước lượng khuyến mãi.
+    - Không tự tính subtotal hoặc totalAmount.
+    - Không sử dụng giá cũ trong lịch sử hội thoại
+      thay cho kết quả mới nhất từ Tool.
+    - Nếu người dùng thay đổi SKU hoặc quantity,
+      phải gọi lại Tool để tính giá.
+
+    - Khi chuẩn bị tạo đơn hàng, phải gọi Tool này
+      để xác minh giá và khuyến mãi trực tiếp
+      trước khi gọi create_order.
+
+    4. QUY TẮC ĐỌC KẾT QUẢ
+
+    Trong data.products, mỗi sản phẩm có:
+
+    - price:
+      Giá bán một sản phẩm trước khuyến mãi trực tiếp.
+
+    - directDiscountAmount:
+      Số tiền giảm trực tiếp trên một sản phẩm.
+
+    - totalDirectDiscountAmount:
+      Tổng tiền giảm trực tiếp theo quantity.
+
+    - subtotal:
+      Thành tiền của sản phẩm sau khuyến mãi trực tiếp,
+      đã tính theo quantity.
+
+    - promotionId:
+      ID chương trình khuyến mãi trực tiếp,
+      có thể null.
+
+    - promotionName:
+      Tên chương trình khuyến mãi trực tiếp,
+      có thể null.
+
+    Các trường tổng hợp:
+
+    - subtotal:
+      Tổng tiền hàng sau khuyến mãi trực tiếp.
+
+    - totalDirectDiscountAmount:
+      Tổng tiền giảm trực tiếp của toàn bộ sản phẩm.
+
+    - totalQuantity:
+      Tổng số lượng sản phẩm.
+
+    - totalAmount:
+      Tổng tiền hàng sau khuyến mãi trực tiếp.
+
+    LƯU Ý:
+
+    API này chưa tính coupon và phí vận chuyển.
+    Không được xem totalAmount trả về là tổng tiền
+    thanh toán cuối cùng của đơn hàng nếu vẫn còn
+    coupon hoặc phí vận chuyển cần áp dụng.
+
+    5. QUY TẮC XỬ LÝ LỖI
+
+    - Nếu success = false:
+      Đọc message, status_code và detail để xác định lỗi.
+
+    - Nếu notFoundSkus không rỗng:
+      Thông báo những SKU không tìm thấy.
+      Không tự thay thế SKU khác.
+
+    - Nếu không tìm thấy sản phẩm:
+      Không tự tạo giá bán hoặc tiếp tục sử dụng
+      giá cũ chưa được xác minh.
+
+    - Nếu gặp lỗi kết nối hoặc timeout:
+      Thông báo chưa thể xác minh giá.
+      Không tự suy đoán kết quả.
+    """
+
+    # ========================================================
+    # 1. VALIDATE ITEMS
+    # ========================================================
+
+    if not items:
+        return {
+            "success": False,
+            "found": False,
+            "data": None,
+            "message": "Danh sách sản phẩm không được để trống.",
+        }
+
+    if len(items) > 100:
+        return {
+            "success": False,
+            "found": False,
+            "data": None,
+            "message": "Danh sách sản phẩm không được vượt quá 100 phần tử.",
+        }
+
+    # ========================================================
+    # 2. GET RUNTIME CONTEXT
+    # ========================================================
+
+    context = runtime.context or {}
+
+    access_token = context.get("access_token")
+
+    # ========================================================
+    # 3. BUILD ITEMS PAYLOAD
+    # ========================================================
+
+    items_payload = [
+        item.model_dump()
+        for item in items
+    ]
+
+    # ========================================================
+    # 4. CALL ORDER SERVICE
+    # ========================================================
+
+    return await calculate_final_price_api(
+        items=items_payload,
         access_token=access_token,
     )

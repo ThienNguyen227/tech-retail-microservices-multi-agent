@@ -87,4 +87,41 @@ export class DirectDiscountService {
       discountValue: promotionSKU.promotion_sku_discount_value,
     };
   }
+
+  // 3. (GET) GET DIRECT DISCOUNT VALUES BY MULTIPLE SKUS -> AI AGENT
+  async getDirectDiscountValues(skus: string[]) {
+    if (!Array.isArray(skus) || skus.length === 0) {
+      throw new BadRequestException('At least one SKU is required');
+    }
+
+    const uniqueSkus = [...new Set(skus)];
+
+    const promotionSKUs = await this.prisma.promotionSKU.findMany({
+      where: {
+        promotion_sku_sku: {
+          in: uniqueSkus,
+        },
+        promotion: {
+          promotion_type: {
+            promotion_type_code: 'DIRECT_DISCOUNT',
+          },
+          promotion_status: {
+            promotion_status_code: 'ACTIVE',
+          },
+        },
+      },
+      include: {
+        promotion: true,
+        promotion_discount_type: true,
+      },
+    });
+
+    return promotionSKUs.map((promotionSKU) => ({
+      sku: promotionSKU.promotion_sku_sku,
+      promotionId: promotionSKU.promotion.promotion_id,
+      promotionName: promotionSKU.promotion.promotion_name,
+      discountType:promotionSKU.promotion_discount_type.promotion_discount_type_code,
+      discountValue: promotionSKU.promotion_sku_discount_value,
+    }));
+  }
 }
