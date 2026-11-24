@@ -12,7 +12,7 @@ const AUTH_URL = "http://localhost/api/v1/customer-session/user-service";
 // Axios instance dùng chung cho các API Customer
 export const customerAxios = axios.create({
   withCredentials: true,
-  timeout: 10000,
+  timeout: 30000,
 });
 
 interface RetryConfig extends InternalAxiosRequestConfig {

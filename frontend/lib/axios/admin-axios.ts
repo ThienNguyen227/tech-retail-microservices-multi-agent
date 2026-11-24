@@ -11,7 +11,7 @@ const AUTH_URL = "http://localhost/api/v1/admin-session/user-service";
 // Axios instance dùng chung cho các API Admin
 export const adminAxios = axios.create({
   withCredentials: true,
-  timeout: 10000,
+  timeout: 15000,
 });
 
 interface RetryConfig extends InternalAxiosRequestConfig {
@@ -52,7 +52,7 @@ async function refreshAdminToken(): Promise<string> {
         { session_id: sessionId },
         {
           withCredentials: true,
-          timeout: 10000,
+          timeout: 30000,
         },
       );
 
