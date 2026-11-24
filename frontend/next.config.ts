@@ -1,7 +1,14 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  async rewrites() {
+    return [
+      {
+        source: "/product/:category(phone|laptop|tablet)/:filename",
+        destination: "/product/:filename",
+      },
+    ];
+  },
 };
 
 export default nextConfig;
