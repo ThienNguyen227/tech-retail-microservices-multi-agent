@@ -1,7 +1,7 @@
 from langchain.tools import tool
 
 from services.user_service import (
-    search_user as search_user_api,
+  search_user as search_user_api,
 )
 
 
