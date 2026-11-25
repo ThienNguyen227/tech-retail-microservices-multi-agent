@@ -188,6 +188,47 @@ export interface UpdateWarehouse1SkuResponse {
   data: UpdateWarehouse1SkuResult;
 }
 
+// ======================================================
+// WAREHOUSE 1 CREATE SERIALS INTERFACES
+// ======================================================
+
+export interface CreateWarehouse1SerialsRequest {
+  serialNumbers: string[];
+  source?: string;
+}
+
+export interface Warehouse1SkippedSerial {
+  serial_number: string;
+  reason: string;
+}
+
+export interface CreateWarehouse1SerialsResult {
+  inventory_id: number;
+  inventory_branch_id: number;
+
+  inventory_sku_id: number;
+  inventory_sku_code: string;
+
+  total_requested: number;
+  total_created: number;
+  total_skipped: number;
+
+  inventory_stock_quantity_before: number;
+  inventory_stock_quantity_after: number;
+
+  inventory_transaction_id: number | null;
+
+  created_serials: Warehouse1Serial[];
+
+  skipped_serials: Warehouse1SkippedSerial[];
+}
+
+export interface CreateWarehouse1SerialsResponse {
+  success: boolean;
+  message: string;
+  data: CreateWarehouse1SerialsResult;
+}
+
 export const adminInventoryService = {
   // ======================================================
   // 1. (GET) INVENTORY-LIST
@@ -335,6 +376,33 @@ export const adminInventoryService = {
       `${INVENTORY_SERVICE_URL}/warehouse-1/inventory-skus/${skuId}`,
       {
         sku: data.sku.trim(),
+      },
+      {
+        signal,
+      },
+    );
+
+    return response.data;
+  },
+
+  // ======================================================
+  // 7. (POST) WAREHOUSE-1 CREATE MULTIPLE INVENTORY SERIALS
+  // ======================================================
+  async createWarehouse1Serials(
+    skuId: number,
+    data: CreateWarehouse1SerialsRequest,
+    signal?: AbortSignal,
+  ) {
+    const response = await adminAxios.post<
+      CreateWarehouse1SerialsResponse
+    >(
+      `${INVENTORY_SERVICE_URL}/warehouse-1/inventory-skus/${skuId}/serials`,
+      {
+        serialNumbers: data.serialNumbers.map(
+          (serial) => serial.trim(),
+        ),
+
+        source: data.source?.trim() || undefined,
       },
       {
         signal,
