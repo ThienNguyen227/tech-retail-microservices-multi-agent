@@ -21,6 +21,9 @@ import {
   ArrayMaxSize,
   MaxLength,
   IsIn,
+  IsInt,
+  Min,
+  ArrayUnique,
 } from 'class-validator';
 
 import { Warehouse1Service } from './warehouse_1.service';
@@ -144,6 +147,52 @@ class UpdateWarehouse1SerialDto {
       'Chỉ cho phép cập nhật trạng thái AVAILABLE hoặc CANCELLED.',
   })
   status?: 'AVAILABLE' | 'CANCELLED';
+}
+
+// ======================================================
+// 6. DTO: EXPORT WAREHOUSE 1 INVENTORY
+// ======================================================
+
+class ExportWarehouse1InventoryDto {
+  @IsIn(['TRANSFER', 'EXPORT'], {
+    message: 'Loại xuất kho không hợp lệ.',
+  })
+  type: 'TRANSFER' | 'EXPORT';
+
+  @IsOptional()
+  @IsInt({
+    message: 'Branch ID phải là số nguyên.',
+  })
+  @Min(1)
+  destinationBranchId?: number;
+
+  @IsOptional()
+  @IsString({
+    message: 'Nơi nhận hàng phải là chuỗi ký tự.',
+  })
+  @MaxLength(255)
+  destination?: string;
+
+  @IsArray({
+    message: 'Danh sách Serial ID phải là một mảng.',
+  })
+  @ArrayMinSize(1, {
+    message: 'Phải chọn ít nhất một Serial Number.',
+  })
+  @ArrayMaxSize(500, {
+    message: 'Chỉ được xuất tối đa 500 Serial mỗi lần.',
+  })
+  @ArrayUnique({
+    message: 'Danh sách Serial ID không được trùng lặp.',
+  })
+  @IsInt({
+    each: true,
+    message: 'Serial ID phải là số nguyên.',
+  })
+  @Min(1, {
+    each: true,
+  })
+  serialIds: number[];
 }
 
 // ======================================================
@@ -296,6 +345,36 @@ export class Warehouse1Controller {
       serialId,
       dto.serialNumber,
       dto.status,
+    );
+  }
+
+  // ======================================================
+  // 6. (POST) EXPORT WAREHOUSE 1 INVENTORY
+  // ======================================================
+
+  @UseGuards(JwtAuthGuard)
+  @Post('export')
+  exportInventory(
+    @Headers('authorization') authorization: string,
+    @Body() dto: ExportWarehouse1InventoryDto,
+  ) {
+    const accessToken = authorization?.replace(
+      /^Bearer\s+/i,
+      '',
+    );
+
+    if (!accessToken) {
+      throw new UnauthorizedException(
+        'Thiếu access token.',
+      );
+    }
+
+    return this.warehouse1Service.exportInventory(
+      accessToken,
+      dto.type,
+      dto.serialIds,
+      dto.destinationBranchId,
+      dto.destination,
     );
   }
 }

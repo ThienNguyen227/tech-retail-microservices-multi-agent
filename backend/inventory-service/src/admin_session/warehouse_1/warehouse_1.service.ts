@@ -2047,4 +2047,838 @@ export class Warehouse1Service {
       );
     }
   }
+
+  // ======================================================
+  // 6. (POST) EXPORT WAREHOUSE 1 INVENTORY
+  // ======================================================
+
+  async exportInventory(
+    accessToken: string,
+    type: 'TRANSFER' | 'EXPORT',
+    serialIds: number[],
+    destinationBranchId?: number,
+    destination?: string,
+  ) {
+    // =========================================
+    // 1. CHECK PERMISSION
+    // =========================================
+
+    await this.checkPermission(
+      accessToken,
+      'ware-house-1-export:create',
+    );
+
+    // =========================================
+    // 2. VALIDATE INPUT
+    // =========================================
+
+    if (type !== 'TRANSFER' && type !== 'EXPORT') {
+      throw new BadRequestException(
+        'Loại xuất kho không hợp lệ.',
+      );
+    }
+
+    if (
+      !Array.isArray(serialIds) ||
+      serialIds.length === 0
+    ) {
+      throw new BadRequestException(
+        'Danh sách Serial ID không được để trống.',
+      );
+    }
+
+    if (serialIds.length > 500) {
+      throw new BadRequestException(
+        'Chỉ được xuất tối đa 500 Serial mỗi lần.',
+      );
+    }
+
+    if (
+      serialIds.some(
+        (id) => !Number.isSafeInteger(id) || id <= 0,
+      )
+    ) {
+      throw new BadRequestException(
+        'Danh sách chứa Serial ID không hợp lệ.',
+      );
+    }
+
+    if (new Set(serialIds).size !== serialIds.length) {
+      throw new BadRequestException(
+        'Danh sách Serial ID bị trùng lặp.',
+      );
+    }
+
+    // =========================================
+    // 3. VALIDATE DESTINATION
+    // =========================================
+
+    if (type === 'TRANSFER') {
+      if (
+        typeof destinationBranchId !== 'number' ||
+        !Number.isSafeInteger(destinationBranchId) ||
+        destinationBranchId <= 0
+      ) {
+        throw new BadRequestException(
+          'Vui lòng chọn chi nhánh nhận hàng.',
+        );
+      }
+
+      if (destinationBranchId === this.branchId) {
+        throw new BadRequestException(
+          'Không thể điều chuyển hàng về chính Kho 1.',
+        );
+      }
+
+      if (destination !== undefined) {
+        throw new BadRequestException(
+          'Không sử dụng destination khi điều chuyển nội bộ.',
+        );
+      }
+    }
+
+    if (type === 'EXPORT') {
+      if (
+        typeof destination !== 'string' ||
+        !destination.trim() ||
+        destination.trim().length > 255
+      ) {
+        throw new BadRequestException(
+          'Vui lòng nhập nơi nhận hàng hợp lệ.',
+        );
+      }
+
+      if (destinationBranchId !== undefined) {
+        throw new BadRequestException(
+          'Không sử dụng destinationBranchId khi xuất ra bên ngoài.',
+        );
+      }
+    }
+
+    try {
+      // =========================================
+      // 4. DATABASE TRANSACTION
+      // =========================================
+
+      const result = await this.prisma.$transaction(
+        async (tx) => {
+
+          // -------------------------------------
+          // 4.1. CHECK SOURCE WAREHOUSE
+          // -------------------------------------
+
+          const sourceInventory =
+            await tx.inventory.findFirst({
+              where: {
+                inventory_id: this.inventoryId,
+                inventory_branch_id: this.branchId,
+              },
+            });
+
+          if (!sourceInventory) {
+            throw new NotFoundException(
+              'Không tìm thấy Kho 1.',
+            );
+          }
+
+          // -------------------------------------
+          // 4.2. CHECK DESTINATION WAREHOUSE
+          // -------------------------------------
+
+          const destinationInventory =
+            type === 'TRANSFER'
+              ? await tx.inventory.findUnique({
+                  where: {
+                    inventory_branch_id:
+                      destinationBranchId!,
+                  },
+                })
+              : null;
+
+          if (
+            type === 'TRANSFER' &&
+            !destinationInventory
+          ) {
+            throw new NotFoundException(
+              'Chi nhánh nhận hàng chưa có kho.',
+            );
+          }
+
+          if (
+            destinationInventory?.inventory_id ===
+            sourceInventory.inventory_id
+          ) {
+            throw new BadRequestException(
+              'Kho nguồn và kho đích không được giống nhau.',
+            );
+          }
+
+          const sourceName = 'Kho 1';
+
+          const destinationName = destinationInventory
+            ? `Kho chi nhánh #${destinationInventory.inventory_branch_id}`
+            : destination!.trim();
+
+          // -------------------------------------
+          // 4.3. GET AVAILABLE STATUS
+          // -------------------------------------
+
+          const availableStatus =
+            await tx.inventorySkuSerialStatus.findUnique({
+              where: {
+                inventory_sku_serial_status_code:
+                  'AVAILABLE',
+              },
+            });
+
+          if (!availableStatus) {
+            throw new InternalServerErrorException(
+              'Không tìm thấy trạng thái AVAILABLE.',
+            );
+          }
+
+          // -------------------------------------
+          // 4.4. GET EXPORTED STATUS
+          // -------------------------------------
+
+          const exportedStatus =
+            type === 'EXPORT'
+              ? await tx.inventorySkuSerialStatus.findUnique({
+                  where: {
+                    inventory_sku_serial_status_code:
+                      'EXPORTED',
+                  },
+                })
+              : null;
+
+          if (type === 'EXPORT' && !exportedStatus) {
+            throw new InternalServerErrorException(
+              'Không tìm thấy trạng thái EXPORTED.',
+            );
+          }
+
+          // -------------------------------------
+          // 4.5. GET TRANSACTION TYPES
+          // -------------------------------------
+
+          const sourceTransactionType =
+            await tx.inventoryTransactionType.findUnique({
+              where: {
+                inventory_transaction_type_code:
+                  type === 'TRANSFER'
+                    ? 'TRANSFER_OUT'
+                    : 'EXPORT',
+              },
+            });
+
+          if (!sourceTransactionType) {
+            throw new InternalServerErrorException(
+              'Không tìm thấy loại giao dịch xuất kho.',
+            );
+          }
+
+          const destinationTransactionType =
+            type === 'TRANSFER'
+              ? await tx.inventoryTransactionType.findUnique({
+                  where: {
+                    inventory_transaction_type_code:
+                      'TRANSFER_IN',
+                  },
+                })
+              : null;
+
+          if (
+            type === 'TRANSFER' &&
+            !destinationTransactionType
+          ) {
+            throw new InternalServerErrorException(
+              'Không tìm thấy loại giao dịch TRANSFER_IN.',
+            );
+          }
+
+          // -------------------------------------
+          // 4.6. GET SELECTED SERIAL NUMBERS
+          // -------------------------------------
+
+          const serials =
+            await tx.inventorySkuSerial.findMany({
+              where: {
+                inventory_sku_serial_id: {
+                  in: serialIds,
+                },
+
+                inventory_id: this.inventoryId,
+              },
+
+              include: {
+                sku: true,
+                status: true,
+              },
+
+              orderBy: {
+                inventory_sku_serial_id: 'asc',
+              },
+            });
+
+          // Kiểm tra tất cả Serial đều thuộc Kho 1.
+          if (serials.length !== serialIds.length) {
+            throw new NotFoundException(
+              'Một hoặc nhiều Serial Number không tồn tại ' +
+              'trong Kho 1.',
+            );
+          }
+
+          // -------------------------------------
+          // 4.7. CHECK SERIAL STATUS
+          // -------------------------------------
+
+          const invalidSerials = serials.filter(
+            (serial) =>
+              serial.inventory_sku_serial_status_id !==
+              availableStatus.inventory_sku_serial_status_id,
+          );
+
+          if (invalidSerials.length > 0) {
+            throw new ConflictException({
+              message:
+                'Chỉ được xuất Serial Number có trạng thái AVAILABLE.',
+
+              invalid_serials: invalidSerials.map(
+                (serial) => ({
+                  serial_id:
+                    serial.inventory_sku_serial_id,
+
+                  serial_number:
+                    serial.inventory_sku_serial_number,
+
+                  status:
+                    serial.status.inventory_sku_serial_status_code,
+                }),
+              ),
+            });
+          }
+
+          // -------------------------------------
+          // 4.8. GROUP SERIAL NUMBERS BY SKU
+          // -------------------------------------
+
+          const skuGroups = new Map<
+            number,
+            {
+              skuId: number;
+              skuCode: string;
+              serialIds: number[];
+              serialNumbers: string[];
+            }
+          >();
+
+          for (const serial of serials) {
+            const skuId = serial.inventory_sku_id;
+
+            let group = skuGroups.get(skuId);
+
+            if (!group) {
+              group = {
+                skuId,
+
+                skuCode:
+                  serial.sku.inventory_sku_code,
+
+                serialIds: [],
+                serialNumbers: [],
+              };
+
+              skuGroups.set(skuId, group);
+            }
+
+            group.serialIds.push(
+              serial.inventory_sku_serial_id,
+            );
+
+            group.serialNumbers.push(
+              serial.inventory_sku_serial_number,
+            );
+          }
+
+          const groups = [...skuGroups.values()].sort(
+            (a, b) => a.skuId - b.skuId,
+          );
+
+          // -------------------------------------
+          // 4.9. PREPARE TRANSACTION ITEMS
+          // -------------------------------------
+
+          const sourceItems: {
+            inventory_sku_id: number;
+            inventory_transaction_item_quantity: number;
+            inventory_transaction_item_before: number;
+            inventory_transaction_item_after: number;
+          }[] = [];
+
+          const destinationItems: {
+            inventory_sku_id: number;
+            inventory_transaction_item_quantity: number;
+            inventory_transaction_item_before: number;
+            inventory_transaction_item_after: number;
+          }[] = [];
+
+          const exportedItems: {
+            inventory_sku_id: number;
+            inventory_sku_code: string;
+            quantity: number;
+            source_quantity_before: number;
+            source_quantity_after: number;
+            destination_quantity_before: number | null;
+            destination_quantity_after: number | null;
+            serial_ids: number[];
+            serial_numbers: string[];
+          }[] = [];
+
+          // -------------------------------------
+          // 4.10. PROCESS EACH SKU
+          // -------------------------------------
+
+          for (const group of groups) {
+            const quantity = group.serialIds.length;
+
+            // ===================================
+            // A. CHECK SOURCE STOCK
+            // ===================================
+
+            const sourceStock =
+              await tx.inventoryStock.findUnique({
+                where: {
+                  inventory_id_inventory_sku_id: {
+                    inventory_id: this.inventoryId,
+
+                    inventory_sku_id: group.skuId,
+                  },
+                },
+              });
+
+            if (!sourceStock) {
+              throw new NotFoundException(
+                `SKU "${group.skuCode}" không tồn tại trong Kho 1.`,
+              );
+            }
+
+            if (
+              sourceStock.inventory_stock_quantity <
+              quantity
+            ) {
+              throw new ConflictException(
+                `SKU "${group.skuCode}" không đủ tồn kho. ` +
+                `Hiện có ${sourceStock.inventory_stock_quantity}, ` +
+                `yêu cầu xuất ${quantity}.`,
+              );
+            }
+
+            // ===================================
+            // B. DECREASE SOURCE STOCK
+            // ===================================
+
+            const decreasedStock =
+              await tx.inventoryStock.updateMany({
+                where: {
+                  inventory_id: this.inventoryId,
+
+                  inventory_sku_id: group.skuId,
+
+                  inventory_stock_quantity: {
+                    gte: quantity,
+                  },
+                },
+
+                data: {
+                  inventory_stock_quantity: {
+                    decrement: quantity,
+                  },
+                },
+              });
+
+            if (decreasedStock.count !== 1) {
+              throw new ConflictException(
+                `Tồn kho SKU "${group.skuCode}" đã thay đổi ` +
+                'hoặc không còn đủ số lượng.',
+              );
+            }
+
+            const updatedSourceStock =
+              await tx.inventoryStock.findUniqueOrThrow({
+                where: {
+                  inventory_id_inventory_sku_id: {
+                    inventory_id: this.inventoryId,
+
+                    inventory_sku_id: group.skuId,
+                  },
+                },
+              });
+
+            const sourceQuantityAfter =
+              updatedSourceStock.inventory_stock_quantity;
+
+            const sourceQuantityBefore =
+              sourceQuantityAfter + quantity;
+
+            let destinationQuantityBefore:
+              number | null = null;
+
+            let destinationQuantityAfter:
+              number | null = null;
+
+            // ===================================
+            // C. TRANSFER TO ANOTHER WAREHOUSE
+            // ===================================
+
+            if (
+              type === 'TRANSFER' &&
+              destinationInventory
+            ) {
+              // Nếu SKU chưa có tại kho đích:
+              // Tạo InventoryStock với số lượng xuất.
+              //
+              // Nếu SKU đã có tại kho đích:
+              // Tăng số lượng tồn kho.
+
+              const updatedDestinationStock =
+                await tx.inventoryStock.upsert({
+                  where: {
+                    inventory_id_inventory_sku_id: {
+                      inventory_id:
+                        destinationInventory.inventory_id,
+
+                      inventory_sku_id: group.skuId,
+                    },
+                  },
+
+                  create: {
+                    inventory_id:
+                      destinationInventory.inventory_id,
+
+                    inventory_sku_id: group.skuId,
+
+                    inventory_stock_quantity: quantity,
+                  },
+
+                  update: {
+                    inventory_stock_quantity: {
+                      increment: quantity,
+                    },
+                  },
+                });
+
+              destinationQuantityAfter =
+                updatedDestinationStock.inventory_stock_quantity;
+
+              destinationQuantityBefore =
+                destinationQuantityAfter - quantity;
+
+              // Chuyển Serial sang kho đích.
+              // Giữ nguyên Serial Number và trạng thái AVAILABLE.
+
+              const movedSerials =
+                await tx.inventorySkuSerial.updateMany({
+                  where: {
+                    inventory_sku_serial_id: {
+                      in: group.serialIds,
+                    },
+
+                    inventory_id: this.inventoryId,
+
+                    inventory_sku_id: group.skuId,
+
+                    inventory_sku_serial_status_id:
+                      availableStatus.inventory_sku_serial_status_id,
+                  },
+
+                  data: {
+                    inventory_id:
+                      destinationInventory.inventory_id,
+                  },
+                });
+
+              if (movedSerials.count !== quantity) {
+                throw new ConflictException(
+                  `Serial của SKU "${group.skuCode}" đã thay đổi. ` +
+                  'Không thể hoàn tất điều chuyển.',
+                );
+              }
+
+              // Lưu Transaction Item của kho đích.
+
+              destinationItems.push({
+                inventory_sku_id: group.skuId,
+
+                inventory_transaction_item_quantity:
+                  quantity,
+
+                inventory_transaction_item_before:
+                  destinationQuantityBefore,
+
+                inventory_transaction_item_after:
+                  destinationQuantityAfter,
+              });
+            }
+
+            // ===================================
+            // D. EXPORT TO EXTERNAL DESTINATION
+            // ===================================
+
+            if (
+              type === 'EXPORT' &&
+              exportedStatus
+            ) {
+              // Giữ lại Serial để phục vụ tra cứu lịch sử.
+              // Không xóa Serial khỏi Database.
+              // Chuyển trạng thái thành EXPORTED.
+
+              const updatedSerials =
+                await tx.inventorySkuSerial.updateMany({
+                  where: {
+                    inventory_sku_serial_id: {
+                      in: group.serialIds,
+                    },
+
+                    inventory_id: this.inventoryId,
+
+                    inventory_sku_id: group.skuId,
+
+                    inventory_sku_serial_status_id:
+                      availableStatus.inventory_sku_serial_status_id,
+                  },
+
+                  data: {
+                    inventory_sku_serial_status_id:
+                      exportedStatus.inventory_sku_serial_status_id,
+                  },
+                });
+
+              if (updatedSerials.count !== quantity) {
+                throw new ConflictException(
+                  `Serial của SKU "${group.skuCode}" đã thay đổi. ` +
+                  'Không thể hoàn tất xuất kho.',
+                );
+              }
+            }
+
+            // ===================================
+            // E. PREPARE SOURCE TRANSACTION ITEM
+            // ===================================
+
+            sourceItems.push({
+              inventory_sku_id: group.skuId,
+
+              inventory_transaction_item_quantity:
+                quantity,
+
+              inventory_transaction_item_before:
+                sourceQuantityBefore,
+
+              inventory_transaction_item_after:
+                sourceQuantityAfter,
+            });
+
+            // ===================================
+            // F. PREPARE RESPONSE ITEM
+            // ===================================
+
+            exportedItems.push({
+              inventory_sku_id: group.skuId,
+
+              inventory_sku_code: group.skuCode,
+
+              quantity,
+
+              source_quantity_before:
+                sourceQuantityBefore,
+
+              source_quantity_after:
+                sourceQuantityAfter,
+
+              destination_quantity_before:
+                destinationQuantityBefore,
+
+              destination_quantity_after:
+                destinationQuantityAfter,
+
+              serial_ids: group.serialIds,
+
+              serial_numbers: group.serialNumbers,
+            });
+          }
+
+          // -------------------------------------
+          // 4.11. CREATE SOURCE TRANSACTION
+          // -------------------------------------
+
+          const sourceTransaction =
+            await tx.inventoryTransaction.create({
+              data: {
+                inventory_id: this.inventoryId,
+
+                inventory_transaction_type_id:
+                  sourceTransactionType.inventory_transaction_type_id,
+
+                inventory_transaction_from:
+                  sourceName,
+
+                inventory_transaction_to:
+                  destinationName,
+
+                items: {
+                  create: sourceItems,
+                },
+              },
+            });
+
+          // -------------------------------------
+          // 4.12. CREATE DESTINATION TRANSACTION
+          // -------------------------------------
+
+          let destinationTransactionId:
+            number | null = null;
+
+          if (
+            type === 'TRANSFER' &&
+            destinationInventory &&
+            destinationTransactionType
+          ) {
+            const destinationTransaction =
+              await tx.inventoryTransaction.create({
+                data: {
+                  inventory_id:
+                    destinationInventory.inventory_id,
+
+                  inventory_transaction_type_id:
+                    destinationTransactionType.inventory_transaction_type_id,
+
+                  inventory_transaction_from:
+                    sourceName,
+
+                  inventory_transaction_to:
+                    destinationName,
+
+                  items: {
+                    create: destinationItems,
+                  },
+                },
+              });
+
+            destinationTransactionId =
+              destinationTransaction.inventory_transaction_id;
+          }
+
+          // -------------------------------------
+          // 4.13. FORMAT RESPONSE
+          // -------------------------------------
+
+          return {
+            type,
+
+            source: {
+              inventory_id: sourceInventory.inventory_id,
+
+              inventory_branch_id:
+                sourceInventory.inventory_branch_id,
+
+              name: sourceName,
+            },
+
+            destination: {
+              inventory_id:
+                destinationInventory?.inventory_id ?? null,
+
+              inventory_branch_id:
+                destinationInventory?.inventory_branch_id ?? null,
+
+              name: destinationName,
+            },
+
+            total_skus: groups.length,
+
+            total_serials: serials.length,
+
+            total_quantity: serials.length,
+
+            source_transaction_id:
+              sourceTransaction.inventory_transaction_id,
+
+            destination_transaction_id:
+              destinationTransactionId,
+
+            items: exportedItems,
+          };
+        },
+
+        {
+          isolationLevel:
+            Prisma.TransactionIsolationLevel.Serializable,
+
+          maxWait: 5000,
+
+          timeout: 30000,
+        },
+      );
+
+      // =========================================
+      // 5. RETURN RESPONSE
+      // =========================================
+
+      return {
+        success: true,
+
+        message:
+          type === 'TRANSFER'
+            ? `Điều chuyển ${result.total_quantity} sản phẩm ` +
+              `từ Kho 1 đến ${result.destination.name} thành công.`
+
+            : `Xuất ${result.total_quantity} sản phẩm ` +
+              `từ Kho 1 đến ${result.destination.name} thành công.`,
+
+        data: result,
+      };
+
+    } catch (error) {
+
+      // =========================================
+      // 6. HANDLE HTTP EXCEPTION
+      // =========================================
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      // =========================================
+      // 7. HANDLE PRISMA ERROR
+      // =========================================
+
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError
+      ) {
+        if (
+          error.code === 'P2034' ||
+          error.code === 'P2025' ||
+          error.code === 'P2002'
+        ) {
+          throw new ConflictException(
+            'Dữ liệu kho đang được cập nhật bởi thao tác khác. ' +
+            'Vui lòng tải lại và thử lại.',
+          );
+        }
+      }
+
+      // =========================================
+      // 8. HANDLE DATABASE ERROR
+      // =========================================
+
+      console.error(
+        'EXPORT WAREHOUSE 1 INVENTORY ERROR:',
+        error,
+      );
+
+      throw new InternalServerErrorException(
+        'Không thể thực hiện xuất hàng từ Kho 1.',
+      );
+    }
+  }
 }

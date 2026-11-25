@@ -30,6 +30,7 @@ import {
   PackagePlus,
   Pencil,
   Save,
+  Truck,
 } from "lucide-react";
 
 import axios from "axios";
@@ -43,6 +44,9 @@ import {
   type UpdateWarehouse1SkuResult,
   type CreateWarehouse1SerialsResult,
   type UpdateWarehouse1SerialResult,
+  type ExportWarehouse1InventoryRequest,
+  type ExportWarehouse1InventoryResult,
+  type InventoryReference,
 } from "@/lib/axios/services/admin-services/inventory_service";
 
 // ======================================================
@@ -97,6 +101,10 @@ const SERIAL_STATUS_OPTIONS = [
   {
     code: "SOLD",
     label: "Đã bán",
+  },
+  {
+    code: "EXPORTED",
+    label: "Đã xuất kho",
   },
 ] as const;
 
@@ -193,6 +201,9 @@ function getSerialStatusStyle(status: string) {
     case "SOLD":
       return "bg-blue-50 text-blue-700";
 
+    case "EXPORTED":
+      return "bg-orange-50 text-orange-700";
+
     default:
       return "bg-slate-100 text-slate-600";
   }
@@ -216,6 +227,9 @@ function getSerialStatusLabel(
 
     case "SOLD":
       return "Đã bán";
+
+    case "EXPORTED":
+      return "Đã xuất kho";
 
     default:
       return status || "Không xác định";
@@ -284,6 +298,9 @@ export default function Warehouse1Page() {
   // UPDATE SKU: giữ ID và mã gốc, lấy số lượng/Serial từ snapshot mới nhất.
   const [editingSku, setEditingSku] = useState<{ id: number; code: string } | null>(null);
   const [updateToast, setUpdateToast] = useState<{ id: number; message: string } | null>(null);
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [exportResult, setExportResult] = useState<ExportWarehouse1InventoryResult | null>(null);
+  const [exportSyncPending, setExportSyncPending] = useState(false);
   const mutationVersion = useRef(0);
   const canReadRef = useRef(false);
 
@@ -351,6 +368,7 @@ export default function Warehouse1Page() {
         setAllStocks(nextStocks);
         setLastUpdated(new Date());
         setStatsError("");
+        setExportSyncPending(false);
 
         // Đóng modal nếu SKU đang xem không còn thuộc Kho 1.
         setSelectedSkuId((id) =>
@@ -374,6 +392,9 @@ export default function Warehouse1Page() {
           setEditingSku(null);
           setShowCreateModal(false);
           setUpdateToast(null);
+          setShowExportModal(false);
+          setExportResult(null);
+          setExportSyncPending(false);
         }
 
         // Với lỗi mạng tạm thời, giữ snapshot thành công gần nhất.
@@ -454,6 +475,10 @@ export default function Warehouse1Page() {
         result.soldSerials +=
           stock.serial_statistics.sold;
 
+        result.exportedSerials += stock.serials.filter(
+          (serial) => serial.status.inventory_sku_serial_status_code === "EXPORTED",
+        ).length;
+
         if (stock.inventory_stock_quantity === 0) {
           result.outOfStockSkus += 1;
         }
@@ -468,6 +493,7 @@ export default function Warehouse1Page() {
         reservedSerials: 0,
         cancelledSerials: 0,
         soldSerials: 0,
+        exportedSerials: 0,
         outOfStockSkus: 0,
       },
     );
@@ -697,6 +723,50 @@ export default function Warehouse1Page() {
   }
 
   // ======================================================
+  // EXPORT INVENTORY SUCCESS
+  // ======================================================
+
+  function handleExportSuccess(result: ExportWarehouse1InventoryResult) {
+    // Hủy hiệu lực mọi GET bắt đầu trước khi POST hoàn tất.
+    mutationVersion.current += 1;
+    setShowExportModal(false);
+    if (canReadRef.current) {
+      setExportResult(result);
+      setBulkResult(null);
+      setUpdateToast(null);
+      setExportSyncPending(true);
+      // Điều chuyển: có thể loại Serial khỏi snapshot một cách an toàn khi
+      // snapshot vẫn khớp tồn trước. Xuất ngoài: GET trả về status ID thật.
+      if (result.type === "TRANSFER") {
+        setAllStocks((previous) => previous.map((stock) => {
+          const item = result.items.find((entry) => entry.inventory_sku_id === stock.inventory_sku_id);
+          if (!item || stock.inventory_id !== result.source.inventory_id ||
+              stock.inventory_stock_quantity !== item.source_quantity_before) return stock;
+          const ids = new Set(item.serial_ids);
+          const matched = stock.serials.filter((serial) => ids.has(serial.inventory_sku_serial_id));
+          if (matched.length !== item.quantity || matched.some((serial) => serial.status.inventory_sku_serial_status_code !== "AVAILABLE")) return stock;
+          const serials = stock.serials.filter((serial) => !ids.has(serial.inventory_sku_serial_id));
+          return {
+            ...stock,
+            inventory_stock_quantity: item.source_quantity_after,
+            serials,
+            serial_statistics: {
+              total: serials.length,
+              available: serials.filter((serial) => serial.status.inventory_sku_serial_status_code === "AVAILABLE").length,
+              reserved: serials.filter((serial) => serial.status.inventory_sku_serial_status_code === "RESERVED").length,
+              cancelled: serials.filter((serial) => serial.status.inventory_sku_serial_status_code === "CANCELLED").length,
+              sold: serials.filter((serial) => serial.status.inventory_sku_serial_status_code === "SOLD").length,
+            },
+          };
+        }));
+      }
+      resetFilters();
+    }
+    // GET mới chạy ngay; không tự tạo status ID EXPORTED hoặc trừ kho hai lần.
+    setRefreshKey((previous) => previous + 1);
+  }
+
+  // ======================================================
   // RENDER
   // ======================================================
 
@@ -749,8 +819,18 @@ export default function Warehouse1Page() {
           <button
             type="button"
             aria-haspopup="dialog"
+            onClick={() => { setExportResult(null); setShowExportModal(true); }}
+            disabled={statsLoading || !lastUpdated || !!statsError || exportSyncPending}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-4 text-sm font-semibold text-orange-700 transition hover:bg-orange-100 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Truck size={19} />
+            Xuất kho
+          </button>
+          <button
+            type="button"
+            aria-haspopup="dialog"
             onClick={() => setShowCreateModal(true)}
-            disabled={statsLoading || !lastUpdated}
+            disabled={statsLoading || !lastUpdated || exportSyncPending}
             className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-md shadow-blue-600/20 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <Plus size={19} />
@@ -885,7 +965,7 @@ export default function Warehouse1Page() {
             {" "}Serial
           </span>
         </div>
-        <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-5">
           <SerialStatCard
             title="Có sẵn"
             code="AVAILABLE"
@@ -915,6 +995,14 @@ export default function Warehouse1Page() {
             code="SOLD"
             value={statistics.soldSerials}
             style="border-blue-100 bg-blue-50 text-blue-700"
+            loading={statsLoading}
+            failed={!!error}
+          />
+          <SerialStatCard
+            title="Đã xuất kho"
+            code="EXPORTED"
+            value={statistics.exportedSerials}
+            style="border-orange-100 bg-orange-50 text-orange-700"
             loading={statsLoading}
             failed={!!error}
           />
@@ -1023,7 +1111,7 @@ export default function Warehouse1Page() {
           className="overflow-x-auto"
           aria-busy={loading}
         >
-          <table className="w-full min-w-[1200px] text-left">
+          <table className="w-full min-w-[1320px] text-left">
             <thead className="bg-slate-50">
               <tr className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                 <th className="px-5 py-4">
@@ -1042,7 +1130,7 @@ export default function Warehouse1Page() {
                   Đã đặt
                 </th>
                 <th className="px-5 py-4 text-center">
-                  Đã hủy đặt
+                  Đã hủy
                 </th>
                 <th className="px-5 py-4 text-center">
                   Đã bán
@@ -1060,7 +1148,7 @@ export default function Warehouse1Page() {
               {loading ? (
                 <tr>
                   <td
-                    colSpan={9}
+                    colSpan={10}
                     className="px-5 py-16 text-center"
                   >
                     <LoaderCircle
@@ -1078,7 +1166,7 @@ export default function Warehouse1Page() {
                 /* ERROR */
                 <tr>
                   <td
-                    colSpan={9}
+                    colSpan={10}
                     className="px-5 py-16 text-center"
                   >
                     <AlertCircle
@@ -1103,7 +1191,7 @@ export default function Warehouse1Page() {
                 /* EMPTY DATA */
                 <tr>
                   <td
-                    colSpan={9}
+                    colSpan={10}
                     className="px-5 py-16 text-center"
                   >
                     <Package
@@ -1229,8 +1317,9 @@ export default function Warehouse1Page() {
                               type="button"
                               aria-haspopup="dialog"
                               title="Xem danh sách Serial Number"
+                              disabled={exportSyncPending}
                               onClick={() => setSelectedSkuId(stock.inventory_sku_id)}
-                              className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-600 transition hover:bg-blue-100"
+                              className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-600 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <Eye size={15} />
                             </button>
@@ -1238,8 +1327,9 @@ export default function Warehouse1Page() {
                               type="button"
                               aria-haspopup="dialog"
                               title={`Cập nhật SKU ${stock.inventory_sku_code}`}
+                              disabled={exportSyncPending}
                               onClick={() => setEditingSku({ id: stock.inventory_sku_id, code: stock.inventory_sku_code })}
-                              className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
+                              className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <Pencil size={15} />
                             </button>
@@ -1268,6 +1358,17 @@ export default function Warehouse1Page() {
 
         )}
       </section>
+      {exportSyncPending && (
+        <div role="status" className="flex items-center gap-2 rounded-xl border border-blue-100 bg-blue-50 p-3 text-sm text-blue-700">
+          {statsError ? <AlertCircle size={18} /> : <LoaderCircle size={18} className="animate-spin" />}
+          {statsError ? "Xuất kho đã thành công, chưa đồng bộ được danh sách mới." : "Xuất kho đã thành công, đang đồng bộ dữ liệu mới..."}
+          {statsError && <button type="button" onClick={retryLoad} className="ml-auto font-semibold underline">Thử lại</button>}
+        </div>
+      )}
+      {showExportModal && (
+        <ExportInventoryModal stocks={allStocks} syncError={statsError} onClose={() => setShowExportModal(false)} onSuccess={handleExportSuccess} onRefresh={() => setRefreshKey((previous) => previous + 1)} />
+      )}
+      {exportResult && <ExportInventoryResult result={exportResult} onClose={() => setExportResult(null)} />}
       {showCreateModal && (
         <CreateSkuModal
           onClose={() => setShowCreateModal(false)}
@@ -1341,6 +1442,311 @@ export default function Warehouse1Page() {
           error={statsError}
         />
       )}
+    </div>
+  );
+}
+
+// ======================================================
+// EXPORT INVENTORY MODAL COMPONENT
+// ======================================================
+
+function ExportInventoryModal({ stocks, syncError, onClose, onSuccess, onRefresh }: {
+  stocks: Warehouse1Stock[];
+  syncError: string;
+  onClose: () => void;
+  onSuccess: (result: ExportWarehouse1InventoryResult) => void;
+  onRefresh: () => void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const mountedRef = useRef(false);
+  const submitLock = useRef(false);
+  const [type, setType] = useState<"TRANSFER" | "EXPORT">("TRANSFER");
+  const [branchId, setBranchId] = useState("");
+  const [destination, setDestination] = useState("");
+  const [warehouses, setWarehouses] = useState<InventoryReference[]>([]);
+  const [branchLoading, setBranchLoading] = useState(true);
+  const [branchError, setBranchError] = useState("");
+  const [branchRefresh, setBranchRefresh] = useState(0);
+  const [keyword, setKeyword] = useState("");
+  const [skuFilter, setSkuFilter] = useState("ALL");
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [onlySelected, setOnlySelected] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [confirmed, setConfirmed] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const pageSize = 12;
+
+  useEffect(() => {
+    mountedRef.current = true;
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.open) dialog.showModal();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      mountedRef.current = false;
+      if (dialog?.open) dialog.close();
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
+  // Dùng API danh sách kho hiện tại; nếu thiếu quyền đọc toàn kho,
+  // cho phép nhập Branch ID thật để backend kiểm tra.
+  useEffect(() => {
+    if (type !== "TRANSFER") return;
+    const controller = new AbortController();
+    setBranchLoading(true);
+    setBranchError("");
+    async function loadBranches() {
+      try {
+        const response = await adminInventoryService.getInventoryList(undefined, undefined, controller.signal);
+        if (controller.signal.aborted) return;
+        if (!response.success || !Array.isArray(response.data)) {
+          throw new Error(response.message || "Không thể tải danh sách kho nhận.");
+        }
+        const options = response.data
+          .filter((warehouse) => warehouse.inventory_id !== 1 && warehouse.inventory_branch_id !== 1)
+          .map(({ inventory_id, inventory_branch_id }) => ({ inventory_id, inventory_branch_id }))
+          .sort((a, b) => a.inventory_branch_id - b.inventory_branch_id);
+        setWarehouses(options);
+        setBranchId((previous) => options.some((warehouse) => String(warehouse.inventory_branch_id) === previous) ? previous : "");
+      } catch (err: unknown) {
+        if (controller.signal.aborted) return;
+        setWarehouses([]);
+        setBranchError(extractErrorMessage(err, "Không thể tải danh sách kho nhận."));
+      } finally {
+        if (!controller.signal.aborted) setBranchLoading(false);
+      }
+    }
+    void loadBranches();
+    return () => controller.abort();
+  }, [type, branchRefresh]);
+
+  const availableRows = useMemo(() => stocks.flatMap((stock) => stock.serials
+    .filter((serial) => serial.inventory_id === 1 && serial.status.inventory_sku_serial_status_code === "AVAILABLE")
+    .map((serial) => ({ stock, serial }))), [stocks]);
+  const availableById = useMemo(() => new Map(availableRows.map((row) => [row.serial.inventory_sku_serial_id, row])), [availableRows]);
+  const selectedSet = useMemo(() => new Set(selectedIds), [selectedIds]);
+  const invalidIds = selectedIds.filter((id) => !availableById.has(id));
+  const selectedGroups = useMemo(() => {
+    const groups = new Map<number, { stock: Warehouse1Stock; quantity: number }>();
+    for (const id of selectedIds) {
+      const row = availableById.get(id);
+      if (!row) continue;
+      const skuId = row.stock.inventory_sku_id;
+      const existing = groups.get(skuId);
+      groups.set(skuId, { stock: row.stock, quantity: (existing?.quantity ?? 0) + 1 });
+    }
+    return [...groups.values()];
+  }, [selectedIds, availableById]);
+  const insufficient = selectedGroups.filter((group) => group.quantity > group.stock.inventory_stock_quantity);
+  const filteredRows = useMemo(() => {
+    const search = keyword.trim().toLowerCase();
+    return availableRows.filter(({ stock, serial }) =>
+      (skuFilter === "ALL" || String(stock.inventory_sku_id) === skuFilter) &&
+      (!onlySelected || selectedSet.has(serial.inventory_sku_serial_id)) &&
+      (!search || stock.inventory_sku_code.toLowerCase().includes(search) ||
+        serial.inventory_sku_serial_number.toLowerCase().includes(search) ||
+        String(serial.inventory_sku_serial_id).includes(search)),
+    );
+  }, [availableRows, keyword, skuFilter, onlySelected, selectedSet]);
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const visibleRows = filteredRows.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const visibleIds = visibleRows.map(({ serial }) => serial.inventory_sku_serial_id);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedSet.has(id));
+  const parsedBranch = Number(branchId);
+  const validBranch = /^\d+$/.test(branchId.trim()) && Number.isSafeInteger(parsedBranch) && parsedBranch > 0 && parsedBranch !== 1 &&
+    (!!branchError || warehouses.some((warehouse) => warehouse.inventory_branch_id === parsedBranch));
+  const validDestination = type === "TRANSFER" ? !branchLoading && validBranch : !!destination.trim() && destination.trim().length <= MAX_SOURCE_LENGTH;
+  const canSubmit = !syncError && validDestination && selectedIds.length > 0 && selectedIds.length <= MAX_BATCH_SIZE && !invalidIds.length && !insufficient.length && confirmed;
+
+  function resetConfirmation() {
+    setConfirmed(false);
+    setError("");
+  }
+
+  function changeSelection(ids: number[]) {
+    if (submitLock.current) return;
+    resetConfirmation();
+    if (ids.length > MAX_BATCH_SIZE) {
+      setError(`Chỉ được xuất tối đa ${MAX_BATCH_SIZE} Serial mỗi lần. Vui lòng giảm số lượng đã chọn.`);
+      return;
+    }
+    setSelectedIds(ids);
+  }
+
+  function toggleSerial(id: number) {
+    changeSelection(selectedSet.has(id) ? selectedIds.filter((value) => value !== id) : [...selectedIds, id]);
+  }
+
+  function toggleVisible() {
+    changeSelection(allVisibleSelected ? selectedIds.filter((id) => !visibleIds.includes(id)) : [...new Set([...selectedIds, ...visibleIds])]);
+  }
+
+  function closeModal() {
+    if (!submitLock.current) onClose();
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (submitLock.current || !canSubmit) return;
+    submitLock.current = true;
+    setSubmitting(true);
+    setError("");
+    const payload: ExportWarehouse1InventoryRequest = type === "TRANSFER"
+      ? { type: "TRANSFER", destinationBranchId: parsedBranch, serialIds: [...selectedIds] }
+      : { type: "EXPORT", destination: destination.trim(), serialIds: [...selectedIds] };
+    try {
+      // Không hủy POST chỉ vì người dùng rời giao diện: backend có thể đã commit.
+      const response = await adminInventoryService.exportWarehouse1Inventory(payload);
+      if (!mountedRef.current) return;
+      const result = response.data;
+      if (!response.success || !result || result.type !== payload.type ||
+          result.source?.inventory_id !== 1 || !result.destination ||
+          !Array.isArray(result.items) || result.total_quantity !== payload.serialIds.length ||
+          !Number.isSafeInteger(result.source_transaction_id)) {
+        setError("Phản hồi xuất kho không hợp lệ. Hãy kiểm tra lịch sử giao dịch trước khi gửi lại.");
+        setConfirmed(false);
+        onRefresh();
+        return;
+      }
+      onSuccess(result);
+    } catch (err: unknown) {
+      if (!mountedRef.current) return;
+      const status = axios.isAxiosError(err) ? err.response?.status : undefined;
+      if (axios.isAxiosError(err) && !err.response) {
+        setError("Không nhận được phản hồi từ server. Giao dịch có thể đã được ghi nhận; hãy kiểm tra lịch sử xuất kho trước khi gửi lại.");
+      } else {
+        const fallback = status === 403 ? "Bạn không có quyền xuất hàng tại Kho 1." :
+          status === 401 ? "Phiên đăng nhập đã hết hạn." :
+          status === 404 ? "Không tìm thấy kho nhận hoặc Serial đã chọn." :
+          status === 409 ? "Dữ liệu tồn kho hoặc Serial đã thay đổi. Hãy kiểm tra lại." :
+          "Không thể xuất hàng từ Kho 1.";
+        setError(extractErrorMessage(err, fallback));
+      }
+      setConfirmed(false);
+      onRefresh();
+    } finally {
+      submitLock.current = false;
+      if (mountedRef.current) setSubmitting(false);
+    }
+  }
+
+  return (
+    <dialog ref={dialogRef} aria-labelledby="warehouse-export-title"
+      onCancel={(event) => { event.preventDefault(); closeModal(); }}
+      onClick={(event) => { if (event.target === event.currentTarget) closeModal(); }}
+      className="fixed inset-0 m-auto max-h-[92dvh] w-[calc(100%_-_2rem)] max-w-5xl overflow-y-auto rounded-2xl border-0 bg-white p-0 text-slate-800 shadow-2xl backdrop:bg-slate-900/50 backdrop:backdrop-blur-sm">
+      <form onSubmit={handleSubmit} noValidate aria-busy={submitting}>
+        <div className="flex items-start gap-3 border-b border-slate-100 p-5">
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-orange-50 text-orange-600"><Truck size={26} /></div>
+          <div className="min-w-0 flex-1">
+            <h2 id="warehouse-export-title" className="text-lg font-bold">Tạo phiếu xuất kho</h2>
+            <p className="mt-1 text-sm text-slate-500">Xuất hàng từ Kho 1 · Chọn nhiều SKU và Serial Number.</p>
+          </div>
+          <button type="button" disabled={submitting} onClick={closeModal} aria-label="Đóng modal xuất kho" className="grid h-9 w-9 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 disabled:opacity-40"><X size={20} /></button>
+        </div>
+        <fieldset disabled={submitting} className="space-y-5 p-5 disabled:opacity-70">
+          <div className="grid gap-3 sm:grid-cols-2">
+            {(["TRANSFER", "EXPORT"] as const).map((option) => (
+              <label key={option} className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${type === option ? "border-blue-300 bg-blue-50" : "border-slate-200 hover:bg-slate-50"}`}>
+                <input type="radio" name="export-type" checked={type === option} onChange={() => { setType(option); resetConfirmation(); }} className="mt-1 accent-blue-600" />
+                <span><span className="block text-sm font-bold">{option === "TRANSFER" ? "Điều chuyển nội bộ" : "Xuất ra bên ngoài"}</span><span className="mt-1 block text-xs text-slate-500">{option === "TRANSFER" ? "Chuyển Serial sang kho của chi nhánh khác." : "Chuyển Serial sang trạng thái EXPORTED."}</span></span>
+              </label>
+            ))}
+          </div>
+          {type === "TRANSFER" ? (
+            <div>
+              <label htmlFor="export-destination-branch" className="mb-2 block text-sm font-semibold text-slate-700">Chi nhánh nhận hàng <span className="text-rose-500">*</span></label>
+              {branchLoading ? <div className="flex items-center gap-2 text-sm text-slate-500"><LoaderCircle size={17} className="animate-spin" /> Đang tải danh sách kho...</div> : branchError ? (
+                <div className="space-y-2">
+                  <div className="rounded-xl bg-amber-50 p-3 text-xs text-amber-800">{branchError} Bạn có thể nhập Branch ID thật; backend sẽ kiểm tra kho đích. <button type="button" onClick={() => { resetConfirmation(); setBranchRefresh((value) => value + 1); }} className="font-semibold underline">Tải lại</button></div>
+                  <input id="export-destination-branch" inputMode="numeric" value={branchId} onChange={(event) => { setBranchId(event.target.value); resetConfirmation(); }} placeholder="Nhập Branch ID (khác 1)" className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+                </div>
+              ) : (
+                <select id="export-destination-branch" value={branchId} onChange={(event) => { setBranchId(event.target.value); resetConfirmation(); }} className={`${SELECT_CLASS} w-full`}>
+                  <option value="">{warehouses.length ? "Chọn chi nhánh nhận hàng" : "Không có kho nhận khả dụng"}</option>
+                  {warehouses.map((warehouse) => <option key={warehouse.inventory_id} value={warehouse.inventory_branch_id}>Chi nhánh #{warehouse.inventory_branch_id} · Kho #{warehouse.inventory_id}</option>)}
+                </select>
+              )}
+            </div>
+          ) : (
+            <div>
+              <label htmlFor="export-destination-name" className="mb-2 block text-sm font-semibold text-slate-700">Nơi nhận hàng <span className="text-rose-500">*</span></label>
+              <input id="export-destination-name" value={destination} maxLength={MAX_SOURCE_LENGTH} onChange={(event) => { setDestination(event.target.value); resetConfirmation(); }} placeholder="Ví dụ: Nhà cung cấp ABC" className="h-10 w-full rounded-xl border border-slate-200 px-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" />
+            </div>
+          )}
+          <section className="overflow-hidden rounded-xl border border-slate-200">
+            <div className="space-y-3 border-b border-slate-100 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div><h3 className="text-sm font-bold">Chọn sản phẩm xuất kho</h3><p className="mt-1 text-xs text-slate-500">Chỉ hiển thị Serial AVAILABLE. Lựa chọn được giữ khi chuyển trang.</p></div>
+                <span className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700">{formatNumber(selectedIds.length)} / {MAX_BATCH_SIZE} đã chọn</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative min-w-[180px] flex-1"><Search size={17} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input aria-label="Tìm SKU hoặc Serial xuất kho" value={keyword} onChange={(event) => { setKeyword(event.target.value); setCurrentPage(1); }} placeholder="Tìm SKU, Serial Number..." className="h-10 w-full rounded-xl border border-slate-200 pl-9 pr-3 text-sm outline-none focus:border-blue-500" /></div>
+                <select aria-label="Lọc SKU xuất kho" value={skuFilter} onChange={(event) => { setSkuFilter(event.target.value); setCurrentPage(1); }} className={`${SELECT_CLASS} max-w-full`}><option value="ALL">Tất cả SKU</option>{stocks.filter((stock) => stock.serials.some((serial) => serial.status.inventory_sku_serial_status_code === "AVAILABLE")).map((stock) => <option key={stock.inventory_sku_id} value={stock.inventory_sku_id}>{stock.inventory_sku_code}</option>)}</select>
+                <label className="flex items-center gap-2 text-xs font-medium text-slate-600"><input type="checkbox" checked={onlySelected} onChange={(event) => { setOnlySelected(event.target.checked); setCurrentPage(1); }} className="accent-blue-600" /> Chỉ xem đã chọn</label>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" disabled={!visibleIds.length} onClick={toggleVisible} className={BUTTON_CLASS}>{allVisibleSelected ? "Bỏ chọn trang này" : "Chọn trang này"}</button>
+                <button type="button" disabled={!filteredRows.length} onClick={() => changeSelection([...new Set([...selectedIds, ...filteredRows.map(({ serial }) => serial.inventory_sku_serial_id)])])} className={BUTTON_CLASS}>Chọn tất cả kết quả lọc ({formatNumber(filteredRows.length)})</button>
+                <button type="button" disabled={!selectedIds.length} onClick={() => changeSelection([])} className={BUTTON_CLASS}>Bỏ chọn tất cả</button>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[620px] text-left text-sm">
+                <thead className="bg-slate-50 text-xs font-semibold text-slate-500"><tr><th className="px-4 py-3">Chọn</th><th className="px-4 py-3">Mã SKU</th><th className="px-4 py-3">Serial Number</th><th className="px-4 py-3 text-right">Tồn kho SKU</th><th className="px-4 py-3">Trạng thái</th></tr></thead>
+                <tbody className="divide-y divide-slate-100">
+                  {visibleRows.length ? visibleRows.map(({ stock, serial }) => (
+                    <tr key={serial.inventory_sku_serial_id} className={selectedSet.has(serial.inventory_sku_serial_id) ? "bg-blue-50/70" : "hover:bg-slate-50"}>
+                      <td className="px-4 py-3"><input type="checkbox" aria-label={`Chọn ${serial.inventory_sku_serial_number}`} checked={selectedSet.has(serial.inventory_sku_serial_id)} onChange={() => toggleSerial(serial.inventory_sku_serial_id)} className="h-4 w-4 accent-blue-600" /></td>
+                      <td className="px-4 py-3 break-all text-xs font-semibold text-slate-700">{stock.inventory_sku_code}</td>
+                      <td className="px-4 py-3 break-all font-medium text-slate-800">{serial.inventory_sku_serial_number}<span className="mt-1 block text-xs font-normal text-slate-400">#{serial.inventory_sku_serial_id}</span></td>
+                      <td className="px-4 py-3 text-right font-medium">{formatNumber(stock.inventory_stock_quantity)}</td>
+                      <td className="px-4 py-3"><StatusBadge label="Có sẵn" style="bg-emerald-50 text-emerald-700" /></td>
+                    </tr>
+                  )) : <tr><td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-500">Không có Serial AVAILABLE phù hợp.</td></tr>}
+                </tbody>
+              </table>
+            </div>
+            <Pagination currentPage={safePage} totalPages={totalPages} totalRecords={filteredRows.length} pageSize={pageSize} unit="Serial" onChange={setCurrentPage} />
+          </section>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-blue-700"><p className="text-xs">Số SKU đã chọn hợp lệ</p><p className="mt-1 text-xl font-bold">{formatNumber(selectedGroups.length)}</p></div>
+            <div className="rounded-xl border border-orange-100 bg-orange-50 p-3 text-orange-700"><p className="text-xs">Tổng Serial đã chọn</p><p className="mt-1 text-xl font-bold">{formatNumber(selectedIds.length)}</p></div>
+          </div>
+          {!!selectedGroups.length && <div className="max-h-40 space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3"><p className="text-xs font-bold text-slate-600">Tóm tắt xuất theo SKU</p>{selectedGroups.map(({ stock, quantity }) => <div key={stock.inventory_sku_id} className="flex flex-wrap justify-between gap-2 border-t border-slate-200 pt-2 text-xs"><span className="break-all font-medium">{stock.inventory_sku_code}</span><span className={quantity > stock.inventory_stock_quantity ? "font-semibold text-rose-600" : "text-slate-600"}>Xuất {formatNumber(quantity)} · tồn {formatNumber(stock.inventory_stock_quantity)} → {formatNumber(stock.inventory_stock_quantity - quantity)}</span></div>)}</div>}
+          {!!invalidIds.length && <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">{invalidIds.length} Serial đã không còn AVAILABLE tại Kho 1. <button type="button" onClick={() => changeSelection(selectedIds.filter((id) => availableById.has(id)))} className="font-semibold underline">Bỏ các Serial không hợp lệ</button></div>}
+          {!!insufficient.length && <div role="alert" className="rounded-xl bg-rose-50 p-3 text-sm text-rose-700">Số lượng đã chọn vượt tồn kho của {insufficient.map(({ stock }) => stock.inventory_sku_code).join(", ")}. Vui lòng giảm số lượng.</div>}
+          {syncError && <div role="alert" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">Không thể đồng bộ dữ liệu kho: {syncError}. Hãy đợi đồng bộ thành công hoặc <button type="button" onClick={onRefresh} className="font-semibold underline">thử lại</button>.</div>}
+          {error && <div role="alert" className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-3"><AlertCircle size={20} className="shrink-0 text-rose-600" /><div><p className="text-sm font-bold text-rose-800">Không thể xác nhận xuất kho</p><p className="mt-1 text-sm text-rose-700">{error}</p></div></div>}
+          <label className="flex items-start gap-3 rounded-xl border border-orange-200 bg-orange-50 p-3 text-sm text-orange-800"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} className="mt-1 h-4 w-4 shrink-0 accent-orange-600" /><span>Tôi đã kiểm tra nơi nhận và danh sách Serial. {type === "TRANSFER" ? "Hàng sẽ được ghi nhận tại kho đích ngay khi xuất thành công." : "Hàng sẽ được đánh dấu đã xuất kho và không còn khả dụng để bán."}</span></label>
+        </fieldset>
+        <div className="sticky bottom-0 flex flex-wrap justify-end gap-3 border-t border-slate-100 bg-white p-4 shadow-sm">
+          <button type="button" disabled={submitting} onClick={closeModal} className={BUTTON_CLASS}>Hủy bỏ</button>
+          <button type="submit" disabled={submitting || !canSubmit} className="inline-flex h-10 items-center gap-2 rounded-xl bg-orange-600 px-5 text-sm font-semibold text-white transition hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-50">{submitting ? <LoaderCircle size={17} className="animate-spin" /> : <Truck size={18} />}{submitting ? "Đang xuất kho..." : `Xuất ${formatNumber(selectedIds.length)} sản phẩm`}</button>
+        </div>
+      </form>
+    </dialog>
+  );
+}
+
+// ======================================================
+// EXPORT INVENTORY RESULT COMPONENT
+// ======================================================
+
+function ExportInventoryResult({ result, onClose }: { result: ExportWarehouse1InventoryResult; onClose: () => void }) {
+  return (
+    <div role="status" aria-live="polite" className="fixed bottom-6 right-4 z-50 max-h-[75dvh] w-[calc(100%_-_2rem)] max-w-md overflow-y-auto rounded-2xl border border-emerald-200 bg-white p-4 shadow-xl sm:right-6">
+      <div className="flex items-start gap-3">
+        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600"><CheckCircle2 size={24} /></div>
+        <div className="min-w-0 flex-1"><p className="text-sm font-bold text-emerald-700">{result.type === "TRANSFER" ? "Điều chuyển kho thành công" : "Xuất kho thành công"}</p><p className="mt-1 break-words text-sm text-slate-600">{result.source.name} → {result.destination.name}</p></div>
+        <button type="button" aria-label="Đóng thông báo xuất kho" onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"><X size={17} /></button>
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2"><div className="rounded-xl bg-emerald-50 p-3 text-emerald-700"><p className="text-xs">Sản phẩm đã xuất</p><p className="text-xl font-bold">{formatNumber(result.total_quantity)}</p></div><div className="rounded-xl bg-blue-50 p-3 text-blue-700"><p className="text-xs">Số SKU</p><p className="text-xl font-bold">{formatNumber(result.total_skus)}</p></div></div>
+      <p className="mt-3 text-xs text-slate-600">Giao dịch xuất: <strong>#{result.source_transaction_id}</strong>{result.destination_transaction_id !== null && <> · Giao dịch nhận: <strong>#{result.destination_transaction_id}</strong></>}</p>
+      <div className="mt-3 max-h-44 space-y-2 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-3">{result.items.map((item) => <div key={item.inventory_sku_id} className="border-b border-slate-200 pb-2 last:border-0 last:pb-0"><p className="break-all text-xs font-semibold text-slate-700">{item.inventory_sku_code}</p><p className="mt-1 text-xs text-slate-500">Xuất {formatNumber(item.quantity)} · Kho 1: {formatNumber(item.source_quantity_before)} → {formatNumber(item.source_quantity_after)}</p>{item.destination_quantity_before !== null && item.destination_quantity_after !== null && <p className="mt-1 text-xs text-emerald-700">Kho nhận: {formatNumber(item.destination_quantity_before)} → {formatNumber(item.destination_quantity_after)}</p>}</div>)}</div>
     </div>
   );
 }
@@ -2567,7 +2973,7 @@ function SerialTableRow({
           type="button"
           aria-haspopup="dialog"
           aria-label={`Chỉnh sửa Serial ${serial.inventory_sku_serial_number}`}
-          title={isEditableSerialStatus(status) ? "Chỉnh sửa Serial Number" : "Không thể sửa Serial đang đặt hoặc đã bán"}
+          title={isEditableSerialStatus(status) ? "Chỉnh sửa Serial Number" : "Chỉ có thể sửa Serial AVAILABLE hoặc CANCELLED"}
           disabled={!isEditableSerialStatus(status)}
           onClick={onEdit}
           className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"

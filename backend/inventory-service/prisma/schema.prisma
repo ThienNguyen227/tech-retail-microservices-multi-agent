@@ -138,7 +138,7 @@ model InventoryTransaction {
 // 2, Xuất kho, EXPORT, Xuất hàng khỏi kho cho nguồn bên ngoài.
 // 3, Chuyển vào, TRANSFER_IN, Nhận hàng được chuyển từ kho khác vào kho.
 // 4, Chuyển ra, TRANSFER_OUT, Chuyển hàng từ kho hiện tại sang kho khác.
-
+// 5, Điều chỉnh tồn kho, ADJUSTMENT, điều chỉnh tồn kho.
 model InventoryTransactionType {
   inventory_transaction_type_id   Int    @id @default(autoincrement())
   inventory_transaction_type_code String @unique
