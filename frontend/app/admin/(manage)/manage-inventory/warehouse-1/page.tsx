@@ -42,6 +42,7 @@ import {
   type CreateWarehouse1SkusResult,
   type UpdateWarehouse1SkuResult,
   type CreateWarehouse1SerialsResult,
+  type UpdateWarehouse1SerialResult,
 } from "@/lib/axios/services/admin-services/inventory_service";
 
 // ======================================================
@@ -70,6 +71,11 @@ type StockStatusFilter =
   | "NEGATIVE";
 
 type SerialStatusFilter = SerialStatus | "ALL";
+type EditableSerialStatus = "AVAILABLE" | "CANCELLED";
+
+function isEditableSerialStatus(status: string): status is EditableSerialStatus {
+  return status === "AVAILABLE" || status === "CANCELLED";
+}
 
 // ======================================================
 // SERIAL STATUS OPTIONS
@@ -214,6 +220,37 @@ function getSerialStatusLabel(
     default:
       return status || "Không xác định";
   }
+}
+
+// ======================================================
+// MERGE SERIAL UPDATE RESPONSE
+// ======================================================
+
+function mergeUpdatedSerial(stock: Warehouse1Stock, result: UpdateWarehouse1SerialResult): Warehouse1Stock {
+  if (stock.inventory_id !== result.inventory_id || stock.inventory_sku_id !== result.inventory_sku_id) return stock;
+
+  const current = stock.serials.find((serial) => serial.inventory_sku_serial_id === result.serial.inventory_sku_serial_id);
+  if (!current) return stock;
+
+  // Nếu GET đã nhận dữ liệu mới (hoặc một thay đổi khác), không ghi đè snapshot đó.
+  if (current.inventory_sku_serial_number !== result.old_serial_number ||
+      current.status.inventory_sku_serial_status_code !== result.old_status) return stock;
+
+  const serials = stock.serials.map((serial) =>
+    serial.inventory_sku_serial_id === result.serial.inventory_sku_serial_id ? result.serial : serial,
+  );
+  return {
+    ...stock,
+    inventory_stock_quantity: result.inventory_stock_quantity_after,
+    serials,
+    serial_statistics: {
+      total: serials.length,
+      available: serials.filter((serial) => serial.status.inventory_sku_serial_status_code === "AVAILABLE").length,
+      reserved: serials.filter((serial) => serial.status.inventory_sku_serial_status_code === "RESERVED").length,
+      cancelled: serials.filter((serial) => serial.status.inventory_sku_serial_status_code === "CANCELLED").length,
+      sold: serials.filter((serial) => serial.status.inventory_sku_serial_status_code === "SOLD").length,
+    },
+  };
 }
 
 // ======================================================
@@ -643,6 +680,19 @@ export default function Warehouse1Page() {
     }
 
     // Giữ Modal chi tiết mở, lấy lại snapshot kể cả khi tất cả Serial bị trùng.
+    setRefreshKey((previous) => previous + 1);
+  }
+
+  // ======================================================
+  // UPDATE SERIAL SUCCESS
+  // ======================================================
+
+  function handleUpdateSerialSuccess(result: UpdateWarehouse1SerialResult) {
+    mutationVersion.current += 1;
+    if (canReadRef.current) {
+      setAllStocks((previous) => previous.map((stock) => mergeUpdatedSerial(stock, result)));
+    }
+    // Lấy snapshot mới ngay, không chờ polling; không đóng modal cha.
     setRefreshKey((previous) => previous + 1);
   }
 
@@ -1286,6 +1336,7 @@ export default function Warehouse1Page() {
           onClose={() => setSelectedSkuId(null)}
           onRefresh={retryLoad}
           onCreateSerialsSuccess={handleCreateSerialsSuccess}
+          onUpdateSerialSuccess={handleUpdateSerialSuccess}
           isRefreshing={isRefreshing}
           error={statsError}
         />
@@ -1819,6 +1870,200 @@ function SerialImportResult({ result, onClose }: {
 }
 
 // ======================================================
+// UPDATE SERIAL MODAL COMPONENT
+// ======================================================
+
+function UpdateSerialModal({
+  stock,
+  original,
+  onClose,
+  onSuccess,
+}: {
+  stock: Warehouse1Stock;
+  original: Warehouse1Serial;
+  onClose: () => void;
+  onSuccess: (result: UpdateWarehouse1SerialResult, message: string) => void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const submitLock = useRef(false);
+  const mountedRef = useRef(false);
+  const originalStatus = original.status.inventory_sku_serial_status_code;
+  const [serialNumber, setSerialNumber] = useState(original.inventory_sku_serial_number);
+  const [status, setStatus] = useState<EditableSerialStatus>(originalStatus === "CANCELLED" ? "CANCELLED" : "AVAILABLE");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const serialId = original.inventory_sku_serial_id;
+  const current = stock.serials.find((serial) => serial.inventory_sku_serial_id === serialId);
+  const newSerialNumber = serialNumber.trim();
+  const nameChanged = newSerialNumber !== original.inventory_sku_serial_number;
+  const statusChanged = status !== originalStatus;
+  const quantityChange = Number(status === "AVAILABLE") - Number(originalStatus === "AVAILABLE");
+  const quantityBefore = stock.inventory_stock_quantity;
+  const quantityAfter = quantityBefore + quantityChange;
+  const blockedReason = !current
+    ? "Serial không còn thuộc SKU này tại Kho 1. Vui lòng đóng cửa sổ và kiểm tra lại."
+    : !isEditableSerialStatus(originalStatus) || !isEditableSerialStatus(current.status.inventory_sku_serial_status_code)
+      ? "Không thể chỉnh sửa Serial đang được đặt hoặc đã bán."
+      : current.inventory_sku_serial_number !== original.inventory_sku_serial_number || current.status.inventory_sku_serial_status_code !== originalStatus
+        ? "Serial đã thay đổi trong lúc chỉnh sửa. Vui lòng đóng và mở lại cửa sổ."
+        : "";
+  const duplicateInSku = nameChanged && stock.serials.some((serial) =>
+    serial.inventory_sku_serial_id !== serialId && serial.inventory_sku_serial_number === newSerialNumber,
+  );
+  const validationError = !newSerialNumber
+    ? "Vui lòng nhập Serial Number."
+    : newSerialNumber.length > MAX_SERIAL_LENGTH
+      ? `Serial Number tối đa ${MAX_SERIAL_LENGTH} ký tự.`
+      : duplicateInSku
+        ? "Serial Number đã tồn tại trong SKU này."
+        : statusChanged && quantityBefore !== stock.serial_statistics.available
+          ? "Tồn kho không khớp số Serial AVAILABLE. Vui lòng kiểm tra lại dữ liệu kho."
+          : statusChanged && quantityAfter < 0
+            ? "Không thể cập nhật vì tồn kho sẽ bị âm."
+            : "";
+
+  useEffect(() => {
+    mountedRef.current = true;
+    const dialog = dialogRef.current;
+    if (dialog && !dialog.open) dialog.showModal();
+    inputRef.current?.focus();
+    inputRef.current?.select();
+    // Modal cha đang khóa body scroll; modal con không thay đổi overflow.
+    return () => {
+      mountedRef.current = false;
+      if (dialog?.open) dialog.close();
+    };
+  }, []);
+
+  function closeModal() {
+    if (!submitLock.current) onClose();
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (submitLock.current) return;
+    if (blockedReason || validationError || (!nameChanged && !statusChanged)) {
+      setError(blockedReason || validationError || "Chưa có dữ liệu nào thay đổi.");
+      return;
+    }
+    submitLock.current = true;
+    setSubmitting(true);
+    setError("");
+    try {
+      // Chỉ gửi trường thực sự thay đổi. Backend kiểm tra quyền và trùng toàn hệ thống.
+      const response = await adminInventoryService.updateWarehouse1Serial(serialId, {
+        serialNumber: nameChanged ? newSerialNumber : undefined,
+        status: statusChanged ? status : undefined,
+      });
+      if (!mountedRef.current) return;
+      const result = response.data;
+      if (!response.success || !result || !result.serial || !result.serial.status ||
+          result.inventory_id !== stock.inventory_id || result.inventory_branch_id !== stock.inventory_branch_id ||
+          result.inventory_sku_id !== stock.inventory_sku_id || result.serial.inventory_sku_serial_id !== serialId ||
+          result.serial.inventory_id !== stock.inventory_id || result.serial.inventory_sku_id !== stock.inventory_sku_id ||
+          !Number.isFinite(result.inventory_stock_quantity_before) || !Number.isFinite(result.inventory_stock_quantity_after) ||
+          result.serial.inventory_sku_serial_number !== result.new_serial_number ||
+          result.serial.status.inventory_sku_serial_status_code !== result.new_status) {
+        setError(!response.success && response.message ? response.message : "Phản hồi không hợp lệ. Hãy kiểm tra danh sách Serial trước khi gửi lại.");
+        return;
+      }
+      onSuccess(result, response.message || `Đã cập nhật Serial Number "${result.new_serial_number}".`);
+    } catch (err: unknown) {
+      if (!mountedRef.current) return;
+      const httpStatus = axios.isAxiosError(err) ? err.response?.status : undefined;
+      let fallback = "Không thể cập nhật Serial Number. Vui lòng thử lại.";
+      if (httpStatus === 401) fallback = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
+      else if (httpStatus === 403) fallback = "Bạn không có quyền cập nhật Serial Number tại Kho 1.";
+      else if (httpStatus === 404) fallback = "Không tìm thấy Serial Number tại Kho 1 hoặc API không tồn tại.";
+      else if (httpStatus === 409) fallback = "Serial bị trùng hoặc dữ liệu kho đã thay đổi. Vui lòng kiểm tra lại.";
+      else if (axios.isAxiosError(err) && !err.response) fallback = "Không nhận được phản hồi. Hãy kiểm tra danh sách Serial trước khi gửi lại.";
+      setError(extractErrorMessage(err, fallback));
+    } finally {
+      submitLock.current = false;
+      if (mountedRef.current) setSubmitting(false);
+    }
+  }
+
+  return (
+    <dialog
+      ref={dialogRef}
+      aria-labelledby="warehouse-update-serial-title"
+      onCancel={(event) => { event.preventDefault(); event.stopPropagation(); closeModal(); }}
+      onClick={(event) => { event.stopPropagation(); if (event.target === event.currentTarget) closeModal(); }}
+      className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-xl overflow-auto rounded-2xl border-0 bg-transparent p-0 text-slate-800 shadow-2xl backdrop:bg-slate-900/50 backdrop:backdrop-blur-sm"
+    >
+      <form onSubmit={handleSubmit} noValidate aria-busy={submitting} className="overflow-hidden rounded-2xl bg-white">
+        <div className="flex items-start gap-3 border-b border-slate-100 p-5">
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-amber-50 text-amber-600"><Pencil size={24} /></div>
+          <div className="min-w-0 flex-1">
+            <h2 id="warehouse-update-serial-title" className="text-lg font-bold text-slate-800">Cập nhật Serial Number</h2>
+            <p className="mt-1 text-sm text-slate-500">Chỉnh sửa mã và trạng thái Serial tại Kho 1.</p>
+          </div>
+          <button type="button" disabled={submitting} onClick={closeModal} aria-label="Đóng modal cập nhật Serial" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"><X size={20} /></button>
+        </div>
+        <div className="space-y-4 p-5">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex items-start gap-3">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-violet-50 text-violet-600"><ScanBarcode size={21} /></div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-slate-500">SKU · Kho 1</p>
+                <p className="mt-1 break-all text-sm font-bold text-slate-800">{stock.inventory_sku_code}</p>
+                <p className="mt-1 text-xs text-slate-500">SKU ID: {stock.inventory_sku_id} · Serial ID: {serialId}</p>
+              </div>
+            </div>
+            <div className="mt-3 space-y-2 border-t border-slate-200 pt-3">
+              <p className="break-all text-xs text-slate-500">Mã hiện tại: <span className="font-semibold text-slate-800">{original.inventory_sku_serial_number}</span></p>
+              <StatusBadge label={getSerialStatusLabel(originalStatus, original.status.inventory_sku_serial_status_name)} style={getSerialStatusStyle(originalStatus)} />
+            </div>
+          </div>
+          <div>
+            <label htmlFor="warehouse-update-serial-number" className="mb-2 block text-sm font-semibold text-slate-700">Serial Number <span className="text-rose-500">*</span></label>
+            <div className="relative">
+              <Hash size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input ref={inputRef} id="warehouse-update-serial-number" value={serialNumber} onChange={(event) => { setSerialNumber(event.target.value); setError(""); }} disabled={submitting || !!blockedReason} autoComplete="off" spellCheck={false} aria-invalid={!!validationError} aria-describedby="warehouse-update-serial-help" className="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm font-medium text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100" placeholder="Nhập Serial Number..." />
+            </div>
+            <p id="warehouse-update-serial-help" className="mt-2 text-xs text-slate-500">Tối đa {MAX_SERIAL_LENGTH} ký tự. Mã Serial phải duy nhất trên toàn hệ thống.</p>
+          </div>
+          <div>
+            <label htmlFor="warehouse-update-serial-status" className="mb-2 block text-sm font-semibold text-slate-700">Trạng thái <span className="text-rose-500">*</span></label>
+            <select id="warehouse-update-serial-status" value={status} disabled={submitting || !!blockedReason} onChange={(event) => { if (isEditableSerialStatus(event.target.value)) { setStatus(event.target.value); setError(""); } }} className={`${SELECT_CLASS} w-full disabled:bg-slate-100`}>
+              <option value="AVAILABLE">Có sẵn (AVAILABLE)</option>
+              <option value="CANCELLED">Đã hủy đặt (CANCELLED)</option>
+            </select>
+          </div>
+          {!blockedReason && (
+            <div className="grid grid-cols-3 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div><p className="text-xs text-slate-500">Tồn hiện tại</p><p className="mt-1 text-lg font-bold text-slate-800">{formatNumber(quantityBefore)}</p></div>
+              <div><p className="text-xs text-slate-500">Thay đổi</p><p className={`mt-1 text-lg font-bold ${quantityChange < 0 ? "text-rose-600" : quantityChange > 0 ? "text-emerald-600" : "text-slate-600"}`}>{quantityChange > 0 ? "+" : ""}{quantityChange}</p></div>
+              <div><p className="text-xs text-slate-500">Tồn dự kiến</p><p className="mt-1 text-lg font-bold text-blue-700">{formatNumber(quantityAfter)}</p></div>
+            </div>
+          )}
+          {(blockedReason || error || validationError) && (
+            <div role="alert" className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-3">
+              <AlertCircle size={19} className="mt-0.5 shrink-0 text-rose-600" />
+              <div className="min-w-0"><p className="text-sm font-semibold text-rose-800">Không thể cập nhật Serial Number</p><p className="mt-1 break-words text-sm text-rose-700">{blockedReason || error || validationError}</p></div>
+            </div>
+          )}
+          <div className="flex items-start gap-2.5 rounded-xl border border-amber-100 bg-amber-50 p-3 text-amber-800">
+            <AlertCircle size={18} className="mt-0.5 shrink-0" />
+            <p className="text-xs leading-relaxed">Chỉ cho phép chỉnh sửa AVAILABLE và CANCELLED. Đổi sang CANCELLED giảm tồn kho 1; đổi sang AVAILABLE tăng tồn kho 1. Chỉ sửa mã không làm đổi tồn kho. Số lượng cuối cùng do Backend xác nhận.</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 bg-slate-50 p-5">
+          <button type="button" disabled={submitting} onClick={closeModal} className={BUTTON_CLASS}>Hủy bỏ</button>
+          <button type="submit" disabled={submitting || !!blockedReason || !!validationError || (!nameChanged && !statusChanged)} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
+            {submitting ? <LoaderCircle size={17} className="animate-spin" /> : <Save size={18} />}
+            {submitting ? "Đang cập nhật..." : "Lưu thay đổi"}
+          </button>
+        </div>
+      </form>
+    </dialog>
+  );
+}
+
+// ======================================================
 // SERIAL MODAL COMPONENT
 // ======================================================
 
@@ -1827,6 +2072,7 @@ function SerialModal({
   onClose,
   onRefresh,
   onCreateSerialsSuccess,
+  onUpdateSerialSuccess,
   isRefreshing,
   error,
 }: {
@@ -1834,6 +2080,7 @@ function SerialModal({
   onClose: () => void;
   onRefresh: () => void;
   onCreateSerialsSuccess: (result: CreateWarehouse1SerialsResult) => void;
+  onUpdateSerialSuccess: (result: UpdateWarehouse1SerialResult) => void;
   isRefreshing: boolean;
   error: string;
 }) {
@@ -1873,6 +2120,7 @@ function SerialModal({
         onClose={onClose}
         onRefresh={onRefresh}
         onCreateSerialsSuccess={onCreateSerialsSuccess}
+        onUpdateSerialSuccess={onUpdateSerialSuccess}
         isRefreshing={isRefreshing}
         error={error}
       />
@@ -1889,6 +2137,7 @@ function SerialList({
   onClose,
   onRefresh,
   onCreateSerialsSuccess,
+  onUpdateSerialSuccess,
   isRefreshing,
   error,
 }: {
@@ -1896,6 +2145,7 @@ function SerialList({
   onClose: () => void;
   onRefresh: () => void;
   onCreateSerialsSuccess: (result: CreateWarehouse1SerialsResult) => void;
+  onUpdateSerialSuccess: (result: UpdateWarehouse1SerialResult) => void;
   isRefreshing: boolean;
   error: string;
 }) {
@@ -1913,11 +2163,27 @@ function SerialList({
   const [showAddSerialModal, setShowAddSerialModal] = useState(false);
   const [serialResult, setSerialResult] = useState<CreateWarehouse1SerialsResult | null>(null);
   const [newSerialIds, setNewSerialIds] = useState<number[]>([]);
+  // Giữ bản gốc khi mở modal để phát hiện thay đổi từ polling.
+  const [editingSerial, setEditingSerial] = useState<Warehouse1Serial | null>(null);
+  const [serialUpdate, setSerialUpdate] = useState<{ result: UpdateWarehouse1SerialResult; message: string } | null>(null);
+
+  function handleSerialUpdateSuccess(result: UpdateWarehouse1SerialResult, message: string) {
+    onUpdateSerialSuccess(result);
+    setEditingSerial(null);
+    setSerialResult(null);
+    setSerialUpdate({ result, message });
+    // Đưa Serial vừa sửa lên đầu, kể cả khi mã/trạng thái không còn khớp bộ lọc cũ.
+    setNewSerialIds([result.serial.inventory_sku_serial_id]);
+    setKeyword("");
+    setStatusFilter("ALL");
+    setCurrentPage(1);
+  }
 
   function handleSerialSuccess(result: CreateWarehouse1SerialsResult) {
     onCreateSerialsSuccess(result);
     setShowAddSerialModal(false);
     setSerialResult(result);
+    setSerialUpdate(null);
     if (result.total_created > 0) {
       setNewSerialIds(result.created_serials.map((serial) => serial.inventory_sku_serial_id));
       setKeyword("");
@@ -2053,6 +2319,28 @@ function SerialList({
       {serialResult && (
         <SerialImportResult result={serialResult} onClose={() => setSerialResult(null)} />
       )}
+      {serialUpdate && (
+        <div role="status" className="mx-4 mt-4 space-y-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+          <div className="flex items-start gap-3">
+            <CheckCircle2 size={22} className="mt-0.5 shrink-0 text-emerald-600" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-emerald-800">Cập nhật Serial Number thành công</p>
+              <p className="mt-1 break-words text-sm text-emerald-700">{serialUpdate.message}</p>
+              <p className="mt-1 break-all text-xs text-emerald-800">{serialUpdate.result.old_serial_number} → {serialUpdate.result.new_serial_number}</p>
+              <p className="mt-1 text-xs text-emerald-800">{getSerialStatusLabel(serialUpdate.result.old_status)} → {getSerialStatusLabel(serialUpdate.result.new_status)}</p>
+              {serialUpdate.result.inventory_transaction_id !== null && (
+                <p className="mt-1 text-xs text-emerald-700">Giao dịch điều chỉnh #{serialUpdate.result.inventory_transaction_id}</p>
+              )}
+            </div>
+            <button type="button" onClick={() => setSerialUpdate(null)} aria-label="Đóng thông báo cập nhật Serial" className="rounded-lg p-1 text-emerald-700 hover:bg-emerald-100"><X size={18} /></button>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-sm">
+            <div className="rounded-lg bg-white p-3"><p className="text-xs text-slate-500">Tồn trước</p><p className="mt-1 font-bold text-slate-800">{formatNumber(serialUpdate.result.inventory_stock_quantity_before)}</p></div>
+            <div className="rounded-lg bg-white p-3"><p className="text-xs text-slate-500">Thay đổi</p><p className={`mt-1 font-bold ${serialUpdate.result.quantity_change < 0 ? "text-rose-600" : "text-emerald-700"}`}>{serialUpdate.result.quantity_change > 0 ? "+" : ""}{serialUpdate.result.quantity_change}</p></div>
+            <div className="rounded-lg bg-white p-3"><p className="text-xs text-slate-500">Tồn sau</p><p className="mt-1 font-bold text-blue-700">{formatNumber(serialUpdate.result.inventory_stock_quantity_after)}</p></div>
+          </div>
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 p-4">
         <div className="relative w-full sm:w-64">
           <Search
@@ -2113,7 +2401,7 @@ function SerialList({
       {/* SERIAL TABLE */}
       {/* ================================================== */}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[800px] text-left">
+        <table className="w-full min-w-[920px] text-left">
           <thead className="bg-slate-50">
             <tr className="text-xs font-semibold uppercase tracking-wider text-slate-500">
               <th className="px-4 py-3">
@@ -2134,13 +2422,14 @@ function SerialList({
               <th className="px-4 py-3">
                 Mã trạng thái
               </th>
+              <th className="px-4 py-3 text-center">Thao tác</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {paginatedSerials.length === 0 ? (
               <tr>
                 <td
-                  colSpan={6}
+                  colSpan={7}
                   className="px-4 py-10 text-center"
                 >
                   <Hash
@@ -2163,6 +2452,8 @@ function SerialList({
                   key={serial.inventory_sku_serial_id}
                   serial={serial}
                   skuCode={stock.inventory_sku_code}
+                  onEdit={() => setEditingSerial(serial)}
+                  recentlyUpdated={serialUpdate?.result.serial.inventory_sku_serial_id === serial.inventory_sku_serial_id}
                   index={
                     (safePage - 1) * SERIAL_PAGE_SIZE +
                     index +
@@ -2195,6 +2486,15 @@ function SerialList({
         onSuccess={handleSerialSuccess}
       />
     )}
+    {editingSerial && (
+      <UpdateSerialModal
+        key={editingSerial.inventory_sku_serial_id}
+        stock={stock}
+        original={editingSerial}
+        onClose={() => setEditingSerial(null)}
+        onSuccess={handleSerialUpdateSuccess}
+      />
+    )}
     </>
   );
 }
@@ -2207,17 +2507,21 @@ function SerialTableRow({
   serial,
   skuCode,
   index,
+  onEdit,
+  recentlyUpdated,
 }: {
   serial: Warehouse1Serial;
   skuCode: string;
   index: number;
+  onEdit: () => void;
+  recentlyUpdated: boolean;
 }) {
 
   const status =
     serial.status?.inventory_sku_serial_status_code ?? "";
 
   return (
-    <tr className="transition hover:bg-slate-50/80">
+    <tr className={`transition ${recentlyUpdated ? "bg-blue-50/80 hover:bg-blue-50" : "hover:bg-slate-50/80"}`}>
       {/* INDEX */}
       <td className="px-4 py-3.5 text-sm text-slate-500">
         {index}
@@ -2256,6 +2560,20 @@ function SerialTableRow({
         <span className="rounded-md bg-slate-100 px-2 py-1 text-xs font-medium text-slate-500">
           {status || "—"}
         </span>
+      </td>
+      {/* ACTIONS */}
+      <td className="px-4 py-3.5 text-center">
+        <button
+          type="button"
+          aria-haspopup="dialog"
+          aria-label={`Chỉnh sửa Serial ${serial.inventory_sku_serial_number}`}
+          title={isEditableSerialStatus(status) ? "Chỉnh sửa Serial Number" : "Không thể sửa Serial đang đặt hoặc đã bán"}
+          disabled={!isEditableSerialStatus(status)}
+          onClick={onEdit}
+          className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
+        >
+          <Pencil size={15} /> Chỉnh sửa
+        </button>
       </td>
     </tr>
   );

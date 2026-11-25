@@ -32,7 +32,7 @@ export interface Inventory extends InventoryReference {
 }
 
 export type SerialStatus = "AVAILABLE" | "RESERVED" | "CANCELLED" | "SOLD";
-export type TransactionType = "IMPORT" | "EXPORT" | "TRANSFER_IN" | "TRANSFER_OUT";
+export type TransactionType = "IMPORT" | "EXPORT" | "TRANSFER_IN" | "TRANSFER_OUT" | "ADJUSTMENT";
 
 export interface InventorySerial {
   inventory_sku_serial_id: number;
@@ -229,6 +229,44 @@ export interface CreateWarehouse1SerialsResponse {
   data: CreateWarehouse1SerialsResult;
 }
 
+// ======================================================
+// WAREHOUSE 1 UPDATE SERIAL INTERFACES
+// ======================================================
+
+export interface UpdateWarehouse1SerialRequest {
+  serialNumber?: string;
+  status?: "AVAILABLE" | "CANCELLED";
+}
+
+export interface UpdateWarehouse1SerialResult {
+  inventory_id: number;
+  inventory_branch_id: number;
+
+  inventory_sku_id: number;
+  inventory_sku_code: string;
+
+  old_serial_number: string;
+  new_serial_number: string;
+
+  old_status: SerialStatus;
+  new_status: SerialStatus;
+
+  quantity_change: number;
+
+  inventory_stock_quantity_before: number;
+  inventory_stock_quantity_after: number;
+
+  inventory_transaction_id: number | null;
+
+  serial: Warehouse1Serial;
+}
+
+export interface UpdateWarehouse1SerialResponse {
+  success: boolean;
+  message: string;
+  data: UpdateWarehouse1SerialResult;
+}
+
 export const adminInventoryService = {
   // ======================================================
   // 1. (GET) INVENTORY-LIST
@@ -403,6 +441,31 @@ export const adminInventoryService = {
         ),
 
         source: data.source?.trim() || undefined,
+      },
+      {
+        signal,
+      },
+    );
+
+    return response.data;
+  },
+
+  // ======================================================
+  // 8. (PATCH) WAREHOUSE-1 UPDATE INVENTORY SERIAL
+  // ======================================================
+
+  async updateWarehouse1Serial(
+    serialId: number,
+    data: UpdateWarehouse1SerialRequest,
+    signal?: AbortSignal,
+  ) {
+    const response = await adminAxios.patch<
+      UpdateWarehouse1SerialResponse
+    >(
+      `${INVENTORY_SERVICE_URL}/warehouse-1/inventory-serials/${serialId}`,
+      {
+        serialNumber: data.serialNumber?.trim(),
+        status: data.status,
       },
       {
         signal,
