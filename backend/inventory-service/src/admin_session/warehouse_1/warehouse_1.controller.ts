@@ -1,6 +1,8 @@
 import {
   Controller,
   Get,
+  Post,
+  Body,
   Query,
   Headers,
   UseGuards,
@@ -10,6 +12,11 @@ import {
 import {
   IsOptional,
   IsString,
+  IsNotEmpty,
+  IsArray,
+  ArrayMinSize,
+  ArrayMaxSize,
+  MaxLength,
 } from 'class-validator';
 
 import { Warehouse1Service } from './warehouse_1.service';
@@ -28,6 +35,36 @@ class GetWarehouse1InventoryList {
 }
 
 // ======================================================
+// DTO: CREATE MULTIPLE WAREHOUSE 1 SKUS
+// ======================================================
+
+class CreateWarehouse1SkusDto {
+  @IsArray({
+    message: 'Danh sách SKU phải là một mảng.',
+  })
+  @ArrayMinSize(1, {
+    message: 'Phải cung cấp ít nhất một SKU.',
+  })
+  @ArrayMaxSize(500, {
+    message: 'Chỉ được thêm tối đa 500 SKU mỗi lần.',
+  })
+  @IsString({
+    each: true,
+    message: 'Mỗi SKU phải là chuỗi ký tự.',
+  })
+  @IsNotEmpty({
+    each: true,
+    message: 'Mã SKU không được để trống.',
+  })
+  @MaxLength(200, {
+    each: true,
+    message: 'Mỗi mã SKU tối đa 200 ký tự.',
+  })
+  skus: string[];
+}
+
+
+// ======================================================
 // CONTROLLER
 // ======================================================
 
@@ -37,9 +74,9 @@ export class Warehouse1Controller {
     private readonly warehouse1Service: Warehouse1Service,
   ) {}
 
-  // ========================================
+  // ======================================================
   // 1. (GET) INVENTORY LIST
-  // ========================================
+  // ======================================================
 
   @UseGuards(JwtAuthGuard)
   @Get('inventory-list')
@@ -61,6 +98,33 @@ export class Warehouse1Controller {
     return this.warehouse1Service.getInventoryList(
       accessToken,
       query.search,
+    );
+  }
+
+  // ======================================================
+  // 2. (POST) CREATE MULTIPLE INVENTORY SKUS
+  // ======================================================
+
+  @UseGuards(JwtAuthGuard)
+  @Post('inventory-skus')
+  createInventorySkus(
+    @Headers('authorization') authorization: string,
+    @Body() dto: CreateWarehouse1SkusDto,
+  ) {
+    const accessToken = authorization?.replace(
+      /^Bearer\s+/i,
+      '',
+    );
+
+    if (!accessToken) {
+      throw new UnauthorizedException(
+        'Thiếu access token.',
+      );
+    }
+
+    return this.warehouse1Service.createInventorySkus(
+      accessToken,
+      dto.skus,
     );
   }
 }

@@ -122,6 +122,52 @@ export interface Warehouse1Stock {
   serials: Warehouse1Serial[];
 }
 
+// ======================================================
+// WAREHOUSE 1 CREATE SKU INTERFACES
+// ======================================================
+
+export interface CreateWarehouse1SkuRequest {
+  sku: string;
+}
+
+export interface CreateWarehouse1SkuResponse {
+  success: boolean;
+  message: string;
+  data: Warehouse1Stock;
+}
+
+// ======================================================
+// WAREHOUSE 1 BULK CREATE SKU INTERFACES
+// ======================================================
+
+export interface CreateWarehouse1SkusRequest {
+  skus: string[];
+}
+
+export interface Warehouse1SkippedSku {
+  sku: string;
+  reason: string;
+}
+
+export interface CreateWarehouse1SkusResult {
+  total_requested: number;
+  total_created: number;
+  total_skipped: number;
+
+  created_skus: string[];
+
+  created_stocks: Warehouse1Stock[];
+
+  skipped_skus: Warehouse1SkippedSku[];
+}
+
+export interface CreateWarehouse1SkusResponse {
+  success: boolean;
+  message: string;
+
+  data: CreateWarehouse1SkusResult;
+}
+
 export const adminInventoryService = {
   // ======================================================
   // 1. (GET) INVENTORY-LIST
@@ -230,4 +276,50 @@ export const adminInventoryService = {
 
     return response.data;
   },
-};
+
+  // ======================================================
+  // 5. (POST) WAREHOUSE-1 CREATE INVENTORY SKU
+  // ======================================================
+
+  async createWarehouse1Sku(
+    data: CreateWarehouse1SkuRequest,
+    signal?: AbortSignal,
+  ) {
+    const response = await adminAxios.post<
+      CreateWarehouse1SkuResponse
+    >(
+      `${INVENTORY_SERVICE_URL}/warehouse-1/inventory-sku`,
+      {
+        sku: data.sku.trim(),
+      },
+      {
+        signal,
+      },
+    );
+
+    return response.data;
+  },
+
+  // ======================================================
+  // 6. (POST) WAREHOUSE-1 CREATE MULTIPLE INVENTORY SKUS
+  // ======================================================
+
+  async createWarehouse1Skus(
+    data: CreateWarehouse1SkusRequest,
+    signal?: AbortSignal,
+  ) {
+    const response = await adminAxios.post<
+      CreateWarehouse1SkusResponse
+    >(
+      `${INVENTORY_SERVICE_URL}/warehouse-1/inventory-skus`,
+      {
+        skus: data.skus.map((sku) => sku.trim()),
+      },
+      {
+        signal,
+      },
+    );
+
+    return response.data;
+  },
+  };

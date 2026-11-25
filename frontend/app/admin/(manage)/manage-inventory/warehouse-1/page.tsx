@@ -6,6 +6,7 @@ import {
   useMemo,
   useState,
   type ReactNode,
+  type FormEvent,
 } from "react";
 
 import {
@@ -25,6 +26,8 @@ import {
   CheckCircle2,
   ClipboardList,
   ScanBarcode,
+  Plus,
+  PackagePlus,
 } from "lucide-react";
 
 import axios from "axios";
@@ -34,6 +37,7 @@ import {
   type Warehouse1Stock,
   type Warehouse1Serial,
   type SerialStatus,
+  type CreateWarehouse1SkusResult,
 } from "@/lib/axios/services/admin-services/inventory_service";
 
 // ======================================================
@@ -43,6 +47,8 @@ import {
 const PAGE_SIZE = 8;
 
 const SERIAL_PAGE_SIZE = 10;
+const MAX_BATCH_SIZE = 500;
+const MAX_SKU_LENGTH = 200;
 
 // Thời gian chờ giữa hai lần đồng bộ thành công hoặc thất bại.
 const POLLING_INTERVAL = 5000;
@@ -123,6 +129,9 @@ function extractErrorMessage(
     }
   }
 
+  if (error instanceof Error && !axios.isAxiosError(error) && error.message.trim()) {
+    return error.message;
+  }
   return fallback;
 }
 
@@ -224,6 +233,22 @@ export default function Warehouse1Page() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // CREATE SKU
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [bulkResult, setBulkResult] = useState<CreateWarehouse1SkusResult | null>(null);
+  const [createdSkuIds, setCreatedSkuIds] = useState<number[]>([]);
+  const [showCreatedOnly, setShowCreatedOnly] = useState(false);
+  const mutationVersion = useRef(0);
+  const canReadRef = useRef(false);
+
+  // Tự ẩn thông báo nếu tất cả SKU đều được thêm. Nếu có SKU bị bỏ qua,
+  // giữ kết quả đến khi người dùng chủ động đóng để có thời gian kiểm tra.
+  useEffect(() => {
+    if (!bulkResult || bulkResult.total_skipped > 0) return;
+    const timer = window.setTimeout(() => setBulkResult(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [bulkResult]);
+
   // ======================================================
   // AUTO REFRESH (POLLING)
   // ======================================================
@@ -253,6 +278,7 @@ export default function Warehouse1Page() {
 
       clearTimer();
       inFlight = true;
+      const requestVersion = mutationVersion.current;
       setIsRefreshing(true);
 
       try {
@@ -261,13 +287,15 @@ export default function Warehouse1Page() {
           controller.signal,
         );
 
-        if (controller.signal.aborted) return;
+        // Không để GET bắt đầu trước POST ghi đè dữ liệu vừa thêm.
+        if (controller.signal.aborted || requestVersion !== mutationVersion.current) return;
 
         if (!response.success || !Array.isArray(response.data)) {
           throw new Error(response.message || "Dữ liệu Kho 1 không hợp lệ.");
         }
 
         const nextStocks = response.data;
+        canReadRef.current = true;
         setAllStocks(nextStocks);
         setLastUpdated(new Date());
         setStatsError("");
@@ -279,14 +307,18 @@ export default function Warehouse1Page() {
             : id,
         );
       } catch (err: unknown) {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || requestVersion !== mutationVersion.current) return;
 
         // Không giữ dữ liệu kho khi Backend từ chối quyền truy cập.
         const status = axios.isAxiosError(err) ? err.response?.status : undefined;
         if (status === 401 || status === 403) {
+          canReadRef.current = false;
           setAllStocks([]);
           setLastUpdated(null);
           setSelectedSkuId(null);
+          setCreatedSkuIds([]);
+          setShowCreatedOnly(false);
+          setBulkResult(null);
         }
 
         // Với lỗi mạng tạm thời, giữ snapshot thành công gần nhất.
@@ -389,7 +421,9 @@ export default function Warehouse1Page() {
   const filteredStocks = useMemo(() => {
     const search = keyword.trim().toLowerCase();
 
-    return allStocks.filter((stock) => {
+    const createdIds = new Set(createdSkuIds);
+    const matches = allStocks.filter((stock) => {
+      if (showCreatedOnly && !createdIds.has(stock.inventory_sku_id)) return false;
       const matchesSearch =
         !search ||
         stock.inventory_sku_code.toLowerCase().includes(search) ||
@@ -415,7 +449,16 @@ export default function Warehouse1Page() {
           return true;
       }
     });
-  }, [allStocks, keyword, stockStatusFilter]);
+
+    // Ưu tiên mã SKU khớp chính xác khi tìm kiếm (kể cả SKU vừa thêm).
+    if (search) {
+      matches.sort((a, b) =>
+        Number(b.inventory_sku_code.toLowerCase() === search) -
+        Number(a.inventory_sku_code.toLowerCase() === search),
+      );
+    }
+    return matches;
+  }, [allStocks, keyword, stockStatusFilter, showCreatedOnly, createdSkuIds]);
 
   // ======================================================
   // PAGINATION
@@ -444,16 +487,20 @@ export default function Warehouse1Page() {
   // ======================================================
 
   function handleSearch(value: string) {
+    setShowCreatedOnly(false);
     setKeyword(value);
     setCurrentPage(1);
   }
 
   function handleStockStatusChange(value: StockStatusFilter) {
+    setShowCreatedOnly(false);
     setStockStatusFilter(value);
     setCurrentPage(1);
   }
 
   function resetFilters() {
+    setShowCreatedOnly(false);
+    setCreatedSkuIds([]);
     setKeyword("");
     setStockStatusFilter("ALL");
     setCurrentPage(1);
@@ -466,6 +513,34 @@ export default function Warehouse1Page() {
 
   function handleChangePage(page: number) {
     setCurrentPage(page);
+  }
+
+  // ======================================================
+  // CREATE SKU SUCCESS
+  // ======================================================
+
+  function handleCreateSuccess(result: CreateWarehouse1SkusResult) {
+    // Vô hiệu hóa snapshot GET cũ trước khi cập nhật dữ liệu vừa tạo.
+    mutationVersion.current += 1;
+    if (canReadRef.current && result.created_stocks.length > 0) {
+      setAllStocks((previous) => {
+        const byId = new Map(previous.map((stock) => [stock.inventory_sku_id, stock]));
+        for (const stock of result.created_stocks) {
+          byId.set(stock.inventory_sku_id, stock);
+        }
+        return [...byId.values()].sort((a, b) => a.inventory_sku_id - b.inventory_sku_id);
+      });
+      // Chỉ hiển thị các SKU vừa tạo để người dùng thấy ngay cả khi có nhiều trang.
+      setCreatedSkuIds(result.created_stocks.map((stock) => stock.inventory_sku_id));
+      setShowCreatedOnly(true);
+      setKeyword("");
+      setStockStatusFilter("ALL");
+      setCurrentPage(1);
+    }
+    setShowCreateModal(false);
+    setBulkResult(canReadRef.current ? result : null);
+    // Buộc GET mới chạy ngay, không chờ polling định kỳ.
+    setRefreshKey((previous) => previous + 1);
   }
 
   // ======================================================
@@ -517,6 +592,16 @@ export default function Warehouse1Page() {
           >
             <RefreshCw size={16} />
             Đặt lại bộ lọc
+          </button>
+          <button
+            type="button"
+            aria-haspopup="dialog"
+            onClick={() => setShowCreateModal(true)}
+            disabled={statsLoading || !lastUpdated}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-md shadow-blue-600/20 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <Plus size={19} />
+            Thêm mã SKU sản phẩm
           </button>
         </div>
       </div>
@@ -772,6 +857,12 @@ export default function Warehouse1Page() {
             </div>
           </div>
         </div>
+        {showCreatedOnly && (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-blue-100 bg-blue-50 px-5 py-3 text-sm text-blue-800">
+            <span>Đang hiển thị {formatNumber(createdSkuIds.length)} SKU vừa thêm.</span>
+            <button type="button" onClick={resetFilters} className="font-semibold text-blue-700 hover:underline">Xem tất cả SKU</button>
+          </div>
+        )}
         {/* ================================================== */}
         {/* INVENTORY TABLE */}
         {/* ================================================== */}
@@ -897,7 +988,11 @@ export default function Warehouse1Page() {
                   return (
                     <tr
                       key={stock.inventory_sku_id}
-                      className="transition hover:bg-slate-50/80"
+                      className={`transition ${
+                        createdSkuIds.includes(stock.inventory_sku_id)
+                          ? "bg-emerald-50/70 hover:bg-emerald-50"
+                          : "hover:bg-slate-50/80"
+                      }`}
                     >
                         {/* SKU INFORMATION */}
                         <td className="px-5 py-4">
@@ -1005,6 +1100,43 @@ export default function Warehouse1Page() {
 
         )}
       </section>
+      {showCreateModal && (
+        <CreateSkuModal
+          onClose={() => setShowCreateModal(false)}
+          onSuccess={handleCreateSuccess}
+        />
+      )}
+      {bulkResult && (
+        <div role="status" aria-live="polite" className={`fixed bottom-6 right-4 z-50 w-[calc(100%_-_2rem)] max-w-md rounded-2xl border bg-white p-4 shadow-xl sm:right-6 ${bulkResult.total_skipped ? "border-amber-200" : "border-emerald-200"}`}>
+          <div className="flex items-start gap-3">
+            <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-xl ${bulkResult.total_created ? "bg-emerald-50 text-emerald-600" : "bg-amber-50 text-amber-600"}`}>
+              {bulkResult.total_created ? <CheckCircle2 size={24} /> : <AlertCircle size={24} />}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className={`text-sm font-bold ${bulkResult.total_created ? "text-emerald-700" : "text-amber-700"}`}>
+                {bulkResult.total_created === 0 ? "Không có SKU mới" : bulkResult.total_skipped ? "Hoàn tất thêm SKU (có mã bị bỏ qua)" : "Thêm SKU thành công"}
+              </p>
+              <p className="mt-1 text-sm text-slate-600">Đã xử lý {formatNumber(bulkResult.total_requested)} mã SKU.</p>
+            </div>
+            <button type="button" aria-label="Đóng thông báo" onClick={() => setBulkResult(null)} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"><X size={17} /></button>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+            <div className="rounded-xl bg-emerald-50 p-3 text-emerald-700"><p className="text-xs">Đã thêm</p><p className="text-xl font-bold">{formatNumber(bulkResult.total_created)}</p></div>
+            <div className="rounded-xl bg-amber-50 p-3 text-amber-700"><p className="text-xs">Bỏ qua</p><p className="text-xl font-bold">{formatNumber(bulkResult.total_skipped)}</p></div>
+          </div>
+          {bulkResult.skipped_skus.length > 0 && (
+            <div className="mt-3 max-h-44 space-y-2 overflow-y-auto rounded-xl border border-amber-100 bg-amber-50/60 p-3">
+              <p className="text-xs font-semibold text-amber-800">Chi tiết mã SKU bị bỏ qua</p>
+              {bulkResult.skipped_skus.map((item, index) => (
+                <div key={`${item.sku}-${index}`} className="border-t border-amber-100 pt-2 text-xs">
+                  <p className="break-all font-semibold text-slate-700">{item.sku}</p>
+                  <p className="mt-0.5 text-amber-700">{item.reason}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {selectedStock && (
         <SerialModal
           key={selectedStock.inventory_sku_id}
@@ -1016,6 +1148,137 @@ export default function Warehouse1Page() {
         />
       )}
     </div>
+  );
+}
+
+// ======================================================
+// CREATE SKU MODAL COMPONENT
+// ======================================================
+
+function CreateSkuModal({
+  onClose,
+  onSuccess,
+}: {
+  onClose: () => void;
+  onSuccess: (result: CreateWarehouse1SkusResult) => void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const submitLock = useRef(false);
+  const requestRef = useRef<AbortController | null>(null);
+  const [skuText, setSkuText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  // Dán từ Excel (tab / xuống dòng) hoặc phân cách bằng dấu phẩy, chấm phẩy.
+  const skus = useMemo(() => skuText.split(/[\s,;]+/).map((sku) => sku.trim()).filter(Boolean), [skuText]);
+  const duplicateCount = skus.length - new Set(skus).size;
+  const invalidLength = skus.some((sku) => sku.length > MAX_SKU_LENGTH);
+
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (!dialog.open) dialog.showModal();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    inputRef.current?.focus();
+    return () => {
+      requestRef.current?.abort();
+      if (dialog.open) dialog.close();
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
+  function closeModal() {
+    if (!submitLock.current) onClose();
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (submitLock.current) return;
+    if (!skus.length || skus.length > MAX_BATCH_SIZE || invalidLength) {
+      setError(!skus.length ? "Vui lòng nhập ít nhất một SKU." : invalidLength ? `Mỗi mã SKU tối đa ${MAX_SKU_LENGTH} ký tự.` : `Tối đa ${MAX_BATCH_SIZE} SKU mỗi lần.`);
+      inputRef.current?.focus();
+      return;
+    }
+    submitLock.current = true;
+    setSubmitting(true);
+    setError("");
+    const controller = new AbortController();
+    requestRef.current = controller;
+    try {
+      // Không loại mã lặp ở FE: BE sẽ báo cáo chính xác từng mã bị bỏ qua.
+      const response = await adminInventoryService.createWarehouse1Skus({ skus }, controller.signal);
+      if (controller.signal.aborted) return;
+      if (!response.success || !response.data || !Array.isArray(response.data.created_stocks) || !Array.isArray(response.data.skipped_skus)) {
+        setError(response.message || "Kết quả thêm SKU không hợp lệ. Hãy kiểm tra danh sách kho trước khi thử lại.");
+        return;
+      }
+      onSuccess(response.data);
+    } catch (err: unknown) {
+      if (controller.signal.aborted) return;
+      const status = axios.isAxiosError(err) ? err.response?.status : undefined;
+      let fallback = "Không thể thêm SKU vào Kho 1. Vui lòng thử lại.";
+      if (status === 403) fallback = "Bạn không có quyền thêm SKU vào Kho 1.";
+      else if (status === 401) fallback = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
+      else if (status === 404) fallback = "Không tìm thấy Kho 1 hoặc API thêm nhiều SKU.";
+      else if (axios.isAxiosError(err) && !err.response) fallback = "Không nhận được phản hồi. Hãy kiểm tra danh sách kho trước khi gửi lại.";
+      setError(extractErrorMessage(err, fallback));
+    } finally {
+      submitLock.current = false;
+      requestRef.current = null;
+      if (!controller.signal.aborted) setSubmitting(false);
+    }
+  }
+
+  return (
+    <dialog
+      ref={dialogRef}
+      aria-labelledby="warehouse-create-sku-title"
+      onCancel={(event) => { event.preventDefault(); closeModal(); }}
+      onClick={(event) => { if (event.target === event.currentTarget) closeModal(); }}
+      className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-2xl overflow-auto rounded-2xl border-0 bg-transparent p-0 text-slate-800 shadow-2xl backdrop:bg-slate-900/50 backdrop:backdrop-blur-sm"
+    >
+      <form onSubmit={handleSubmit} noValidate aria-busy={submitting} className="overflow-hidden rounded-2xl bg-white">
+        <div className="flex items-start gap-3 border-b border-slate-100 p-5">
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600"><PackagePlus size={25} /></div>
+          <div className="min-w-0 flex-1">
+            <h2 id="warehouse-create-sku-title" className="text-lg font-bold text-slate-800">Thêm SKU hàng loạt</h2>
+            <p className="mt-1 text-sm text-slate-500">Đăng ký nhiều mã SKU vào Kho 1 chỉ với một thao tác.</p>
+          </div>
+          <button type="button" disabled={submitting} onClick={closeModal} aria-label="Đóng modal" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"><X size={20} /></button>
+        </div>
+        <div className="space-y-4 p-5">
+          <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <Warehouse size={21} className="shrink-0 text-blue-600" />
+            <div><p className="text-sm font-semibold text-slate-700">Kho hàng số 1</p><p className="mt-0.5 text-xs text-slate-500">Inventory ID: 1 · Branch ID: 1</p></div>
+          </div>
+          <div>
+            <label htmlFor="warehouse-bulk-skus" className="mb-2 block text-sm font-semibold text-slate-700">Danh sách mã SKU <span className="text-rose-500">*</span></label>
+            <textarea ref={inputRef} id="warehouse-bulk-skus" value={skuText} onChange={(event) => { setSkuText(event.target.value); setError(""); }} disabled={submitting} rows={7} spellCheck={false} aria-invalid={!!error || skus.length > MAX_BATCH_SIZE || invalidLength} aria-describedby="warehouse-bulk-help" placeholder={"IP17PM-256GB-CAM-VU-TRU\nIP17PM-512GB-CAM-VU-TRU\nMBA-M4-256GB"} className={`w-full resize-y rounded-xl border bg-white p-3 font-mono text-sm leading-relaxed text-slate-900 outline-none transition placeholder:text-slate-400 disabled:bg-slate-50 ${error || skus.length > MAX_BATCH_SIZE || invalidLength ? "border-rose-300 focus:border-rose-500 focus:ring-2 focus:ring-rose-100" : "border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"}`} />
+            <p id="warehouse-bulk-help" className="mt-2 text-xs leading-relaxed text-slate-500">Mỗi dòng một SKU hoặc dán trực tiếp từ một cột Excel. Hỗ trợ dấu phẩy, chấm phẩy và khoảng trắng. Tối đa 500 SKU/lần.</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-blue-700"><p className="text-xs font-medium">Đã nhập</p><p className="mt-1 text-xl font-bold">{formatNumber(skus.length)} / {MAX_BATCH_SIZE}</p></div>
+            <div className="rounded-xl border border-amber-100 bg-amber-50 p-3 text-amber-700"><p className="text-xs font-medium">Mã lặp trong danh sách</p><p className="mt-1 text-xl font-bold">{formatNumber(duplicateCount)}</p></div>
+          </div>
+          {(error || skus.length > MAX_BATCH_SIZE || invalidLength) && (
+            <div role="alert" className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-3">
+              <AlertCircle size={19} className="mt-0.5 shrink-0 text-rose-600" />
+              <div className="min-w-0"><p className="text-sm font-semibold text-rose-800">Không thể thêm SKU</p><p className="mt-1 break-words text-sm text-rose-700">{error || (invalidLength ? `Mỗi mã SKU tối đa ${MAX_SKU_LENGTH} ký tự.` : `Vui lòng giảm xuống tối đa ${MAX_BATCH_SIZE} SKU.`)}</p></div>
+            </div>
+          )}
+          <div className="flex items-start gap-2.5 rounded-xl border border-blue-100 bg-blue-50 p-3 text-blue-700"><AlertCircle size={17} className="mt-0.5 shrink-0" /><p className="text-xs leading-relaxed">SKU đã tồn tại trong Kho 1 và các mã lặp sẽ được bỏ qua. SKU mới có tồn kho ban đầu bằng 0; chưa tạo Serial Number hoặc giao dịch nhập kho.</p></div>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 bg-slate-50 p-5">
+          <button type="button" disabled={submitting} onClick={closeModal} className={BUTTON_CLASS}>Hủy bỏ</button>
+          <button type="submit" disabled={submitting || !skus.length || skus.length > MAX_BATCH_SIZE || invalidLength} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
+            {submitting ? <LoaderCircle size={17} className="animate-spin" /> : <Plus size={18} />}
+            {submitting ? "Đang thêm SKU..." : `Thêm ${formatNumber(skus.length)} SKU`}
+          </button>
+        </div>
+      </form>
+    </dialog>
   );
 }
 
