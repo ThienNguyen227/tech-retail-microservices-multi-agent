@@ -31,7 +31,7 @@ export interface Inventory extends InventoryReference {
   total_stock_quantity: number;
 }
 
-export type SerialStatus = "AVAILABLE" | "RESERVED" | "CANCELLED" | "SOLD";
+export type SerialStatus = "AVAILABLE" | "RESERVED" | "CANCELLED" | "SOLD" | "EXPORTED";
 export type TransactionType = "IMPORT" | "EXPORT" | "TRANSFER_IN" | "TRANSFER_OUT" | "ADJUSTMENT";
 
 export interface InventorySerial {
@@ -267,6 +267,77 @@ export interface UpdateWarehouse1SerialResponse {
   data: UpdateWarehouse1SerialResult;
 }
 
+// ======================================================
+// WAREHOUSE 1 EXPORT INVENTORY INTERFACES
+// ======================================================
+
+export type Warehouse1ExportType =
+  | "TRANSFER"
+  | "EXPORT";
+
+export type ExportWarehouse1InventoryRequest =
+  | {
+      type: "TRANSFER";
+      destinationBranchId: number;
+      destination?: never;
+      serialIds: number[];
+    }
+  | {
+      type: "EXPORT";
+      destination: string;
+      destinationBranchId?: never;
+      serialIds: number[];
+    };
+
+export interface Warehouse1ExportSource
+  extends InventoryReference {
+  name: string;
+}
+
+export interface Warehouse1ExportDestination {
+  inventory_id: number | null;
+  inventory_branch_id: number | null;
+  name: string;
+}
+
+export interface Warehouse1ExportItem {
+  inventory_sku_id: number;
+  inventory_sku_code: string;
+
+  quantity: number;
+
+  source_quantity_before: number;
+  source_quantity_after: number;
+
+  destination_quantity_before: number | null;
+  destination_quantity_after: number | null;
+
+  serial_ids: number[];
+  serial_numbers: string[];
+}
+
+export interface ExportWarehouse1InventoryResult {
+  type: Warehouse1ExportType;
+
+  source: Warehouse1ExportSource;
+  destination: Warehouse1ExportDestination;
+
+  total_skus: number;
+  total_serials: number;
+  total_quantity: number;
+
+  source_transaction_id: number;
+  destination_transaction_id: number | null;
+
+  items: Warehouse1ExportItem[];
+}
+
+export interface ExportWarehouse1InventoryResponse {
+  success: boolean;
+  message: string;
+  data: ExportWarehouse1InventoryResult;
+}
+
 export const adminInventoryService = {
   // ======================================================
   // 1. (GET) INVENTORY-LIST
@@ -467,6 +538,40 @@ export const adminInventoryService = {
         serialNumber: data.serialNumber?.trim(),
         status: data.status,
       },
+      {
+        signal,
+      },
+    );
+
+    return response.data;
+  },
+
+  // ======================================================
+  // 9. (POST) WAREHOUSE-1 EXPORT INVENTORY
+  // ======================================================
+
+  async exportWarehouse1Inventory(
+    data: ExportWarehouse1InventoryRequest,
+    signal?: AbortSignal,
+  ) {
+    const payload: ExportWarehouse1InventoryRequest =
+      data.type === "TRANSFER"
+        ? {
+            type: "TRANSFER",
+            destinationBranchId: data.destinationBranchId,
+            serialIds: data.serialIds,
+          }
+        : {
+            type: "EXPORT",
+            destination: data.destination.trim(),
+            serialIds: data.serialIds,
+          };
+
+    const response = await adminAxios.post<
+      ExportWarehouse1InventoryResponse
+    >(
+      `${INVENTORY_SERVICE_URL}/warehouse-1/export`,
+      payload,
       {
         signal,
       },
