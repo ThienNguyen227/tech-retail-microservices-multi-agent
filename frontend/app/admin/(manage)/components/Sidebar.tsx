@@ -8,7 +8,6 @@ import {
   Users,
   ShieldCheck,
   ChevronRight,
-  ChevronLeft,
   UserPlus,
   UserRoundPlus,
   PanelLeftClose,
@@ -17,7 +16,10 @@ import {
   UserCog,
   UserRound,
   FileText,
-   ShoppingBag,
+  ShoppingBag,
+  Warehouse,  
+  Boxes,
+  Store,
 } from "lucide-react";
 
 const menuItems = [
@@ -67,6 +69,23 @@ const menuItems = [
     title: "Quản lý đơn hàng",
     href: "/admin/manage-order",
     icon: ShoppingBag,
+  },
+  {
+    title: "Quản lý kho hàng",
+    href: "/admin/manage-inventory",
+    icon: Warehouse,
+    children: [
+      {
+        title: "Kho tổng",
+        href: "/admin/manage-inventory/central-warehouse",
+        icon: Boxes,
+      },
+      {
+        title: "Kho 1",
+        href: "/admin/manage-inventory/warehouse-1",
+        icon: Store,
+      },
+    ],
   },
 ];
 
