@@ -338,6 +338,36 @@ export interface ExportWarehouse1InventoryResponse {
   data: ExportWarehouse1InventoryResult;
 }
 
+// ======================================================
+// CENTRAL WAREHOUSE INTERFACES
+// Cùng cấu trúc request/response với Kho 1.
+// ======================================================
+
+export type CentralWarehouseSerial = Warehouse1Serial;
+export type CentralWarehouseSerialStatistics = Warehouse1SerialStatistics;
+export type CentralWarehouseStock = Warehouse1Stock;
+export type CreateCentralWarehouseSkusRequest = CreateWarehouse1SkusRequest;
+export type CentralWarehouseSkippedSku = Warehouse1SkippedSku;
+export type CreateCentralWarehouseSkusResult = CreateWarehouse1SkusResult;
+export type CreateCentralWarehouseSkusResponse = CreateWarehouse1SkusResponse;
+export type UpdateCentralWarehouseSkuRequest = UpdateWarehouse1SkuRequest;
+export type UpdateCentralWarehouseSkuResult = UpdateWarehouse1SkuResult;
+export type UpdateCentralWarehouseSkuResponse = UpdateWarehouse1SkuResponse;
+export type CreateCentralWarehouseSerialsRequest = CreateWarehouse1SerialsRequest;
+export type CentralWarehouseSkippedSerial = Warehouse1SkippedSerial;
+export type CreateCentralWarehouseSerialsResult = CreateWarehouse1SerialsResult;
+export type CreateCentralWarehouseSerialsResponse = CreateWarehouse1SerialsResponse;
+export type UpdateCentralWarehouseSerialRequest = UpdateWarehouse1SerialRequest;
+export type UpdateCentralWarehouseSerialResult = UpdateWarehouse1SerialResult;
+export type UpdateCentralWarehouseSerialResponse = UpdateWarehouse1SerialResponse;
+export type CentralWarehouseExportType = Warehouse1ExportType;
+export type ExportCentralWarehouseInventoryRequest = ExportWarehouse1InventoryRequest;
+export type CentralWarehouseExportSource = Warehouse1ExportSource;
+export type CentralWarehouseExportDestination = Warehouse1ExportDestination;
+export type CentralWarehouseExportItem = Warehouse1ExportItem;
+export type ExportCentralWarehouseInventoryResult = ExportWarehouse1InventoryResult;
+export type ExportCentralWarehouseInventoryResponse = ExportWarehouse1InventoryResponse;
+
 export const adminInventoryService = {
   // ======================================================
   // 1. (GET) INVENTORY-LIST
@@ -571,6 +601,162 @@ export const adminInventoryService = {
       ExportWarehouse1InventoryResponse
     >(
       `${INVENTORY_SERVICE_URL}/warehouse-1/export`,
+      payload,
+      {
+        signal,
+      },
+    );
+
+    return response.data;
+  },
+
+  // ======================================================
+  // 10. (GET) CENTRAL WAREHOUSE INVENTORY-LIST
+  // ======================================================
+
+  async getCentralWarehouseInventoryList(
+    search?: string,
+    signal?: AbortSignal,
+  ) {
+    const response = await adminAxios.get<
+      InventoryListResponse<CentralWarehouseStock>
+    >(
+      `${INVENTORY_SERVICE_URL}/central-warehouse/inventory-list`,
+      {
+        params: {
+          search: search?.trim() || undefined,
+        },
+        signal,
+      },
+    );
+
+    return response.data;
+  },
+
+  // ======================================================
+  // 11. (POST) CENTRAL WAREHOUSE CREATE MULTIPLE INVENTORY SKUS
+  // ======================================================
+
+  async createCentralWarehouseSkus(
+    data: CreateCentralWarehouseSkusRequest,
+    signal?: AbortSignal,
+  ) {
+    const response = await adminAxios.post<
+      CreateCentralWarehouseSkusResponse
+    >(
+      `${INVENTORY_SERVICE_URL}/central-warehouse/inventory-skus`,
+      {
+        skus: data.skus.map((sku) => sku.trim()),
+      },
+      {
+        signal,
+      },
+    );
+
+    return response.data;
+  },
+
+  // ======================================================
+  // 12. (PATCH) CENTRAL WAREHOUSE UPDATE INVENTORY SKU
+  // ======================================================
+
+  async updateCentralWarehouseSku(
+    skuId: number,
+    data: UpdateCentralWarehouseSkuRequest,
+    signal?: AbortSignal,
+  ) {
+    const response = await adminAxios.patch<
+      UpdateCentralWarehouseSkuResponse
+    >(
+      `${INVENTORY_SERVICE_URL}/central-warehouse/inventory-skus/${skuId}`,
+      {
+        sku: data.sku.trim(),
+      },
+      {
+        signal,
+      },
+    );
+
+    return response.data;
+  },
+
+  // ======================================================
+  // 13. (POST) CENTRAL WAREHOUSE CREATE MULTIPLE INVENTORY SERIALS
+  // ======================================================
+  async createCentralWarehouseSerials(
+    skuId: number,
+    data: CreateCentralWarehouseSerialsRequest,
+    signal?: AbortSignal,
+  ) {
+    const response = await adminAxios.post<
+      CreateCentralWarehouseSerialsResponse
+    >(
+      `${INVENTORY_SERVICE_URL}/central-warehouse/inventory-skus/${skuId}/serials`,
+      {
+        serialNumbers: data.serialNumbers.map(
+          (serial) => serial.trim(),
+        ),
+
+        source: data.source?.trim() || undefined,
+      },
+      {
+        signal,
+      },
+    );
+
+    return response.data;
+  },
+
+  // ======================================================
+  // 14. (PATCH) CENTRAL WAREHOUSE UPDATE INVENTORY SERIAL
+  // ======================================================
+
+  async updateCentralWarehouseSerial(
+    serialId: number,
+    data: UpdateCentralWarehouseSerialRequest,
+    signal?: AbortSignal,
+  ) {
+    const response = await adminAxios.patch<
+      UpdateCentralWarehouseSerialResponse
+    >(
+      `${INVENTORY_SERVICE_URL}/central-warehouse/inventory-serials/${serialId}`,
+      {
+        serialNumber: data.serialNumber?.trim(),
+        status: data.status,
+      },
+      {
+        signal,
+      },
+    );
+
+    return response.data;
+  },
+
+  // ======================================================
+  // 15. (POST) CENTRAL WAREHOUSE EXPORT INVENTORY
+  // ======================================================
+
+  async exportCentralWarehouseInventory(
+    data: ExportCentralWarehouseInventoryRequest,
+    signal?: AbortSignal,
+  ) {
+    const payload: ExportCentralWarehouseInventoryRequest =
+      data.type === "TRANSFER"
+        ? {
+            type: "TRANSFER",
+            destinationBranchId: data.destinationBranchId,
+            serialIds: data.serialIds,
+          }
+        : {
+            type: "EXPORT",
+            destination: data.destination.trim(),
+            serialIds: data.serialIds,
+          };
+
+    const response = await adminAxios.post<
+      ExportCentralWarehouseInventoryResponse
+    >(
+      `${INVENTORY_SERVICE_URL}/central-warehouse/export`,
       payload,
       {
         signal,

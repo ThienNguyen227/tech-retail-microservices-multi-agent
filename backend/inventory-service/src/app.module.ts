@@ -6,6 +6,7 @@ import { RestoreModule } from './inventories/restore/restore.module';
 
 import { InventoryListModule } from './admin_session/inventory_list/inventory_list.module';
 import { Warehouse1Module } from './admin_session/warehouse_1/warehouse_1.module';
+import { CentralWarehouseModule } from './admin_session/central_warehouse/central_warehouse.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { Warehouse1Module } from './admin_session/warehouse_1/warehouse_1.module
     // ADMIN-SESSION
     InventoryListModule,
     Warehouse1Module,
+    CentralWarehouseModule,
   ],
   controllers: [],
   providers: [],
