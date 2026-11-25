@@ -20,6 +20,7 @@ import {
   ArrayMinSize,
   ArrayMaxSize,
   MaxLength,
+  IsIn,
 } from 'class-validator';
 
 import { Warehouse1Service } from './warehouse_1.service';
@@ -117,6 +118,32 @@ class CreateWarehouse1SerialsDto {
   })
   @MaxLength(255)
   source?: string;
+}
+
+// ======================================================
+// 5. DTO: UPDATE WAREHOUSE 1 SERIAL NUMBER
+// ======================================================
+
+class UpdateWarehouse1SerialDto {
+  @IsOptional()
+  @IsString({
+    message: 'Serial Number phải là chuỗi ký tự.',
+  })
+  @IsNotEmpty({
+    message: 'Serial Number không được để trống.',
+  })
+  @MaxLength(200, {
+    message: 'Serial Number tối đa 200 ký tự.',
+  })
+  serialNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['AVAILABLE', 'CANCELLED'], {
+    message:
+      'Chỉ cho phép cập nhật trạng thái AVAILABLE hoặc CANCELLED.',
+  })
+  status?: 'AVAILABLE' | 'CANCELLED';
 }
 
 // ======================================================
@@ -239,6 +266,36 @@ export class Warehouse1Controller {
       skuId,
       dto.serialNumbers,
       dto.source,
+    );
+  }
+
+  // ======================================================
+  // 5. (PATCH) UPDATE INVENTORY SERIAL NUMBER
+  // ======================================================
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('inventory-serials/:serialId')
+  updateInventorySerial(
+    @Headers('authorization') authorization: string,
+    @Param('serialId', ParseIntPipe) serialId: number,
+    @Body() dto: UpdateWarehouse1SerialDto,
+  ) {
+    const accessToken = authorization?.replace(
+      /^Bearer\s+/i,
+      '',
+    );
+
+    if (!accessToken) {
+      throw new UnauthorizedException(
+        'Thiếu access token.',
+      );
+    }
+
+    return this.warehouse1Service.updateInventorySerial(
+      accessToken,
+      serialId,
+      dto.serialNumber,
+      dto.status,
     );
   }
 }

@@ -1539,4 +1539,512 @@ export class Warehouse1Service {
       );
     }
   }
+
+  // ======================================================
+  // 5. (PATCH) UPDATE INVENTORY SERIAL NUMBER
+  // ======================================================
+
+  async updateInventorySerial(
+    accessToken: string,
+    serialId: number,
+    serialNumber?: string,
+    status?: 'AVAILABLE' | 'CANCELLED',
+  ) {
+    // =========================================
+    // 1. CHECK PERMISSION
+    // =========================================
+
+    await this.checkPermission(
+      accessToken,
+      'ware-house-1-update-serial:update',
+    );
+
+    // =========================================
+    // 2. VALIDATE INPUT
+    // =========================================
+
+    if (!Number.isSafeInteger(serialId) || serialId <= 0) {
+      throw new BadRequestException(
+        'Serial ID không hợp lệ.',
+      );
+    }
+
+    if (
+      serialNumber === undefined &&
+      status === undefined
+    ) {
+      throw new BadRequestException(
+        'Phải cung cấp ít nhất một trường cần cập nhật.',
+      );
+    }
+
+    if (
+      serialNumber !== undefined &&
+      (
+        typeof serialNumber !== 'string' ||
+        !serialNumber.trim() ||
+        serialNumber.trim().length > 200
+      )
+    ) {
+      throw new BadRequestException(
+        'Serial Number không hợp lệ.',
+      );
+    }
+
+    if (
+      status !== undefined &&
+      !['AVAILABLE', 'CANCELLED'].includes(status)
+    ) {
+      throw new BadRequestException(
+        'Trạng thái Serial Number không hợp lệ.',
+      );
+    }
+
+    try {
+      // =========================================
+      // 3. DATABASE TRANSACTION
+      // =========================================
+
+      const result = await this.prisma.$transaction(
+        async (tx) => {
+
+          // -------------------------------------
+          // 3.1. CHECK SERIAL IN WAREHOUSE 1
+          // -------------------------------------
+
+          const currentSerial =
+            await tx.inventorySkuSerial.findFirst({
+              where: {
+                inventory_sku_serial_id: serialId,
+
+                inventory_id: this.inventoryId,
+
+                inventory: {
+                  is: {
+                    inventory_branch_id: this.branchId,
+                  },
+                },
+              },
+
+              include: {
+                status: true,
+                sku: true,
+              },
+            });
+
+          if (!currentSerial) {
+            throw new NotFoundException(
+              'Không tìm thấy Serial Number trong Kho 1.',
+            );
+          }
+
+          const skuId =
+            currentSerial.inventory_sku_id;
+
+          const oldSerialNumber =
+            currentSerial.inventory_sku_serial_number;
+
+          const oldStatusCode =
+            currentSerial.status
+              .inventory_sku_serial_status_code;
+
+          // -------------------------------------
+          // 3.2. CHECK RESERVED AND SOLD STATUS
+          // -------------------------------------
+
+          if (
+            !['AVAILABLE', 'CANCELLED'].includes(
+              oldStatusCode,
+            )
+          ) {
+            throw new ConflictException(
+              'Không thể chỉnh sửa Serial Number ' +
+              'đang được đặt, đã bán hoặc có trạng thái không hỗ trợ.',
+            );
+          }
+
+          // -------------------------------------
+          // 3.3. PREPARE NEW VALUES
+          // -------------------------------------
+
+          const newSerialNumber =
+            serialNumber?.trim() ?? oldSerialNumber;
+
+          const newStatusCode =
+            status ?? oldStatusCode;
+
+          const serialChanged =
+            newSerialNumber !== oldSerialNumber;
+
+          const statusChanged =
+            newStatusCode !== oldStatusCode;
+
+          if (!serialChanged && !statusChanged) {
+            throw new BadRequestException(
+              'Không có dữ liệu nào được thay đổi.',
+            );
+          }
+
+          // -------------------------------------
+          // 3.4. LOCK INVENTORY STOCK
+          // -------------------------------------
+
+          // Khóa bản ghi tồn kho để hạn chế xung đột
+          // với nghiệp vụ nhập hàng và đặt hàng.
+
+          const lockedStocks = await tx.$queryRaw<
+            { inventory_stock_quantity: number }[]
+          >`
+            SELECT inventory_stock_quantity
+            FROM inventory_stock
+            WHERE inventory_id = ${this.inventoryId}
+            AND inventory_sku_id = ${skuId}
+            FOR UPDATE
+          `;
+
+          if (lockedStocks.length === 0) {
+            throw new NotFoundException(
+              'Không tìm thấy dữ liệu tồn kho của SKU.',
+            );
+          }
+
+          const quantityBefore =
+            lockedStocks[0].inventory_stock_quantity;
+
+          let quantityAfter = quantityBefore;
+
+          // -------------------------------------
+          // 3.5. CHECK DUPLICATE SERIAL NUMBER
+          // -------------------------------------
+
+          if (serialChanged) {
+            const duplicateSerial =
+              await tx.inventorySkuSerial.findUnique({
+                where: {
+                  inventory_sku_serial_number:
+                    newSerialNumber,
+                },
+              });
+
+            if (
+              duplicateSerial &&
+              duplicateSerial.inventory_sku_serial_id !==
+                serialId
+            ) {
+              throw new ConflictException(
+                `Serial Number "${newSerialNumber}" ` +
+                'đã tồn tại trong hệ thống.',
+              );
+            }
+          }
+
+          // -------------------------------------
+          // 3.6. GET NEW SERIAL STATUS
+          // -------------------------------------
+
+          const newStatus =
+            await tx.inventorySkuSerialStatus.findUnique({
+              where: {
+                inventory_sku_serial_status_code:
+                  newStatusCode,
+              },
+            });
+
+          if (!newStatus) {
+            throw new NotFoundException(
+              `Không tìm thấy trạng thái "${newStatusCode}".`,
+            );
+          }
+
+          // -------------------------------------
+          // 3.7. CALCULATE STOCK ADJUSTMENT
+          // -------------------------------------
+
+          let quantityChange = 0;
+
+          if (
+            oldStatusCode === 'AVAILABLE' &&
+            newStatusCode === 'CANCELLED'
+          ) {
+            quantityChange = -1;
+          }
+
+          if (
+            oldStatusCode === 'CANCELLED' &&
+            newStatusCode === 'AVAILABLE'
+          ) {
+            quantityChange = 1;
+          }
+
+          // -------------------------------------
+          // 3.8. CHECK STOCK CONSISTENCY
+          // -------------------------------------
+
+          if (quantityChange !== 0) {
+            const availableSerialCount =
+              await tx.inventorySkuSerial.count({
+                where: {
+                  inventory_id: this.inventoryId,
+
+                  inventory_sku_id: skuId,
+
+                  status: {
+                    is: {
+                      inventory_sku_serial_status_code:
+                        'AVAILABLE',
+                    },
+                  },
+                },
+              });
+
+            if (quantityBefore !== availableSerialCount) {
+              throw new ConflictException(
+                'Số lượng tồn kho không khớp với số Serial AVAILABLE. ' +
+                'Vui lòng kiểm tra lại dữ liệu kho.',
+              );
+            }
+          }
+
+          if (quantityBefore + quantityChange < 0) {
+            throw new ConflictException(
+              'Không thể cập nhật vì tồn kho sẽ bị âm.',
+            );
+          }
+
+          // -------------------------------------
+          // 3.9. UPDATE INVENTORY STOCK
+          // -------------------------------------
+
+          if (quantityChange !== 0) {
+            const updatedStock =
+              await tx.inventoryStock.update({
+                where: {
+                  inventory_id_inventory_sku_id: {
+                    inventory_id: this.inventoryId,
+
+                    inventory_sku_id: skuId,
+                  },
+                },
+
+                data: {
+                  inventory_stock_quantity: {
+                    increment: quantityChange,
+                  },
+                },
+              });
+
+            quantityAfter =
+              updatedStock.inventory_stock_quantity;
+          }
+
+          // -------------------------------------
+          // 3.10. UPDATE SERIAL NUMBER
+          // -------------------------------------
+
+          const updateResult =
+            await tx.inventorySkuSerial.updateMany({
+              where: {
+                inventory_sku_serial_id: serialId,
+
+                inventory_id: this.inventoryId,
+
+                inventory_sku_id: skuId,
+
+                inventory_sku_serial_number:
+                  oldSerialNumber,
+
+                inventory_sku_serial_status_id:
+                  currentSerial.inventory_sku_serial_status_id,
+              },
+
+              data: {
+                inventory_sku_serial_number:
+                  newSerialNumber,
+
+                inventory_sku_serial_status_id:
+                  newStatus.inventory_sku_serial_status_id,
+              },
+            });
+
+          if (updateResult.count !== 1) {
+            throw new ConflictException(
+              'Dữ liệu Serial Number đã thay đổi. ' +
+              'Vui lòng tải lại và thử lại.',
+            );
+          }
+
+          const updatedSerial =
+            await tx.inventorySkuSerial.findUniqueOrThrow({
+              where: {
+                inventory_sku_serial_id: serialId,
+              },
+
+              include: {
+                status: true,
+              },
+            });
+
+          // -------------------------------------
+          // 3.11. CREATE ADJUSTMENT TRANSACTION
+          // -------------------------------------
+
+          let transactionId: number | null = null;
+
+          if (quantityChange !== 0) {
+            const adjustmentType =
+              await tx.inventoryTransactionType.findUnique({
+                where: {
+                  inventory_transaction_type_code:
+                    'ADJUSTMENT',
+                },
+              });
+
+            if (!adjustmentType) {
+              throw new InternalServerErrorException(
+                'Không tìm thấy loại giao dịch ADJUSTMENT.',
+              );
+            }
+
+            const transaction =
+              await tx.inventoryTransaction.create({
+                data: {
+                  inventory_id: this.inventoryId,
+
+                  inventory_transaction_type_id:
+                    adjustmentType.inventory_transaction_type_id,
+
+                  inventory_transaction_from:
+                    `Serial #${serialId}: ${oldStatusCode}`,
+
+                  inventory_transaction_to:
+                    `Serial #${serialId}: ${newStatusCode}`,
+
+                  items: {
+                    create: {
+                      inventory_sku_id: skuId,
+
+                      inventory_transaction_item_quantity:
+                        Math.abs(quantityChange),
+
+                      inventory_transaction_item_before:
+                        quantityBefore,
+
+                      inventory_transaction_item_after:
+                        quantityAfter,
+                    },
+                  },
+                },
+              });
+
+            transactionId =
+              transaction.inventory_transaction_id;
+          }
+
+          // -------------------------------------
+          // 3.12. FORMAT RESPONSE DATA
+          // -------------------------------------
+
+          return {
+            inventory_id: this.inventoryId,
+
+            inventory_branch_id: this.branchId,
+
+            inventory_sku_id: skuId,
+
+            inventory_sku_code:
+              currentSerial.sku.inventory_sku_code,
+
+            old_serial_number: oldSerialNumber,
+
+            new_serial_number: newSerialNumber,
+
+            old_status: oldStatusCode,
+
+            new_status: newStatusCode,
+
+            quantity_change: quantityChange,
+
+            inventory_stock_quantity_before:
+              quantityBefore,
+
+            inventory_stock_quantity_after:
+              quantityAfter,
+
+            inventory_transaction_id:
+              transactionId,
+
+            serial: updatedSerial,
+          };
+        },
+
+        {
+          isolationLevel:
+            Prisma.TransactionIsolationLevel.Serializable,
+
+          timeout: 15000,
+        },
+      );
+
+      // =========================================
+      // 4. RETURN RESPONSE
+      // =========================================
+
+      return {
+        success: true,
+
+        message:
+          `Cập nhật Serial Number ` +
+          `"${result.new_serial_number}" thành công.`,
+
+        data: result,
+      };
+
+    } catch (error) {
+
+      // =========================================
+      // 5. HANDLE HTTP EXCEPTION
+      // =========================================
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      // =========================================
+      // 6. HANDLE PRISMA ERROR
+      // =========================================
+
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError
+      ) {
+        if (error.code === 'P2002') {
+          throw new ConflictException(
+            'Serial Number đã tồn tại trong hệ thống.',
+          );
+        }
+
+        if (
+          error.code === 'P2034' ||
+          error.code === 'P2025'
+        ) {
+          throw new ConflictException(
+            'Dữ liệu kho đang được cập nhật bởi thao tác khác. ' +
+            'Vui lòng tải lại và thử lại.',
+          );
+        }
+      }
+
+      // =========================================
+      // 7. HANDLE DATABASE ERROR
+      // =========================================
+
+      console.error(
+        'UPDATE WAREHOUSE 1 SERIAL ERROR:',
+        error,
+      );
+
+      throw new InternalServerErrorException(
+        'Không thể cập nhật Serial Number trong Kho 1.',
+      );
+    }
+  }
 }
