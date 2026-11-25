@@ -4,6 +4,10 @@ import {
   UnauthorizedException,
   ForbiddenException,
   ServiceUnavailableException,
+  BadRequestException,
+  ConflictException,
+  NotFoundException,
+  HttpException,
 } from '@nestjs/common';
 
 import axios from 'axios';
@@ -25,18 +29,15 @@ export class Warehouse1Service {
   private readonly branchId = 1;
 
   // ======================================================
-  // 1. (GET) INVENTORY LIST
+  // CHECK PERMISSION
   // ======================================================
 
-  async getInventoryList(
+  private async checkPermission(
     accessToken: string,
-    search?: string,
-  ) {
-    // =========================================
-    // 1. CHECK PERMISSION THROUGH USER-SERVICE
-    // =========================================
-
-    const userServiceUrl = process.env.USER_SERVICE_URL;
+    permissionName: string,
+  ): Promise<void> {
+    const userServiceUrl =
+      process.env.USER_SERVICE_URL?.replace(/\/+$/, '');
 
     if (!userServiceUrl) {
       throw new ServiceUnavailableException(
@@ -52,7 +53,7 @@ export class Warehouse1Service {
       }>(
         `${userServiceUrl}/api/v1/admin-session/user-service/check-permission`,
         {
-          permission_name: 'ware-house-1:read',
+          permission_name: permissionName,
         },
         {
           headers: {
@@ -74,7 +75,7 @@ export class Warehouse1Service {
 
         if (error.response?.status === 403) {
           throw new ForbiddenException(
-            'Bạn không có quyền kiểm tra quyền truy cập.',
+            'Bạn không có quyền thực hiện thao tác này.',
           );
         }
       }
@@ -86,20 +87,34 @@ export class Warehouse1Service {
 
     if (allowed !== true) {
       throw new ForbiddenException(
-        'Bạn không có quyền xem thông tin Kho 1.',
+        'Bạn không có quyền thực hiện thao tác này tại Kho 1.',
       );
     }
+  }
 
+  // ======================================================
+  // 1. (GET) INVENTORY LIST
+  // ======================================================
+
+  async getInventoryList(
+    accessToken: string,
+    search?: string,
+  ) {
     // =========================================
-    // 2. GET WAREHOUSE 1 INVENTORY LIST
+    // 1. CHECK PERMISSION
     // =========================================
+
+    await this.checkPermission(
+      accessToken,
+      'ware-house-1:read',
+    );
 
     try {
       const keyword = search?.trim();
 
-      // -------------------------------------
-      // 2.1. SERIAL CONDITION
-      // -------------------------------------
+      // =========================================
+      // 2. SERIAL CONDITION
+      // =========================================
 
       const serialWhere: Prisma.InventorySkuSerialWhereInput = {
         inventory_id: this.inventoryId,
@@ -111,9 +126,9 @@ export class Warehouse1Service {
         },
       };
 
-      // -------------------------------------
-      // 2.2. STOCK CONDITION
-      // -------------------------------------
+      // =========================================
+      // 3. STOCK CONDITION
+      // =========================================
 
       const where: Prisma.InventoryStockWhereInput = {
         // Cố định Kho 1
@@ -158,9 +173,9 @@ export class Warehouse1Service {
         }),
       };
 
-      // -------------------------------------
-      // 2.3. QUERY INVENTORY STOCK
-      // -------------------------------------
+      // =========================================
+      // 4. QUERY INVENTORY STOCK
+      // =========================================
 
       const stocks =
         await this.prisma.inventoryStock.findMany({
@@ -213,7 +228,7 @@ export class Warehouse1Service {
         });
 
       // =========================================
-      // 3. FORMAT RESPONSE DATA
+      // 5. FORMAT RESPONSE DATA
       // =========================================
 
       const data = stocks.map((stock) => {
@@ -275,7 +290,7 @@ export class Warehouse1Service {
       });
 
       // =========================================
-      // 4. RETURN RESULT
+      // 6. RETURN RESULT
       // =========================================
 
       return {
@@ -293,6 +308,392 @@ export class Warehouse1Service {
 
       throw new InternalServerErrorException(
         'Không thể lấy danh sách tồn kho Kho 1.',
+      );
+    }
+  }
+  
+  // ======================================================
+  // 2. (POST) CREATE MULTIPLE INVENTORY SKUS
+  // ======================================================
+
+  async createInventorySkus(
+    accessToken: string,
+    skus: string[],
+  ) {
+    // =========================================
+    // 1. CHECK PERMISSION
+    // =========================================
+
+    await this.checkPermission(
+      accessToken,
+      'ware-house-1-add-skus:create',
+    );
+
+    // =========================================
+    // 2. VALIDATE SKU LIST
+    // =========================================
+
+    if (!Array.isArray(skus) || skus.length === 0) {
+      throw new BadRequestException(
+        'Danh sách SKU không được để trống.',
+      );
+    }
+
+    if (skus.length > 500) {
+      throw new BadRequestException(
+        'Chỉ được thêm tối đa 500 SKU mỗi lần.',
+      );
+    }
+
+    if (
+      skus.some(
+        (sku) =>
+          typeof sku !== 'string' ||
+          !sku.trim() ||
+          sku.trim().length > 200,
+      )
+    ) {
+      throw new BadRequestException(
+        'Danh sách chứa mã SKU không hợp lệ.',
+      );
+    }
+
+    // =========================================
+    // 3. NORMALIZE AND REMOVE DUPLICATE INPUT
+    // =========================================
+
+    const normalizedSkus = skus.map(
+      (sku) => sku.trim(),
+    );
+
+    const skuSet = new Set<string>();
+
+    const skippedSkus: {
+      sku: string;
+      reason: string;
+    }[] = [];
+
+    for (const sku of normalizedSkus) {
+      if (skuSet.has(sku)) {
+        skippedSkus.push({
+          sku,
+          reason: 'Mã SKU bị lặp trong danh sách yêu cầu.',
+        });
+
+        continue;
+      }
+
+      skuSet.add(sku);
+    }
+
+    const uniqueSkus = [...skuSet].sort();
+
+    try {
+      // =========================================
+      // 4. DATABASE TRANSACTION
+      // =========================================
+
+      const result = await this.prisma.$transaction(
+        async (tx) => {
+
+          // -------------------------------------
+          // 4.1. CHECK WAREHOUSE 1
+          // -------------------------------------
+
+          const inventory =
+            await tx.inventory.findFirst({
+              where: {
+                inventory_id: this.inventoryId,
+                inventory_branch_id: this.branchId,
+              },
+
+              select: {
+                inventory_id: true,
+                inventory_branch_id: true,
+              },
+            });
+
+          if (!inventory) {
+            throw new NotFoundException(
+              'Không tìm thấy Kho 1.',
+            );
+          }
+
+          // -------------------------------------
+          // 4.2. CREATE MISSING INVENTORY SKUS
+          // -------------------------------------
+
+          // SKU đã tồn tại trong inventory_sku
+          // sẽ được tự động bỏ qua.
+
+          await tx.inventorySku.createMany({
+            data: uniqueSkus.map((skuCode) => ({
+              inventory_sku_code: skuCode,
+            })),
+
+            skipDuplicates: true,
+          });
+
+          // -------------------------------------
+          // 4.3. GET INVENTORY SKU IDS
+          // -------------------------------------
+
+          const inventorySkus =
+            await tx.inventorySku.findMany({
+              where: {
+                inventory_sku_code: {
+                  in: uniqueSkus,
+                },
+              },
+
+              select: {
+                inventory_sku_id: true,
+                inventory_sku_code: true,
+              },
+
+              orderBy: {
+                inventory_sku_id: 'asc',
+              },
+            });
+
+          // -------------------------------------
+          // 4.4. BULK CREATE INVENTORY STOCK
+          // -------------------------------------
+
+          // Khóa chính kết hợp:
+          // inventory_id + inventory_sku_id
+          //
+          // Nếu SKU đã tồn tại trong Kho 1,
+          // skipDuplicates sẽ bỏ qua bản ghi đó.
+
+          const createdStocks =
+            await tx.inventoryStock.createManyAndReturn({
+              data: inventorySkus.map((sku) => ({
+                inventory_id: this.inventoryId,
+
+                inventory_sku_id:
+                  sku.inventory_sku_id,
+
+                inventory_stock_quantity: 0,
+              })),
+
+              skipDuplicates: true,
+
+              select: {
+                inventory_sku_id: true,
+              },
+            });
+
+          // -------------------------------------
+          // 4.5. IDENTIFY CREATED AND SKIPPED SKUS
+          // -------------------------------------
+
+          const createdSkuIds = new Set(
+            createdStocks.map(
+              (stock) => stock.inventory_sku_id,
+            ),
+          );
+
+          for (const sku of inventorySkus) {
+            if (
+              !createdSkuIds.has(
+                sku.inventory_sku_id,
+              )
+            ) {
+              skippedSkus.push({
+                sku: sku.inventory_sku_code,
+
+                reason:
+                  'SKU đã tồn tại trong Kho 1.',
+              });
+            }
+          }
+
+          // -------------------------------------
+          // 4.6. GET NEWLY CREATED STOCK DETAILS
+          // -------------------------------------
+
+          const stocks =
+            await tx.inventoryStock.findMany({
+              where: {
+                inventory_id: this.inventoryId,
+
+                inventory: {
+                  is: {
+                    inventory_branch_id:
+                      this.branchId,
+                  },
+                },
+
+                inventory_sku_id: {
+                  in: [...createdSkuIds],
+                },
+              },
+
+              select: {
+                inventory_id: true,
+                inventory_sku_id: true,
+                inventory_stock_quantity: true,
+
+                sku: {
+                  select: {
+                    inventory_sku_code: true,
+
+                    serials: {
+                      where: {
+                        inventory_id:
+                          this.inventoryId,
+                      },
+
+                      select: {
+                        inventory_sku_serial_id: true,
+                        inventory_sku_serial_number: true,
+                        inventory_sku_serial_status_id: true,
+
+                        inventory_id: true,
+                        inventory_sku_id: true,
+
+                        status: {
+                          select: {
+                            inventory_sku_serial_status_id: true,
+                            inventory_sku_serial_status_code: true,
+                            inventory_sku_serial_status_name: true,
+                          },
+                        },
+                      },
+
+                      orderBy: {
+                        inventory_sku_serial_id: 'asc',
+                      },
+                    },
+                  },
+                },
+              },
+
+              orderBy: {
+                inventory_sku_id: 'asc',
+              },
+            });
+
+          // -------------------------------------
+          // 4.7. FORMAT CREATED STOCKS
+          // -------------------------------------
+
+          const createdStockDetails = stocks.map(
+            (stock) => {
+              const serials = stock.sku.serials;
+
+              return {
+                inventory_id: stock.inventory_id,
+
+                inventory_branch_id:
+                  inventory.inventory_branch_id,
+
+                inventory_sku_id:
+                  stock.inventory_sku_id,
+
+                inventory_sku_code:
+                  stock.sku.inventory_sku_code,
+
+                inventory_stock_quantity:
+                  stock.inventory_stock_quantity,
+
+                serial_statistics: {
+                  total: serials.length,
+
+                  available: serials.filter(
+                    (serial) =>
+                      serial.status
+                        .inventory_sku_serial_status_code ===
+                      'AVAILABLE',
+                  ).length,
+
+                  reserved: serials.filter(
+                    (serial) =>
+                      serial.status
+                        .inventory_sku_serial_status_code ===
+                      'RESERVED',
+                  ).length,
+
+                  cancelled: serials.filter(
+                    (serial) =>
+                      serial.status
+                        .inventory_sku_serial_status_code ===
+                      'CANCELLED',
+                  ).length,
+
+                  sold: serials.filter(
+                    (serial) =>
+                      serial.status
+                        .inventory_sku_serial_status_code ===
+                      'SOLD',
+                  ).length,
+                },
+
+                serials,
+              };
+            },
+          );
+
+          // -------------------------------------
+          // 4.8. RETURN TRANSACTION RESULT
+          // -------------------------------------
+
+          return {
+            total_requested: normalizedSkus.length,
+
+            total_created: createdStockDetails.length,
+
+            total_skipped: skippedSkus.length,
+
+            created_skus: createdStockDetails.map(
+              (stock) => stock.inventory_sku_code,
+            ),
+
+            created_stocks: createdStockDetails,
+
+            skipped_skus: skippedSkus,
+          };
+        },
+
+        {
+          isolationLevel:
+            Prisma.TransactionIsolationLevel.ReadCommitted,
+
+          timeout: 15000,
+        },
+      );
+
+      // =========================================
+      // 5. RETURN RESPONSE
+      // =========================================
+
+      return {
+        success: true,
+
+        message:
+          `Đã thêm ${result.total_created} SKU vào Kho 1, ` +
+          `bỏ qua ${result.total_skipped} SKU.`,
+
+        data: result,
+      };
+
+    } catch (error) {
+      // =========================================
+      // 6. HANDLE HTTP EXCEPTION
+      // =========================================
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      console.error(
+        'CREATE MULTIPLE WAREHOUSE 1 SKUS ERROR:',
+        error,
+      );
+
+      throw new InternalServerErrorException(
+        'Không thể thêm danh sách SKU vào Kho 1.',
       );
     }
   }
