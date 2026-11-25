@@ -28,6 +28,8 @@ import {
   ScanBarcode,
   Plus,
   PackagePlus,
+  Pencil,
+  Save,
 } from "lucide-react";
 
 import axios from "axios";
@@ -38,6 +40,7 @@ import {
   type Warehouse1Serial,
   type SerialStatus,
   type CreateWarehouse1SkusResult,
+  type UpdateWarehouse1SkuResult,
 } from "@/lib/axios/services/admin-services/inventory_service";
 
 // ======================================================
@@ -238,6 +241,9 @@ export default function Warehouse1Page() {
   const [bulkResult, setBulkResult] = useState<CreateWarehouse1SkusResult | null>(null);
   const [createdSkuIds, setCreatedSkuIds] = useState<number[]>([]);
   const [showCreatedOnly, setShowCreatedOnly] = useState(false);
+  // UPDATE SKU: giữ ID và mã gốc, lấy số lượng/Serial từ snapshot mới nhất.
+  const [editingSku, setEditingSku] = useState<{ id: number; code: string } | null>(null);
+  const [updateToast, setUpdateToast] = useState<{ id: number; message: string } | null>(null);
   const mutationVersion = useRef(0);
   const canReadRef = useRef(false);
 
@@ -248,6 +254,12 @@ export default function Warehouse1Page() {
     const timer = window.setTimeout(() => setBulkResult(null), 5000);
     return () => window.clearTimeout(timer);
   }, [bulkResult]);
+
+  useEffect(() => {
+    if (!updateToast) return;
+    const timer = window.setTimeout(() => setUpdateToast(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [updateToast]);
 
   // ======================================================
   // AUTO REFRESH (POLLING)
@@ -287,7 +299,7 @@ export default function Warehouse1Page() {
           controller.signal,
         );
 
-        // Không để GET bắt đầu trước POST ghi đè dữ liệu vừa thêm.
+        // Không để GET bắt đầu trước POST/PATCH ghi đè dữ liệu vừa thay đổi.
         if (controller.signal.aborted || requestVersion !== mutationVersion.current) return;
 
         if (!response.success || !Array.isArray(response.data)) {
@@ -319,6 +331,9 @@ export default function Warehouse1Page() {
           setCreatedSkuIds([]);
           setShowCreatedOnly(false);
           setBulkResult(null);
+          setEditingSku(null);
+          setShowCreateModal(false);
+          setUpdateToast(null);
         }
 
         // Với lỗi mạng tạm thời, giữ snapshot thành công gần nhất.
@@ -365,6 +380,10 @@ export default function Warehouse1Page() {
   const selectedStock = useMemo(
     () => allStocks.find((stock) => stock.inventory_sku_id === selectedSkuId),
     [allStocks, selectedSkuId],
+  );
+
+  const editingStock = allStocks.find(
+    (stock) => stock.inventory_sku_id === editingSku?.id,
   );
 
   // ======================================================
@@ -540,6 +559,40 @@ export default function Warehouse1Page() {
     setShowCreateModal(false);
     setBulkResult(canReadRef.current ? result : null);
     // Buộc GET mới chạy ngay, không chờ polling định kỳ.
+    setRefreshKey((previous) => previous + 1);
+  }
+
+  // ======================================================
+  // UPDATE SKU SUCCESS
+  // ======================================================
+
+  function handleUpdateSuccess(result: UpdateWarehouse1SkuResult, message: string) {
+    // Loại bỏ snapshot GET đã bắt đầu trước khi PATCH hoàn tất.
+    mutationVersion.current += 1;
+    if (canReadRef.current) {
+      const { old_inventory_sku_id, old_inventory_sku_code, ...updatedStock } = result;
+      setAllStocks((previous) => {
+        const byId = new Map(previous.map((stock) => [stock.inventory_sku_id, stock]));
+        byId.delete(old_inventory_sku_id);
+        byId.set(updatedStock.inventory_sku_id, updatedStock);
+        return [...byId.values()].sort((a, b) => a.inventory_sku_id - b.inventory_sku_id);
+      });
+      // Đồng bộ các ID của bộ lọc SKU vừa thêm nếu ID đã thay đổi.
+      setCreatedSkuIds((ids) => [...new Set(ids.map((id) =>
+        id === old_inventory_sku_id ? updatedStock.inventory_sku_id : id,
+      ))]);
+      setSelectedSkuId(null);
+      setShowCreatedOnly(false);
+      setKeyword(updatedStock.inventory_sku_code);
+      setStockStatusFilter("ALL");
+      setCurrentPage(1);
+      setUpdateToast({
+        id: updatedStock.inventory_sku_id,
+        message: message || `Đã cập nhật SKU "${old_inventory_sku_code}" thành "${updatedStock.inventory_sku_code}".`,
+      });
+    }
+    setEditingSku(null);
+    // Đồng bộ lại ngay, kể cả khi GET trước đó chưa hoàn thành.
     setRefreshKey((previous) => previous + 1);
   }
 
@@ -870,7 +923,7 @@ export default function Warehouse1Page() {
           className="overflow-x-auto"
           aria-busy={loading}
         >
-          <table className="w-full min-w-[1050px] text-left">
+          <table className="w-full min-w-[1200px] text-left">
             <thead className="bg-slate-50">
               <tr className="text-xs font-semibold uppercase tracking-wider text-slate-500">
                 <th className="px-5 py-4">
@@ -989,9 +1042,11 @@ export default function Warehouse1Page() {
                     <tr
                       key={stock.inventory_sku_id}
                       className={`transition ${
-                        createdSkuIds.includes(stock.inventory_sku_id)
-                          ? "bg-emerald-50/70 hover:bg-emerald-50"
-                          : "hover:bg-slate-50/80"
+                        updateToast?.id === stock.inventory_sku_id
+                          ? "bg-blue-50/80 hover:bg-blue-50"
+                          : createdSkuIds.includes(stock.inventory_sku_id)
+                            ? "bg-emerald-50/70 hover:bg-emerald-50"
+                            : "hover:bg-slate-50/80"
                       }`}
                     >
                         {/* SKU INFORMATION */}
@@ -1007,6 +1062,11 @@ export default function Warehouse1Page() {
                               <p className="mt-1 text-xs text-slate-400">
                                 SKU ID: {stock.inventory_sku_id}
                               </p>
+                              {updateToast?.id === stock.inventory_sku_id && (
+                                <span className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-blue-600">
+                                  <CheckCircle2 size={13} /> Vừa cập nhật
+                                </span>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -1064,7 +1124,7 @@ export default function Warehouse1Page() {
                         </td>
                         {/* ACTIONS */}
                         <td className="px-5 py-4">
-                          <div className="flex justify-center">
+                          <div className="flex flex-wrap items-center justify-center gap-2">
                             <button
                               type="button"
                               aria-haspopup="dialog"
@@ -1073,7 +1133,15 @@ export default function Warehouse1Page() {
                               className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-600 transition hover:bg-blue-100"
                             >
                               <Eye size={15} />
-                              Xem Serial
+                            </button>
+                            <button
+                              type="button"
+                              aria-haspopup="dialog"
+                              title={`Cập nhật SKU ${stock.inventory_sku_code}`}
+                              onClick={() => setEditingSku({ id: stock.inventory_sku_id, code: stock.inventory_sku_code })}
+                              className="inline-flex items-center gap-2 whitespace-nowrap rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-700 transition hover:bg-amber-100"
+                            >
+                              <Pencil size={15} />
                             </button>
                           </div>
                         </td>
@@ -1105,6 +1173,30 @@ export default function Warehouse1Page() {
           onClose={() => setShowCreateModal(false)}
           onSuccess={handleCreateSuccess}
         />
+      )}
+      {editingSku && (
+        <UpdateSkuModal
+          key={editingSku.id}
+          skuId={editingSku.id}
+          originalCode={editingSku.code}
+          stock={editingStock}
+          onClose={() => setEditingSku(null)}
+          onSuccess={handleUpdateSuccess}
+        />
+      )}
+      {updateToast && (
+        <div role="status" aria-live="polite" className="fixed right-4 top-20 z-50 w-[calc(100%_-_2rem)] max-w-md rounded-2xl border border-emerald-200 bg-white p-4 shadow-xl sm:right-6">
+          <div className="flex items-start gap-3">
+            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600">
+              <CheckCircle2 size={24} />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-emerald-700">Cập nhật SKU thành công</p>
+              <p className="mt-1 break-words text-sm text-slate-600">{updateToast.message}</p>
+            </div>
+            <button type="button" aria-label="Đóng thông báo cập nhật" onClick={() => setUpdateToast(null)} className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"><X size={17} /></button>
+          </div>
+        </div>
       )}
       {bulkResult && (
         <div role="status" aria-live="polite" className={`fixed bottom-6 right-4 z-50 w-[calc(100%_-_2rem)] max-w-md rounded-2xl border bg-white p-4 shadow-xl sm:right-6 ${bulkResult.total_skipped ? "border-amber-200" : "border-emerald-200"}`}>
@@ -1275,6 +1367,192 @@ function CreateSkuModal({
           <button type="submit" disabled={submitting || !skus.length || skus.length > MAX_BATCH_SIZE || invalidLength} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
             {submitting ? <LoaderCircle size={17} className="animate-spin" /> : <Plus size={18} />}
             {submitting ? "Đang thêm SKU..." : `Thêm ${formatNumber(skus.length)} SKU`}
+          </button>
+        </div>
+      </form>
+    </dialog>
+  );
+}
+
+// ======================================================
+// UPDATE SKU MODAL COMPONENT
+// ======================================================
+
+function UpdateSkuModal({
+  skuId,
+  originalCode,
+  stock,
+  onClose,
+  onSuccess,
+}: {
+  skuId: number;
+  originalCode: string;
+  stock: Warehouse1Stock | undefined;
+  onClose: () => void;
+  onSuccess: (result: UpdateWarehouse1SkuResult, message: string) => void;
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const submitLock = useRef(false);
+  const mountedRef = useRef(false);
+  const [sku, setSku] = useState(originalCode);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const newSku = sku.trim();
+  const blockedReason = !stock
+    ? "SKU không còn xuất hiện trong Kho 1. Vui lòng kiểm tra lại danh sách."
+    : stock.inventory_sku_code !== originalCode
+      ? "Mã SKU đã thay đổi. Vui lòng đóng và mở lại cửa sổ chỉnh sửa."
+      : stock.inventory_stock_quantity !== 0
+        ? "Không thể chỉnh sửa SKU vì số lượng tồn kho khác 0."
+        : stock.serial_statistics.total > 0
+          ? "Không thể chỉnh sửa SKU vì đã có Serial Number."
+          : "";
+  const invalidLength = newSku.length > MAX_SKU_LENGTH;
+  const unchanged = newSku === originalCode;
+
+  useEffect(() => {
+    mountedRef.current = true;
+    const dialog = dialogRef.current;
+    if (!dialog) return () => { mountedRef.current = false; };
+    if (!dialog.open) dialog.showModal();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    inputRef.current?.focus();
+    inputRef.current?.select();
+    return () => {
+      mountedRef.current = false;
+      if (dialog.open) dialog.close();
+      document.body.style.overflow = previousOverflow;
+    };
+  }, []);
+
+  function closeModal() {
+    if (!submitLock.current) onClose();
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (submitLock.current) return;
+
+    if (blockedReason || !newSku || invalidLength || unchanged) {
+      setError(blockedReason || (!newSku
+        ? "Vui lòng nhập mã SKU mới."
+        : invalidLength
+          ? `Mã SKU tối đa ${MAX_SKU_LENGTH} ký tự.`
+          : "Mã SKU mới phải khác mã SKU hiện tại."));
+      return;
+    }
+
+    submitLock.current = true;
+    setSubmitting(true);
+    setError("");
+
+    try {
+      // PATCH không cần AbortSignal; việc hủy request không rollback DB.
+      const response = await adminInventoryService.updateWarehouse1Sku(skuId, { sku: newSku });
+      if (!mountedRef.current) return;
+      const result = response.data;
+      if (!response.success || !result || result.old_inventory_sku_id !== skuId ||
+          !Number.isSafeInteger(result.inventory_sku_id) || result.inventory_sku_id <= 0 ||
+          result.inventory_sku_code !== newSku || result.inventory_id !== 1 ||
+          result.inventory_branch_id !== 1 || !result.serial_statistics || !Array.isArray(result.serials)) {
+        setError(response.message && !response.success ? response.message : "Phản hồi cập nhật không hợp lệ. Hãy kiểm tra danh sách kho trước khi thử lại.");
+        return;
+      }
+      onSuccess(result, response.message);
+    } catch (err: unknown) {
+      if (!mountedRef.current) return;
+      const status = axios.isAxiosError(err) ? err.response?.status : undefined;
+      let fallback = "Không thể cập nhật SKU. Vui lòng thử lại.";
+      if (status === 400) fallback = "Mã SKU mới không hợp lệ.";
+      else if (status === 401) fallback = "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
+      else if (status === 403) fallback = "Bạn không có quyền cập nhật SKU trong Kho 1.";
+      else if (status === 404) fallback = "Không tìm thấy SKU trong Kho 1.";
+      else if (status === 409) fallback = "SKU đã tồn tại hoặc không đủ điều kiện chỉnh sửa. Vui lòng kiểm tra lại.";
+      else if (axios.isAxiosError(err) && !err.response) fallback = "Không nhận được phản hồi. Hãy kiểm tra danh sách kho trước khi gửi lại.";
+      setError(extractErrorMessage(err, fallback));
+    } finally {
+      submitLock.current = false;
+      if (mountedRef.current) setSubmitting(false);
+    }
+  }
+
+  return (
+    <dialog
+      ref={dialogRef}
+      aria-labelledby="warehouse-update-sku-title"
+      onCancel={(event) => { event.preventDefault(); closeModal(); }}
+      onClick={(event) => { if (event.target === event.currentTarget) closeModal(); }}
+      className="fixed inset-0 m-auto max-h-[90dvh] w-[calc(100%_-_2rem)] max-w-xl overflow-auto rounded-2xl border-0 bg-transparent p-0 text-slate-800 shadow-2xl backdrop:bg-slate-900/50 backdrop:backdrop-blur-sm"
+    >
+      <form onSubmit={handleSubmit} noValidate aria-busy={submitting} className="overflow-hidden rounded-2xl bg-white">
+        <div className="flex items-start gap-3 border-b border-slate-100 p-5">
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-amber-50 text-amber-600">
+            <Pencil size={24} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 id="warehouse-update-sku-title" className="text-lg font-bold text-slate-800">Cập nhật SKU</h2>
+            <p className="mt-1 text-sm text-slate-500">Chỉnh sửa mã SKU đã đăng ký tại Kho 1.</p>
+          </div>
+          <button type="button" disabled={submitting} onClick={closeModal} aria-label="Đóng modal cập nhật" className="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"><X size={20} /></button>
+        </div>
+
+        <div className="space-y-4 p-5">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex items-start gap-3">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-blue-50 text-blue-600"><Package size={21} /></div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-slate-500">Mã SKU hiện tại · Kho 1</p>
+                <p className="mt-1 break-all text-sm font-bold text-slate-800">{originalCode}</p>
+                <p className="mt-1 text-xs text-slate-400">SKU ID: {skuId}</p>
+              </div>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-200 pt-3">
+              <div><p className="text-xs text-slate-500">Số lượng tồn kho</p><p className="mt-1 text-lg font-bold text-slate-800">{stock ? formatNumber(stock.inventory_stock_quantity) : "—"}</p></div>
+              <div><p className="text-xs text-slate-500">Tổng Serial Number</p><p className="mt-1 text-lg font-bold text-slate-800">{stock ? formatNumber(stock.serial_statistics.total) : "—"}</p></div>
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="warehouse-update-sku" className="mb-2 block text-sm font-semibold text-slate-700">Mã SKU mới <span className="text-rose-500">*</span></label>
+            <div className="relative">
+              <Hash size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                ref={inputRef}
+                id="warehouse-update-sku"
+                value={sku}
+                onChange={(event) => { setSku(event.target.value); setError(""); }}
+                disabled={submitting || !!blockedReason}
+                spellCheck={false}
+                autoComplete="off"
+                aria-invalid={!!error || invalidLength}
+                aria-describedby="warehouse-update-help"
+                placeholder="Nhập mã SKU mới..."
+                className={`h-11 w-full rounded-xl border bg-white pl-10 pr-3 text-sm font-medium text-slate-800 outline-none transition disabled:bg-slate-100 disabled:text-slate-500 ${error || invalidLength ? "border-rose-300 focus:border-rose-500 focus:ring-2 focus:ring-rose-100" : "border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"}`}
+              />
+            </div>
+            <p id="warehouse-update-help" className="mt-2 text-xs text-slate-500">Nhập mã SKU chính xác, tối đa {MAX_SKU_LENGTH} ký tự.</p>
+          </div>
+
+          {(error || blockedReason || invalidLength) && (
+            <div role="alert" className="flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 p-3">
+              <AlertCircle size={19} className="mt-0.5 shrink-0 text-rose-600" />
+              <div className="min-w-0"><p className="text-sm font-bold text-rose-800">Không thể cập nhật SKU</p><p className="mt-1 break-words text-sm text-rose-700">{error || blockedReason || `Mã SKU tối đa ${MAX_SKU_LENGTH} ký tự.`}</p></div>
+            </div>
+          )}
+          <div className="flex items-start gap-2.5 rounded-xl border border-amber-100 bg-amber-50 p-3 text-amber-800">
+            <AlertCircle size={18} className="mt-0.5 shrink-0" />
+            <p className="text-xs leading-relaxed">Chỉ được chỉnh sửa SKU có tồn kho bằng 0, chưa có Serial Number và chưa có giao dịch tại Kho 1. Backend sẽ kiểm tra quyền, lịch sử giao dịch và trùng mã trước khi lưu. Thao tác không đổi mã SKU ở các kho khác.</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-end gap-3 border-t border-slate-100 bg-slate-50 p-5">
+          <button type="button" disabled={submitting} onClick={closeModal} className={BUTTON_CLASS}>Hủy bỏ</button>
+          <button type="submit" disabled={submitting || !!blockedReason || !newSku || unchanged || invalidLength} className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60">
+            {submitting ? <LoaderCircle size={17} className="animate-spin" /> : <Save size={18} />}
+            {submitting ? "Đang cập nhật..." : "Lưu thay đổi"}
           </button>
         </div>
       </form>
