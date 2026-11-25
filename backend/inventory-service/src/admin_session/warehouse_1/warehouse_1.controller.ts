@@ -7,6 +7,9 @@ import {
   Headers,
   UseGuards,
   UnauthorizedException,
+  Patch,
+  Param,
+  ParseIntPipe,
 } from '@nestjs/common';
 
 import {
@@ -61,6 +64,23 @@ class CreateWarehouse1SkusDto {
     message: 'Mỗi mã SKU tối đa 200 ký tự.',
   })
   skus: string[];
+}
+
+// ======================================================
+// DTO: UPDATE WAREHOUSE 1 SKU
+// ======================================================
+
+class UpdateWarehouse1SkuDto {
+  @IsString({
+    message: 'Mã SKU phải là chuỗi ký tự.',
+  })
+  @IsNotEmpty({
+    message: 'Mã SKU không được để trống.',
+  })
+  @MaxLength(200, {
+    message: 'Mã SKU tối đa 200 ký tự.',
+  })
+  sku: string;
 }
 
 
@@ -125,6 +145,35 @@ export class Warehouse1Controller {
     return this.warehouse1Service.createInventorySkus(
       accessToken,
       dto.skus,
+    );
+  }
+
+  // ======================================================
+  // 3. (PATCH) UPDATE INVENTORY SKU
+  // ======================================================
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('inventory-skus/:skuId')
+  updateInventorySku(
+    @Headers('authorization') authorization: string,
+    @Param('skuId', ParseIntPipe) skuId: number,
+    @Body() dto: UpdateWarehouse1SkuDto,
+  ) {
+    const accessToken = authorization?.replace(
+      /^Bearer\s+/i,
+      '',
+    );
+
+    if (!accessToken) {
+      throw new UnauthorizedException(
+        'Thiếu access token.',
+      );
+    }
+
+    return this.warehouse1Service.updateInventorySku(
+      accessToken,
+      skuId,
+      dto.sku,
     );
   }
 }

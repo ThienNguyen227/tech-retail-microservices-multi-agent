@@ -168,6 +168,26 @@ export interface CreateWarehouse1SkusResponse {
   data: CreateWarehouse1SkusResult;
 }
 
+// ======================================================
+// WAREHOUSE 1 UPDATE SKU INTERFACES
+// ======================================================
+
+export interface UpdateWarehouse1SkuRequest {
+  sku: string;
+}
+
+export interface UpdateWarehouse1SkuResult
+  extends Warehouse1Stock {
+  old_inventory_sku_id: number;
+  old_inventory_sku_code: string;
+}
+
+export interface UpdateWarehouse1SkuResponse {
+  success: boolean;
+  message: string;
+  data: UpdateWarehouse1SkuResult;
+}
+
 export const adminInventoryService = {
   // ======================================================
   // 1. (GET) INVENTORY-LIST
@@ -278,30 +298,7 @@ export const adminInventoryService = {
   },
 
   // ======================================================
-  // 5. (POST) WAREHOUSE-1 CREATE INVENTORY SKU
-  // ======================================================
-
-  async createWarehouse1Sku(
-    data: CreateWarehouse1SkuRequest,
-    signal?: AbortSignal,
-  ) {
-    const response = await adminAxios.post<
-      CreateWarehouse1SkuResponse
-    >(
-      `${INVENTORY_SERVICE_URL}/warehouse-1/inventory-sku`,
-      {
-        sku: data.sku.trim(),
-      },
-      {
-        signal,
-      },
-    );
-
-    return response.data;
-  },
-
-  // ======================================================
-  // 6. (POST) WAREHOUSE-1 CREATE MULTIPLE INVENTORY SKUS
+  // 5. (POST) WAREHOUSE-1 CREATE MULTIPLE INVENTORY SKUS
   // ======================================================
 
   async createWarehouse1Skus(
@@ -322,4 +319,28 @@ export const adminInventoryService = {
 
     return response.data;
   },
-  };
+
+  // ======================================================
+  // 6. (PATCH) WAREHOUSE-1 UPDATE INVENTORY SKU
+  // ======================================================
+
+  async updateWarehouse1Sku(
+    skuId: number,
+    data: UpdateWarehouse1SkuRequest,
+    signal?: AbortSignal,
+  ) {
+    const response = await adminAxios.patch<
+      UpdateWarehouse1SkuResponse
+    >(
+      `${INVENTORY_SERVICE_URL}/warehouse-1/inventory-skus/${skuId}`,
+      {
+        sku: data.sku.trim(),
+      },
+      {
+        signal,
+      },
+    );
+
+    return response.data;
+  },
+};

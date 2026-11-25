@@ -697,4 +697,396 @@ export class Warehouse1Service {
       );
     }
   }
+
+  // ======================================================
+  // 3. (PATCH) UPDATE INVENTORY SKU
+  // ======================================================
+
+  async updateInventorySku(
+    accessToken: string,
+    skuId: number,
+    sku: string,
+  ) {
+    // =========================================
+    // 1. CHECK PERMISSION
+    // =========================================
+
+    await this.checkPermission(
+      accessToken,
+      'ware-house-1-update-sku:update',
+    );
+
+    // =========================================
+    // 2. VALIDATE INPUT
+    // =========================================
+
+    if (!Number.isSafeInteger(skuId) || skuId <= 0) {
+      throw new BadRequestException(
+        'SKU ID không hợp lệ.',
+      );
+    }
+
+    if (typeof sku !== 'string') {
+      throw new BadRequestException(
+        'Mã SKU phải là chuỗi ký tự.',
+      );
+    }
+
+    const newSkuCode = sku.trim();
+
+    if (!newSkuCode) {
+      throw new BadRequestException(
+        'Mã SKU không được để trống.',
+      );
+    }
+
+    if (newSkuCode.length > 200) {
+      throw new BadRequestException(
+        'Mã SKU tối đa 200 ký tự.',
+      );
+    }
+
+    try {
+      // =========================================
+      // 3. DATABASE TRANSACTION
+      // =========================================
+
+      const result = await this.prisma.$transaction(
+        async (tx) => {
+
+          // -------------------------------------
+          // 3.1. CHECK WAREHOUSE 1
+          // -------------------------------------
+
+          const inventory = await tx.inventory.findFirst({
+            where: {
+              inventory_id: this.inventoryId,
+              inventory_branch_id: this.branchId,
+            },
+
+            select: {
+              inventory_id: true,
+              inventory_branch_id: true,
+            },
+          });
+
+          if (!inventory) {
+            throw new NotFoundException(
+              'Không tìm thấy Kho 1.',
+            );
+          }
+
+          // -------------------------------------
+          // 3.2. GET CURRENT SKU IN WAREHOUSE 1
+          // -------------------------------------
+
+          const currentStock =
+            await tx.inventoryStock.findUnique({
+              where: {
+                inventory_id_inventory_sku_id: {
+                  inventory_id: this.inventoryId,
+                  inventory_sku_id: skuId,
+                },
+              },
+
+              include: {
+                sku: true,
+              },
+            });
+
+          if (!currentStock) {
+            throw new NotFoundException(
+              'Không tìm thấy SKU trong Kho 1.',
+            );
+          }
+
+          const oldSkuCode =
+            currentStock.sku.inventory_sku_code;
+
+          // -------------------------------------
+          // 3.3. CHECK SAME SKU CODE
+          // -------------------------------------
+
+          if (oldSkuCode === newSkuCode) {
+            throw new BadRequestException(
+              'Mã SKU mới không khác mã SKU hiện tại.',
+            );
+          }
+
+          // -------------------------------------
+          // 3.4. CHECK STOCK QUANTITY
+          // -------------------------------------
+
+          if (currentStock.inventory_stock_quantity !== 0) {
+            throw new ConflictException(
+              `Không thể chỉnh sửa SKU "${oldSkuCode}" ` +
+              'vì số lượng tồn kho khác 0.',
+            );
+          }
+
+          // -------------------------------------
+          // 3.5. CHECK EXISTING SERIALS
+          // -------------------------------------
+
+          const existingSerial =
+            await tx.inventorySkuSerial.findFirst({
+              where: {
+                inventory_id: this.inventoryId,
+                inventory_sku_id: skuId,
+              },
+
+              select: {
+                inventory_sku_serial_id: true,
+              },
+            });
+
+          if (existingSerial) {
+            throw new ConflictException(
+              `Không thể chỉnh sửa SKU "${oldSkuCode}" ` +
+              'vì SKU đã có Serial Number trong Kho 1.',
+            );
+          }
+
+          // -------------------------------------
+          // 3.6. CHECK TRANSACTION HISTORY
+          // -------------------------------------
+
+          const existingTransaction =
+            await tx.inventoryTransactionItem.findFirst({
+              where: {
+                inventory_sku_id: skuId,
+
+                transaction: {
+                  is: {
+                    inventory_id: this.inventoryId,
+                  },
+                },
+              },
+
+              select: {
+                inventory_transaction_id: true,
+              },
+            });
+
+          if (existingTransaction) {
+            throw new ConflictException(
+              `Không thể chỉnh sửa SKU "${oldSkuCode}" ` +
+              'vì SKU đã phát sinh giao dịch tại Kho 1.',
+            );
+          }
+
+          // -------------------------------------
+          // 3.7. CHECK NEW SKU IN SYSTEM
+          // -------------------------------------
+
+          let targetSku =
+            await tx.inventorySku.findUnique({
+              where: {
+                inventory_sku_code: newSkuCode,
+              },
+            });
+
+          // -------------------------------------
+          // 3.8. CREATE NEW SKU IF NOT EXISTS
+          // -------------------------------------
+
+          if (!targetSku) {
+            await tx.inventorySku.createMany({
+              data: [
+                {
+                  inventory_sku_code: newSkuCode,
+                },
+              ],
+
+              skipDuplicates: true,
+            });
+
+            targetSku =
+              await tx.inventorySku.findUniqueOrThrow({
+                where: {
+                  inventory_sku_code: newSkuCode,
+                },
+              });
+          }
+
+          // -------------------------------------
+          // 3.9. CHECK DUPLICATE SKU IN WAREHOUSE 1
+          // -------------------------------------
+
+          const duplicateStock =
+            await tx.inventoryStock.findUnique({
+              where: {
+                inventory_id_inventory_sku_id: {
+                  inventory_id: this.inventoryId,
+
+                  inventory_sku_id:
+                    targetSku.inventory_sku_id,
+                },
+              },
+            });
+
+          if (duplicateStock) {
+            throw new ConflictException(
+              `SKU "${newSkuCode}" đã tồn tại trong Kho 1.`,
+            );
+          }
+
+          // -------------------------------------
+          // 3.10. CHECK TARGET SKU SERIALS
+          // -------------------------------------
+
+          const targetSerial =
+            await tx.inventorySkuSerial.findFirst({
+              where: {
+                inventory_id: this.inventoryId,
+
+                inventory_sku_id:
+                  targetSku.inventory_sku_id,
+              },
+
+              select: {
+                inventory_sku_serial_id: true,
+              },
+            });
+
+          if (targetSerial) {
+            throw new ConflictException(
+              `SKU "${newSkuCode}" đã có dữ liệu Serial ` +
+              'trong Kho 1. Vui lòng kiểm tra lại dữ liệu.',
+            );
+          }
+
+          // -------------------------------------
+          // 3.11. UPDATE INVENTORY STOCK
+          // -------------------------------------
+
+          // Chỉ thay đổi SKU ID trong InventoryStock.
+          // Không thay đổi mã SKU dùng chung trong InventorySku.
+          //
+          // Kiểm tra lại số lượng tồn kho khi cập nhật.
+
+          const updatedStock =
+            await tx.inventoryStock.updateMany({
+              where: {
+                inventory_id: this.inventoryId,
+
+                inventory_sku_id: skuId,
+
+                inventory_stock_quantity: 0,
+              },
+
+              data: {
+                inventory_sku_id:
+                  targetSku.inventory_sku_id,
+              },
+            });
+
+          if (updatedStock.count !== 1) {
+            throw new ConflictException(
+              'Dữ liệu SKU đã thay đổi. Vui lòng tải lại và thử lại.',
+            );
+          }
+
+          // -------------------------------------
+          // 3.12. FORMAT RESPONSE DATA
+          // -------------------------------------
+
+          return {
+            old_inventory_sku_id: skuId,
+
+            old_inventory_sku_code: oldSkuCode,
+
+            inventory_id: inventory.inventory_id,
+
+            inventory_branch_id:
+              inventory.inventory_branch_id,
+
+            inventory_sku_id:
+              targetSku.inventory_sku_id,
+
+            inventory_sku_code:
+              targetSku.inventory_sku_code,
+
+            inventory_stock_quantity: 0,
+
+            serial_statistics: {
+              total: 0,
+              available: 0,
+              reserved: 0,
+              cancelled: 0,
+              sold: 0,
+            },
+
+            serials: [],
+          };
+        },
+
+        {
+          isolationLevel:
+            Prisma.TransactionIsolationLevel.Serializable,
+
+          timeout: 15000,
+        },
+      );
+
+      // =========================================
+      // 4. RETURN RESPONSE
+      // =========================================
+
+      return {
+        success: true,
+
+        message:
+          `Cập nhật SKU "${result.old_inventory_sku_code}" ` +
+          `thành "${result.inventory_sku_code}" thành công.`,
+
+        data: result,
+      };
+
+    } catch (error) {
+      // =========================================
+      // 5. HANDLE HTTP EXCEPTION
+      // =========================================
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      // =========================================
+      // 6. HANDLE PRISMA ERROR
+      // =========================================
+
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError
+      ) {
+        // Trùng khóa chính hoặc unique constraint
+        if (error.code === 'P2002') {
+          throw new ConflictException(
+            `SKU "${newSkuCode}" đã tồn tại trong Kho 1.`,
+          );
+        }
+
+        // Dữ liệu bị thay đổi đồng thời
+        if (error.code === 'P2034' || error.code === 'P2025') {
+          throw new ConflictException(
+            'Dữ liệu kho đang được cập nhật bởi một thao tác khác. ' +
+            'Vui lòng thử lại.',
+          );
+        }
+      }
+
+      // =========================================
+      // 7. HANDLE DATABASE ERROR
+      // =========================================
+
+      console.error(
+        'UPDATE WAREHOUSE 1 SKU ERROR:',
+        error,
+      );
+
+      throw new InternalServerErrorException(
+        'Không thể cập nhật SKU trong Kho 1.',
+      );
+    }
+  }
 }
