@@ -1089,4 +1089,454 @@ export class Warehouse1Service {
       );
     }
   }
+
+  // ======================================================
+  // 4. (POST) CREATE MULTIPLE INVENTORY SERIALS
+  // ======================================================
+
+  async createInventorySerials(
+    accessToken: string,
+    skuId: number,
+    serialNumbers: string[],
+    source?: string,
+  ) {
+    // =========================================
+    // 1. CHECK PERMISSION
+    // =========================================
+
+    await this.checkPermission(
+      accessToken,
+      'ware-house-1-add-serials:create',
+    );
+
+    // =========================================
+    // 2. VALIDATE INPUT
+    // =========================================
+
+    if (!Number.isSafeInteger(skuId) || skuId <= 0) {
+      throw new BadRequestException(
+        'SKU ID không hợp lệ.',
+      );
+    }
+
+    if (
+      !Array.isArray(serialNumbers) ||
+      serialNumbers.length === 0
+    ) {
+      throw new BadRequestException(
+        'Danh sách Serial Number không được để trống.',
+      );
+    }
+
+    if (serialNumbers.length > 500) {
+      throw new BadRequestException(
+        'Chỉ được thêm tối đa 500 Serial Number mỗi lần.',
+      );
+    }
+
+    if (
+      serialNumbers.some(
+        (serial) =>
+          typeof serial !== 'string' ||
+          !serial.trim() ||
+          serial.trim().length > 200,
+      )
+    ) {
+      throw new BadRequestException(
+        'Danh sách chứa Serial Number không hợp lệ.',
+      );
+    }
+
+    if (
+      source != null &&
+      (
+        typeof source !== 'string' ||
+        source.trim().length > 255
+      )
+    ) {
+      throw new BadRequestException(
+        'Nguồn nhập hàng không hợp lệ.',
+      );
+    }
+
+    // =========================================
+    // 3. NORMALIZE AND REMOVE DUPLICATE INPUT
+    // =========================================
+
+    const normalizedSerials = serialNumbers.map(
+      (serial) => serial.trim(),
+    );
+
+    const serialSet = new Set<string>();
+
+    const skippedSerials: {
+      serial_number: string;
+      reason: string;
+    }[] = [];
+
+    for (const serial of normalizedSerials) {
+      if (serialSet.has(serial)) {
+        skippedSerials.push({
+          serial_number: serial,
+          reason: 'Serial Number bị lặp trong danh sách yêu cầu.',
+        });
+
+        continue;
+      }
+
+      serialSet.add(serial);
+    }
+
+    const uniqueSerials = [...serialSet].sort();
+
+    try {
+      // =========================================
+      // 4. DATABASE TRANSACTION
+      // =========================================
+
+      const result = await this.prisma.$transaction(
+        async (tx) => {
+
+          // -------------------------------------
+          // 4.1. CHECK WAREHOUSE 1
+          // -------------------------------------
+
+          const inventory =
+            await tx.inventory.findFirst({
+              where: {
+                inventory_id: this.inventoryId,
+                inventory_branch_id: this.branchId,
+              },
+            });
+
+          if (!inventory) {
+            throw new NotFoundException(
+              'Không tìm thấy Kho 1.',
+            );
+          }
+
+          // -------------------------------------
+          // 4.2. CHECK SKU IN WAREHOUSE 1
+          // -------------------------------------
+
+          const stock =
+            await tx.inventoryStock.findUnique({
+              where: {
+                inventory_id_inventory_sku_id: {
+                  inventory_id: this.inventoryId,
+                  inventory_sku_id: skuId,
+                },
+              },
+
+              include: {
+                sku: true,
+              },
+            });
+
+          if (!stock) {
+            throw new NotFoundException(
+              'SKU chưa được đăng ký tại Kho 1.',
+            );
+          }
+
+          // -------------------------------------
+          // 4.3. GET AVAILABLE SERIAL STATUS
+          // -------------------------------------
+
+          const availableStatus =
+            await tx.inventorySkuSerialStatus.findUnique({
+              where: {
+                inventory_sku_serial_status_code:
+                  'AVAILABLE',
+              },
+            });
+
+          if (!availableStatus) {
+            throw new InternalServerErrorException(
+              'Không tìm thấy trạng thái AVAILABLE.',
+            );
+          }
+
+          // -------------------------------------
+          // 4.4. GET IMPORT TRANSACTION TYPE
+          // -------------------------------------
+
+          const importType =
+            await tx.inventoryTransactionType.findUnique({
+              where: {
+                inventory_transaction_type_code:
+                  'IMPORT',
+              },
+            });
+
+          if (!importType) {
+            throw new InternalServerErrorException(
+              'Không tìm thấy loại giao dịch IMPORT.',
+            );
+          }
+
+          // -------------------------------------
+          // 4.5. BULK CREATE SERIAL NUMBERS
+          // -------------------------------------
+
+          const createdSerials =
+            await tx.inventorySkuSerial.createManyAndReturn({
+              data: uniqueSerials.map((serialNumber) => ({
+                inventory_sku_serial_number:
+                  serialNumber,
+
+                inventory_sku_serial_status_id:
+                  availableStatus.inventory_sku_serial_status_id,
+
+                inventory_sku_id: skuId,
+
+                inventory_id: this.inventoryId,
+              })),
+
+              // Serial Number là UNIQUE trên toàn hệ thống.
+              skipDuplicates: true,
+
+              select: {
+                inventory_sku_serial_id: true,
+                inventory_sku_serial_number: true,
+                inventory_sku_serial_status_id: true,
+                inventory_sku_id: true,
+                inventory_id: true,
+              },
+            });
+
+          // -------------------------------------
+          // 4.6. IDENTIFY DUPLICATE SERIAL NUMBERS
+          // -------------------------------------
+
+          const createdSerialSet = new Set(
+            createdSerials.map(
+              (serial) =>
+                serial.inventory_sku_serial_number,
+            ),
+          );
+
+          for (const serialNumber of uniqueSerials) {
+            if (!createdSerialSet.has(serialNumber)) {
+              skippedSerials.push({
+                serial_number: serialNumber,
+
+                reason:
+                  'Serial Number đã tồn tại trong hệ thống.',
+              });
+            }
+          }
+
+          // -------------------------------------
+          // 4.7. CALCULATE CREATED QUANTITY
+          // -------------------------------------
+
+          const createdQuantity = createdSerials.length;
+
+          let quantityBefore =
+            stock.inventory_stock_quantity;
+
+          let quantityAfter = quantityBefore;
+
+          let transactionId: number | null = null;
+
+          // Chỉ cập nhật tồn kho và tạo giao dịch
+          // khi thực sự có Serial Number mới.
+
+          if (createdQuantity > 0) {
+
+            // -----------------------------------
+            // 4.8. UPDATE INVENTORY STOCK
+            // -----------------------------------
+
+            const updatedStock =
+              await tx.inventoryStock.update({
+                where: {
+                  inventory_id_inventory_sku_id: {
+                    inventory_id: this.inventoryId,
+                    inventory_sku_id: skuId,
+                  },
+                },
+
+                data: {
+                  inventory_stock_quantity: {
+                    increment: createdQuantity,
+                  },
+                },
+              });
+
+            quantityAfter =
+              updatedStock.inventory_stock_quantity;
+
+            quantityBefore =
+              quantityAfter - createdQuantity;
+
+            // -----------------------------------
+            // 4.9. CREATE IMPORT TRANSACTION
+            // -----------------------------------
+
+            const inventoryTransaction =
+              await tx.inventoryTransaction.create({
+                data: {
+                  inventory_id: this.inventoryId,
+
+                  inventory_transaction_type_id:
+                    importType.inventory_transaction_type_id,
+
+                  inventory_transaction_from:
+                    source?.trim() || null,
+
+                  inventory_transaction_to:
+                    'Kho 1',
+
+                  // -----------------------------
+                  // 4.10. CREATE TRANSACTION ITEM
+                  // -----------------------------
+
+                  items: {
+                    create: {
+                      inventory_sku_id: skuId,
+
+                      inventory_transaction_item_quantity:
+                        createdQuantity,
+
+                      inventory_transaction_item_before:
+                        quantityBefore,
+
+                      inventory_transaction_item_after:
+                        quantityAfter,
+                    },
+                  },
+                },
+              });
+
+            transactionId =
+              inventoryTransaction.inventory_transaction_id;
+          }
+
+          // -------------------------------------
+          // 4.11. FORMAT RESPONSE DATA
+          // -------------------------------------
+
+          return {
+            inventory_id: inventory.inventory_id,
+
+            inventory_branch_id:
+              inventory.inventory_branch_id,
+
+            inventory_sku_id: skuId,
+
+            inventory_sku_code:
+              stock.sku.inventory_sku_code,
+
+            total_requested:
+              normalizedSerials.length,
+
+            total_created:
+              createdQuantity,
+
+            total_skipped:
+              skippedSerials.length,
+
+            inventory_stock_quantity_before:
+              quantityBefore,
+
+            inventory_stock_quantity_after:
+              quantityAfter,
+
+            inventory_transaction_id:
+              transactionId,
+
+            created_serials: createdSerials.map(
+              (serial) => ({
+                ...serial,
+
+                status: {
+                  inventory_sku_serial_status_id:
+                    availableStatus.inventory_sku_serial_status_id,
+
+                  inventory_sku_serial_status_code:
+                    availableStatus.inventory_sku_serial_status_code,
+
+                  inventory_sku_serial_status_name:
+                    availableStatus.inventory_sku_serial_status_name,
+                },
+              }),
+            ),
+
+            skipped_serials: skippedSerials,
+          };
+        },
+
+        {
+          isolationLevel:
+            Prisma.TransactionIsolationLevel.Serializable,
+
+          timeout: 15000,
+        },
+      );
+
+      // =========================================
+      // 5. RETURN RESPONSE
+      // =========================================
+
+      return {
+        success: true,
+
+        message:
+          `Đã thêm ${result.total_created} Serial Number ` +
+          `cho SKU "${result.inventory_sku_code}", ` +
+          `bỏ qua ${result.total_skipped} Serial Number.`,
+
+        data: result,
+      };
+
+    } catch (error) {
+
+      // =========================================
+      // 6. HANDLE HTTP EXCEPTION
+      // =========================================
+
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      // =========================================
+      // 7. HANDLE PRISMA ERROR
+      // =========================================
+
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError
+      ) {
+        if (
+          error.code === 'P2034' ||
+          error.code === 'P2025'
+        ) {
+          throw new ConflictException(
+            'Dữ liệu kho đang được cập nhật bởi một thao tác khác. ' +
+            'Vui lòng tải lại và thử lại.',
+          );
+        }
+
+        if (error.code === 'P2002') {
+          throw new ConflictException(
+            'Phát hiện dữ liệu bị trùng. Vui lòng thử lại.',
+          );
+        }
+      }
+
+      // =========================================
+      // 8. HANDLE DATABASE ERROR
+      // =========================================
+
+      console.error(
+        'CREATE WAREHOUSE 1 SERIAL NUMBERS ERROR:',
+        error,
+      );
+
+      throw new InternalServerErrorException(
+        'Không thể thêm Serial Number vào Kho 1.',
+      );
+    }
+  }
 }

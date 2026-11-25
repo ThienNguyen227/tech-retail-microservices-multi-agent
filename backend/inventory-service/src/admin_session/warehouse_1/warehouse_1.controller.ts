@@ -26,7 +26,7 @@ import { Warehouse1Service } from './warehouse_1.service';
 import { JwtAuthGuard } from '../../auth/jwt-auth.guard';
 
 // ======================================================
-// DTO: GET WAREHOUSE 1 INVENTORY LIST
+// 1. DTO: GET WAREHOUSE 1 INVENTORY LIST
 // ======================================================
 
 class GetWarehouse1InventoryList {
@@ -38,7 +38,7 @@ class GetWarehouse1InventoryList {
 }
 
 // ======================================================
-// DTO: CREATE MULTIPLE WAREHOUSE 1 SKUS
+// 2. DTO: CREATE MULTIPLE WAREHOUSE 1 SKUS
 // ======================================================
 
 class CreateWarehouse1SkusDto {
@@ -67,7 +67,7 @@ class CreateWarehouse1SkusDto {
 }
 
 // ======================================================
-// DTO: UPDATE WAREHOUSE 1 SKU
+// 3. DTO: UPDATE WAREHOUSE 1 SKU
 // ======================================================
 
 class UpdateWarehouse1SkuDto {
@@ -83,6 +83,41 @@ class UpdateWarehouse1SkuDto {
   sku: string;
 }
 
+// ======================================================
+// 4. DTO: CREATE MULTIPLE WAREHOUSE 1 SERIAL NUMBERS
+// ======================================================
+
+class CreateWarehouse1SerialsDto {
+  @IsArray({
+    message: 'Danh sách Serial Number phải là một mảng.',
+  })
+  @ArrayMinSize(1, {
+    message: 'Phải cung cấp ít nhất một Serial Number.',
+  })
+  @ArrayMaxSize(500, {
+    message: 'Chỉ được thêm tối đa 500 Serial Number mỗi lần.',
+  })
+  @IsString({
+    each: true,
+    message: 'Serial Number phải là chuỗi ký tự.',
+  })
+  @IsNotEmpty({
+    each: true,
+    message: 'Serial Number không được để trống.',
+  })
+  @MaxLength(200, {
+    each: true,
+    message: 'Serial Number tối đa 200 ký tự.',
+  })
+  serialNumbers: string[];
+
+  @IsOptional()
+  @IsString({
+    message: 'Nguồn nhập hàng phải là chuỗi ký tự.',
+  })
+  @MaxLength(255)
+  source?: string;
+}
 
 // ======================================================
 // CONTROLLER
@@ -174,6 +209,36 @@ export class Warehouse1Controller {
       accessToken,
       skuId,
       dto.sku,
+    );
+  }
+
+  // ======================================================
+  // 4. (POST) CREATE MULTIPLE INVENTORY SERIALS
+  // ======================================================
+
+  @UseGuards(JwtAuthGuard)
+  @Post('inventory-skus/:skuId/serials')
+  createInventorySerials(
+    @Headers('authorization') authorization: string,
+    @Param('skuId', ParseIntPipe) skuId: number,
+    @Body() dto: CreateWarehouse1SerialsDto,
+  ) {
+    const accessToken = authorization?.replace(
+      /^Bearer\s+/i,
+      '',
+    );
+
+    if (!accessToken) {
+      throw new UnauthorizedException(
+        'Thiếu access token.',
+      );
+    }
+
+    return this.warehouse1Service.createInventorySerials(
+      accessToken,
+      skuId,
+      dto.serialNumbers,
+      dto.source,
     );
   }
 }
