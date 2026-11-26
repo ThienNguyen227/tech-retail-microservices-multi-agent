@@ -29,7 +29,7 @@ export class CreateWarrantyRequestService {
     // ======================================================
     // 1. CHECK PERMISSION THROUGH USER-SERVICE
     // ======================================================
-    const userServiceUrl = 'http://localhost:3001';
+    const userServiceUrl = process.env.USER_SERVICE_URL;
 
     let allowed: boolean;
 
