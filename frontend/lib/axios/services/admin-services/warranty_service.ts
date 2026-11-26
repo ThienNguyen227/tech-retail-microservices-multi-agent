@@ -4,10 +4,11 @@ import { adminAxios } from "../../admin-axios";
 // const WARRANTY_SERVICE_URL = "http://localhost:3010/api/v1/admin-session/warranty-service";
 
 // CALL THROUGH API GATEWAY (NGINX)
-const WARRANTY_SERVICE_URL = "http://localhost/api/v1/admin-session/warranty-service";
+const WARRANTY_SERVICE_URL =
+  "http://localhost/api/v1/admin-session/warranty-service";
 
 export const adminWarrantyService = {
-  // ======================================== CUSTOMER_INFORMATION MODULE =================================================//
+  // ======================================== WARRANTY MODULE =================================================//
 
   // 1. (GET) WARRANTY-LIST
   async getWarrantyList(search?: string, status?: string) {
@@ -32,6 +33,21 @@ export const adminWarrantyService = {
   }) {
     const response = await adminAxios.post(
       `${WARRANTY_SERVICE_URL}/warranty-request`,
+      payload,
+    );
+
+    return response.data;
+  },
+
+  // 3. (PATCH) UPDATE WARRANTY REQUEST STATUS
+  async updateWarrantyRequest(
+    warrantyRequestId: number,
+    payload: {
+      warranty_request_status_id: number;
+    },
+  ) {
+    const response = await adminAxios.patch(
+      `${WARRANTY_SERVICE_URL}/warranty-request/${warrantyRequestId}/status`,
       payload,
     );
 

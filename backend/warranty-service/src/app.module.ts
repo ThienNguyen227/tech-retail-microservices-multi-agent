@@ -4,7 +4,7 @@ import { RabbitMQModule } from './rabbitmq/rabbitmq.module';
 import { GetWarrantyModule } from './customer_session/get_warranty/get_warranty.module';
 import { WarrantyListModule } from './admin_sesion/warranty_list/warranty_list.module';
 import { CreateWarrantyRequestModule } from './admin_sesion/create_warranty_request/create_warranty_request.module';
-
+import { UpdateWarrantyRequestModule } from './admin_sesion/update_warranty_request/update_warranty_request.module';
 @Module({
   imports: [
     PrismaModule, 
@@ -15,9 +15,8 @@ import { CreateWarrantyRequestModule } from './admin_sesion/create_warranty_requ
 
     // ADMIN - SESSION
     WarrantyListModule,
-    CreateWarrantyRequestModule
-
-
+    CreateWarrantyRequestModule,
+    UpdateWarrantyRequestModule
   ],
 })
 export class AppModule {}
