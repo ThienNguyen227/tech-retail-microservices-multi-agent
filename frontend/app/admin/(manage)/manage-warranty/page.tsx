@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
@@ -97,6 +96,32 @@ interface WarrantyListResponse {
 }
 
 const PAGE_SIZE = 8;
+
+// ID trạng thái theo dữ liệu seed của Warranty Service.
+const REQUEST_STATUS_IDS = {
+  RECEIVED: 1,
+  INSPECTING: 2,
+  IN_REPAIR: 3,
+  COMPLETED: 4,
+  REJECTED: 5,
+} as const;
+
+type RequestStatusCode = keyof typeof REQUEST_STATUS_IDS;
+
+// Đồng bộ quy tắc chuyển trạng thái với Backend.
+const REQUEST_STATUS_TRANSITIONS: Record<string, RequestStatusCode[]> = {
+  RECEIVED: ["INSPECTING", "REJECTED"],
+  INSPECTING: ["IN_REPAIR", "COMPLETED", "REJECTED"],
+  IN_REPAIR: ["COMPLETED"],
+  COMPLETED: [],
+  REJECTED: [],
+};
+
+function getAllowedRequestStatuses(request: WarrantyRequest): RequestStatusCode[] {
+  return REQUEST_STATUS_TRANSITIONS[
+    request.status?.warranty_request_status_code ?? ""
+  ] ?? [];
+}
 
 // ======================================================
 // HELPERS
@@ -314,6 +339,93 @@ export default function ManageWarrantyPage() {
   const [successMessage, setSuccessMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // ======================================================
+  // UPDATE WARRANTY REQUEST STATUS MODAL
+  // ======================================================
+  const [selectedRequest, setSelectedRequest] = useState<WarrantyRequest | null>(null);
+  const [newRequestStatus, setNewRequestStatus] = useState<RequestStatusCode | "">("");
+  const [updateRequestError, setUpdateRequestError] = useState("");
+  const [isUpdatingRequest, setIsUpdatingRequest] = useState(false);
+
+  function handleOpenUpdateRequest(request: WarrantyRequest) {
+    if (getAllowedRequestStatuses(request).length === 0) return;
+
+    setSelectedRequest(request);
+    setNewRequestStatus("");
+    setUpdateRequestError("");
+  }
+
+  function handleCloseUpdateRequest() {
+    if (isUpdatingRequest) return;
+
+    setSelectedRequest(null);
+    setNewRequestStatus("");
+    setUpdateRequestError("");
+  }
+
+  async function handleUpdateRequestSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (isUpdatingRequest || !selectedWarranty || !selectedRequest) return;
+
+    setUpdateRequestError("");
+    setSuccessMessage("");
+
+    if (!newRequestStatus || !getAllowedRequestStatuses(selectedRequest).includes(newRequestStatus)) {
+      setUpdateRequestError("Vui lòng chọn trạng thái mới hợp lệ.");
+      return;
+    }
+
+    const warrantyId = selectedWarranty.warranty_id;
+    const requestId = selectedRequest.warranty_request_id;
+
+    try {
+      setIsUpdatingRequest(true);
+
+      const response = await adminWarrantyService.updateWarrantyRequest(requestId, {
+        warranty_request_status_id: REQUEST_STATUS_IDS[newRequestStatus],
+      });
+
+      const updatedRequest = response?.data as WarrantyRequest | undefined;
+
+      if (!updatedRequest || updatedRequest.warranty_request_id !== requestId) {
+        setRefreshKey((prev) => prev + 1);
+        setUpdateRequestError("Phản hồi API không hợp lệ. Vui lòng đóng cửa sổ và mở lại chi tiết để kiểm tra trạng thái.");
+        return;
+      }
+
+      // Đồng bộ yêu cầu vừa cập nhật trong modal và danh sách hiện tại.
+      function applyUpdatedRequest(warranty: Warranty): Warranty {
+        if (warranty.warranty_id !== warrantyId) return warranty;
+
+        return {
+          ...warranty,
+          requests: (warranty.requests ?? []).map((request) =>
+            request.warranty_request_id === requestId
+              ? { ...request, ...updatedRequest }
+              : request,
+          ),
+        };
+      }
+
+      setSelectedWarranty((current) => current ? applyUpdatedRequest(current) : current);
+      setWarranties((current) => current.map(applyUpdatedRequest));
+      setStatsWarranties((current) => current.map(applyUpdatedRequest));
+
+      setSelectedRequest(null);
+      setNewRequestStatus("");
+      setSuccessMessage(response?.message || "Cập nhật trạng thái yêu cầu bảo hành thành công!");
+      setRefreshKey((prev) => prev + 1);
+    } catch (error: unknown) {
+      console.error("Update warranty request error:", error);
+      setUpdateRequestError(
+        extractErrorMessage(error, "Không thể cập nhật trạng thái. Vui lòng thử lại."),
+      );
+    } finally {
+      setIsUpdatingRequest(false);
+    }
+  }
+
   function handleOpenCreateRequest() {
     if (selectedWarranty?.status?.warranty_status_code !== "ACTIVE") return;
 
@@ -513,7 +625,17 @@ export default function ManageWarrantyPage() {
     if (!selectedWarranty) return;
 
     function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
+      if (event.key !== "Escape") return;
+      if (isUpdatingRequest || isSubmitting) return;
+
+      if (selectedRequest) {
+        setSelectedRequest(null);
+        setNewRequestStatus("");
+        setUpdateRequestError("");
+      } else if (showCreateRequestModal) {
+        setShowCreateRequestModal(false);
+        setRequestFormError("");
+      } else {
         setSelectedWarranty(null);
       }
     }
@@ -523,7 +645,7 @@ export default function ManageWarrantyPage() {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [selectedWarranty]);
+  }, [selectedWarranty, selectedRequest, showCreateRequestModal, isUpdatingRequest, isSubmitting]);
 
   // ======================================================
   // PAGINATION
@@ -1291,8 +1413,9 @@ export default function ManageWarrantyPage() {
 
                     <button
                       type="button"
-                      onClick={() => setShowCreateRequestModal(true)}
-                      className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-700"
+                      onClick={handleOpenCreateRequest}
+                      disabled={selectedWarranty.status?.warranty_status_code !== "ACTIVE"}
+                      className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <CirclePlus size={15} />
                       Thêm yêu cầu
@@ -1416,10 +1539,21 @@ export default function ManageWarrantyPage() {
 
                         </div>
 
-                        <div className="mt-3 border-t border-slate-100 pt-3">
+                        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
                           <p className="text-xs text-slate-400">
                             Cập nhật lần cuối: {formatDateTime(request.warranty_request_updated_at)}
                           </p>
+
+                          {getAllowedRequestStatuses(request).length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenUpdateRequest(request)}
+                              className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
+                            >
+                              <RefreshCw size={15} />
+                              Cập nhật trạng thái
+                            </button>
+                          )}
                         </div>
 
                       </div>
@@ -1631,6 +1765,147 @@ export default function ManageWarrantyPage() {
                     <>
                       <CirclePlus size={16} />
                       Tạo yêu cầu
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
+
+      {/* ================================================== */}
+      {/* UPDATE WARRANTY REQUEST STATUS MODAL */}
+      {/* ================================================== */}
+      {selectedRequest && selectedWarranty && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) handleCloseUpdateRequest();
+          }}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="update-warranty-request-title"
+            className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+          >
+            <div className="flex items-start justify-between border-b border-slate-100 px-6 py-5">
+              <div>
+                <div className="mb-2 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                  <RefreshCw size={20} />
+                </div>
+                <h2 id="update-warranty-request-title" className="text-lg font-bold text-slate-800">
+                  Cập nhật trạng thái yêu cầu bảo hành
+                </h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Chọn trạng thái tiếp theo của yêu cầu bảo hành / sửa chữa.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseUpdateRequest}
+                disabled={isUpdatingRequest}
+                aria-label="Đóng cửa sổ cập nhật trạng thái"
+                className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateRequestSubmit}>
+              <div className="max-h-[60vh] space-y-5 overflow-y-auto p-6">
+                <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div>
+                    <p className="text-xs text-slate-500">Mã yêu cầu</p>
+                    <p className="mt-1 break-all text-sm font-semibold text-slate-800">
+                      {selectedRequest.warranty_request_code}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">Sản phẩm</p>
+                    <p className="mt-1 break-words text-sm font-medium text-slate-700">
+                      {selectedWarranty.warranty_product_name || "Chưa cập nhật"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-500">Trạng thái hiện tại</p>
+                    <span className={`mt-1 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${getRequestStatusStyle(selectedRequest.status?.warranty_request_status_code ?? "")}`}>
+                      {getRequestStatusLabel(selectedRequest.status?.warranty_request_status_code ?? "")}
+                    </span>
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="new-warranty-request-status" className="mb-2 block text-sm font-semibold text-slate-700">
+                    Trạng thái mới <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    id="new-warranty-request-status"
+                    value={newRequestStatus}
+                    disabled={isUpdatingRequest}
+                    onChange={(event) => {
+                      setNewRequestStatus(event.target.value as RequestStatusCode | "");
+                      setUpdateRequestError("");
+                    }}
+                    className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:opacity-60"
+                    required
+                  >
+                    <option value="">-- Chọn trạng thái --</option>
+                    {getAllowedRequestStatuses(selectedRequest).map((status) => (
+                      <option key={status} value={status}>
+                        {getRequestStatusLabel(status)}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-1.5 text-xs text-slate-400">
+                    Chỉ hiển thị các trạng thái được phép chuyển tiếp.
+                  </p>
+                </div>
+
+                {(newRequestStatus === "COMPLETED" || newRequestStatus === "REJECTED") && (
+                  <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                    <AlertCircle size={18} className="mt-0.5 shrink-0" />
+                    <p>
+                      {newRequestStatus === "COMPLETED"
+                        ? "Yêu cầu sẽ được hoàn thành và hệ thống tự ghi nhận ngày hoàn thành."
+                        : "Yêu cầu sẽ bị từ chối."}{" "}
+                      Sau khi cập nhật, không thể chuyển sang trạng thái khác.
+                    </p>
+                  </div>
+                )}
+
+                {updateRequestError && (
+                  <div role="alert" className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+                    <AlertCircle size={18} className="mt-0.5 shrink-0" />
+                    <p>{updateRequestError}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex flex-col-reverse gap-2 border-t border-slate-100 bg-slate-50 px-6 py-4 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={handleCloseUpdateRequest}
+                  disabled={isUpdatingRequest}
+                  className="rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 disabled:opacity-50"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={isUpdatingRequest || !newRequestStatus}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isUpdatingRequest ? (
+                    <>
+                      <LoaderCircle size={16} className="animate-spin" />
+                      Đang cập nhật...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={16} />
+                      Xác nhận cập nhật
                     </>
                   )}
                 </button>
