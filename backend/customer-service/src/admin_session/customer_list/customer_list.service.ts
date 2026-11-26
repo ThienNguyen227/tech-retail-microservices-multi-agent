@@ -21,7 +21,7 @@ export class CustomerListService {
   // 1. (GET) CUSTOMER-LIST
   async getCustomerList(filters: GetCustomerListDto, accessToken: string) {
     // 1. Kiểm tra quyền thông qua user-service
-    const userServiceUrl = 'http://localhost:3001';
+    const userServiceUrl = process.env.USER_SERVICE_URL;
 
     let allowed: boolean;
 
@@ -166,7 +166,7 @@ export class CustomerListService {
     }
 
     // 3. Kiểm tra quyền thông qua user-service
-    const userServiceUrl = 'http://localhost:3001';
+    const userServiceUrl = process.env.USER_SERVICE_URL;
 
     try {
       const response = await axios.post<{ allowed: boolean }>(
