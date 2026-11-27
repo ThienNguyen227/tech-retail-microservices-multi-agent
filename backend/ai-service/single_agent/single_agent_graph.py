@@ -53,6 +53,7 @@ from tools.branch_tools import get_branch_address
 from tools.order_tools import (
     calculate_final_price,
     create_order,
+    cancel_order,
 )
 
 # PROMOTION-SERVICE
@@ -114,7 +115,7 @@ llm = ChatOllama(
     reasoning=False,
     num_ctx=MODEL_NUM_CTX,
     num_predict=MODEL_NUM_PREDICT,
-    keep_alive="30m",
+    keep_alive=-1,
 )
 
 SUMMARIZER_NUM_CTX = min(MODEL_NUM_CTX, 8192)
@@ -127,7 +128,7 @@ summarizer_llm = ChatOllama(
     reasoning=False,
     num_ctx=SUMMARIZER_NUM_CTX,
     num_predict=SUMMARIZER_NUM_PREDICT,
-    keep_alive="30m",
+    keep_alive=-1,
 )
 
 
@@ -170,6 +171,7 @@ tools = [
     # ORDER
     create_order,
     calculate_final_price,
+    cancel_order,
 
     # PROMOTION
     get_all_coupons,

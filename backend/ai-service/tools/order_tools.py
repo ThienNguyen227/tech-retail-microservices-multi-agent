@@ -7,6 +7,7 @@ from langchain.tools import tool, ToolRuntime
 from services.order_service import (
     create_order as create_order_api,
     calculate_final_price as calculate_final_price_api,
+    cancel_order as cancel_order_api,
 )
 
 # ============================================================
@@ -491,4 +492,114 @@ async def calculate_final_price(
         items=items_payload,
         access_token=access_token,
         coupon_id=coupon_id,
+    )
+
+# ============================================================
+# CANCEL ORDER TOOL
+# ============================================================
+
+@tool
+async def cancel_order(
+    order_id: int,
+    runtime: ToolRuntime,
+):
+    """
+    TOOL: cancel_order
+
+    Hủy đơn hàng của khách hàng thông qua Order Service.
+
+    1. THAM SỐ
+
+    - order_id: ID chính xác của đơn hàng cần hủy.
+    - Phải là số nguyên dương.
+    - Không phải mã đơn hàng (order_code).
+
+    2. KHI NÀO SỬ DỤNG
+
+    - Người dùng muốn hủy đơn hàng đã đặt.
+    - Đã xác định chính xác đơn hàng cần hủy.
+    - Người dùng đã xác nhận muốn hủy đơn hàng.
+
+    3. QUY TẮC
+
+    - Không tự tạo hoặc suy đoán order_id.
+    - Không sử dụng order_code thay cho order_id.
+    - Nếu chưa xác định được order_id, yêu cầu người dùng
+      cung cấp hoặc tra cứu đơn hàng bằng Tool phù hợp nếu có.
+    - Phải xác nhận với người dùng trước khi hủy đơn hàng.
+    - Không tự động hủy đơn hàng khi người dùng chỉ hỏi
+      về điều kiện hoặc cách thức hủy đơn hàng.
+    - Chỉ hủy đơn hàng thuộc tài khoản đang đăng nhập.
+    - Chỉ được hủy đơn hàng đang chờ xác nhận.
+    - Order Service chịu trách nhiệm kiểm tra quyền sở hữu
+      và trạng thái đơn hàng.
+
+    4. XỬ LÝ KẾT QUẢ
+
+    - success = true:
+      Thông báo hủy đơn hàng thành công.
+
+    - success = false:
+      Thông báo nguyên nhân theo message và detail.
+
+    - Timeout hoặc lỗi kết nối:
+      Không khẳng định đơn hàng đã được hủy.
+      Không tự động gọi lại Tool.
+      Cần kiểm tra trạng thái đơn hàng trước khi thử lại.
+
+    Không tự thay đổi trạng thái đơn hàng hoặc suy đoán
+    kết quả khi chưa nhận được xác nhận từ Order Service.
+    """
+
+    # ========================================================
+    # 1. GET RUNTIME CONTEXT
+    # ========================================================
+
+    context = runtime.context or {}
+
+    user_id = context.get("user_id")
+    access_token = context.get("access_token")
+
+    if not isinstance(user_id, str) or not user_id.strip():
+        return {
+            "success": False,
+            "found": False,
+            "data": None,
+            "message": "Không xác định được tài khoản người dùng.",
+        }
+
+    if (
+        not isinstance(access_token, str)
+        or not access_token.strip()
+    ):
+        return {
+            "success": False,
+            "found": False,
+            "data": None,
+            "message": "Không tìm thấy Access Token hợp lệ.",
+        }
+
+    # ========================================================
+    # 2. VALIDATE ORDER ID
+    # ========================================================
+
+    if (
+        isinstance(order_id, bool)
+        or not isinstance(order_id, int)
+        or order_id < 1
+    ):
+        return {
+            "success": False,
+            "found": False,
+            "data": None,
+            "message": "Order ID phải là số nguyên dương.",
+        }
+
+    # ========================================================
+    # 3. CALL ORDER SERVICE
+    # ========================================================
+
+    return await cancel_order_api(
+        order_id=order_id,
+        access_token=access_token.strip(),
     )
