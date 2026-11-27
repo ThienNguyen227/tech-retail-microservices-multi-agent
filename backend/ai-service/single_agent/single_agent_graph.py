@@ -32,7 +32,6 @@ from tools.user_tools import search_user
 # CUSTOMER-SERVICE
 from tools.customer_tools import (
     search_customer,
-    get_customer_addresses,
 )
 
 # PRODUCT-SERVICE
@@ -87,11 +86,10 @@ if not MONGODB_URI:
 MODEL_NAME = os.getenv("AGENT_MODEL", "qwen3.5:4b")
 TOKENIZER_NAME = os.getenv("AGENT_TOKENIZER", "Qwen/Qwen3.5-4B")
 
-MODEL_NUM_CTX = int(os.getenv("AGENT_NUM_CTX", "24576"))
-MODEL_NUM_PREDICT = int(os.getenv("AGENT_NUM_PREDICT", "512"))
+MODEL_NUM_CTX = int(os.getenv("AGENT_NUM_CTX", "32768"))
+MODEL_NUM_PREDICT = int(os.getenv("AGENT_NUM_PREDICT", "1024"))
 
 CONTEXT_SAFETY_MARGIN = 1024
-
 CONTEXT_EXTRA_MARGIN = 1024
 
 MAX_SAFE_MESSAGE_TOKENS = (
@@ -102,10 +100,7 @@ MAX_SAFE_MESSAGE_TOKENS = (
 )
 
 if MAX_SAFE_MESSAGE_TOKENS <= 0:
-    raise RuntimeError(
-        "Cấu hình context không hợp lệ. Hãy kiểm tra AGENT_NUM_CTX, "
-        "AGENT_NUM_PREDICT và AGENT_CONTEXT_SAFETY_MARGIN."
-    )
+    raise RuntimeError("Cấu hình context không hợp lệ.")
 
 
 llm = ChatOllama(
@@ -118,7 +113,8 @@ llm = ChatOllama(
     keep_alive=-1,
 )
 
-SUMMARIZER_NUM_CTX = min(MODEL_NUM_CTX, 8192)
+
+SUMMARIZER_NUM_CTX = MODEL_NUM_CTX
 SUMMARIZER_NUM_PREDICT = 512
 
 summarizer_llm = ChatOllama(
@@ -149,14 +145,13 @@ tokenizer = AutoTokenizer.from_pretrained(
 # ============================================================
 
 tools = [
-    # USER
+    # USER-SERVICE
     search_user,
 
-    # CUSTOMER
+    # CUSTOMER-SERVICE
     search_customer,
-    get_customer_addresses,
 
-    # PRODUCT
+    # PRODUCT-SERVICE
     get_phone_detail,
     get_laptop_detail,
     get_tablet_detail,
@@ -165,15 +160,15 @@ tools = [
     compare_tablets,
     search_products,
 
-    # BRANCH
+    # BRANCH-SERVICE
     get_branch_address,
 
-    # ORDER
+    # ORDER-SERVICE
     create_order,
     calculate_final_price,
     cancel_order,
 
-    # PROMOTION
+    # PROMOTION-SERVICE
     get_all_coupons,
 ]
 
@@ -1026,7 +1021,8 @@ builder.add_conditional_edges(
 )
 
 # Sau mỗi Tool Result, Agent sẽ đếm lại toàn bộ context trước lần gọi tiếp theo.
-builder.add_edge("tools", "agent")
+# builder.add_edge("tools", "agent")
+builder.add_edge("tools", "summarize")
 
 
 # ============================================================

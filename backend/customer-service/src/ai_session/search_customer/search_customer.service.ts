@@ -1,103 +1,412 @@
 import {
-  BadRequestException,
   Injectable,
-  NotFoundException,
+  BadRequestException,
+  UnauthorizedException,
+  ForbiddenException,
 } from '@nestjs/common';
 
 import { PrismaService } from '../../prisma/prisma.service';
 
-interface SearchCustomerParams {
-  userId?: string;
-  customerCode?: string;
+// ============================================================
+// INTERFACES
+// ============================================================
+
+interface CustomerSearchParams {
+  userIds?: string | string[];
+  customerCodes?: string | string[];
 }
+
+interface CustomerSearchWhere {
+  customer_user_id?: bigint;
+
+  OR?: Array<{
+    customer_user_id?: {
+      in: bigint[];
+    };
+
+    customer_code?: {
+      in: string[];
+    };
+  }>;
+}
+
+// ============================================================
+// CONSTANTS
+// ============================================================
+
+const MAX_SEARCH_VALUES = 100;
+
+const MAX_BIGINT = BigInt(
+  '9223372036854775807',
+);
 
 @Injectable()
 export class SearchCustomerService {
-  // Khởi tạo service với Prisma dùng cho các truy vấn AI session.
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+  ) {}
 
-  // Chuyển userId từ query string sang BigInt để truy vấn Prisma.
-  private parseUserId(value: string): bigint {
-    if (!/^[1-9]\d*$/.test(value)) {
+  // ========================================================
+  // NORMALIZE SEARCH VALUES
+  // ========================================================
+
+  private normalizeValues(
+    values: unknown,
+  ): string[] {
+    if (values === undefined) {
+      return [];
+    }
+
+    const list = Array.isArray(values)
+      ? values
+      : [values];
+
+    if (
+      list.some(
+        (value) =>
+          typeof value !== 'string' ||
+          !value.trim(),
+      )
+    ) {
       throw new BadRequestException(
-        'userId phải là số nguyên dương dạng chuỗi',
+        'Giá trị tìm kiếm phải là chuỗi không rỗng',
+      );
+    }
+
+    const normalized = (list as string[]).map(
+      (value) => value.trim(),
+    );
+
+    // Loại bỏ giá trị trùng lặp
+    return [...new Set(normalized)];
+  }
+
+  // ========================================================
+  // PARSE USER ID
+  // ========================================================
+
+  private parseUserId(value: string): bigint {
+    if (
+      !/^[1-9]\d{0,18}$/.test(value) ||
+      BigInt(value) > MAX_BIGINT
+    ) {
+      throw new BadRequestException(
+        'User ID phải là số nguyên dương hợp lệ',
       );
     }
 
     return BigInt(value);
   }
 
-  // Chuẩn hóa và kiểm tra định danh customer từ request của AI.
-  private normalizeParams(params: SearchCustomerParams) {
-    const userId = params.userId?.trim();
-    const customerCode = params.customerCode?.trim();
+  // ========================================================
+  // 1. (GET) SEARCH CUSTOMER AND ADDRESSES
+  // ========================================================
 
-    if (!userId && !customerCode) {
+  async searchCustomer(
+    currentUserId: string | undefined,
+    roles: unknown,
+    params: CustomerSearchParams,
+  ) {
+    // ========================================================
+    // 1. VALIDATE AUTHENTICATED USER ID
+    // ========================================================
+
+    if (
+      typeof currentUserId !== 'string' ||
+      !/^[1-9]\d{0,18}$/.test(currentUserId) ||
+      BigInt(currentUserId) > MAX_BIGINT
+    ) {
+      throw new UnauthorizedException(
+        'Không xác định được tài khoản đăng nhập',
+      );
+    }
+
+    const authenticatedUserId = BigInt(
+      currentUserId,
+    );
+
+    // ========================================================
+    // 2. VALIDATE ROLES FROM JWT
+    // ========================================================
+
+    if (
+      !Array.isArray(roles) ||
+      roles.some(
+        (role) => typeof role !== 'string',
+      )
+    ) {
+      throw new ForbiddenException(
+        'Không xác định được quyền của tài khoản',
+      );
+    }
+
+    // Role 1: CUSTOMER
+    const isCustomer = roles.includes('CUSTOMER');
+
+    // Role 2: ADMIN
+    const isAdmin = roles.includes('ADMIN');
+
+    // Role 3: MANAGER
+    const isManager = roles.includes('MANAGER');
+
+    // Role 4: EMPLOYEE
+    const isEmployee = roles.includes('EMPLOYEE');
+
+    const canSearchAll =
+      isAdmin ||
+      isManager ||
+      isEmployee;
+
+    // ========================================================
+    // 3. CHECK AUTHORIZATION
+    // ========================================================
+
+    if (!isCustomer && !canSearchAll) {
+      throw new ForbiddenException(
+        'Bạn không có quyền truy vấn thông tin khách hàng',
+      );
+    }
+
+    // CUSTOMER chỉ được truy vấn chính mình.
+    // Nếu có CUSTOMER cùng Role khác,
+    // vẫn ưu tiên giới hạn quyền CUSTOMER.
+    const isSelfOnly = isCustomer;
+
+    // ========================================================
+    // 4. NORMALIZE SEARCH PARAMETERS
+    // ========================================================
+
+    const userIds = this.normalizeValues(
+      params.userIds,
+    );
+
+    const customerCodes = this.normalizeValues(
+      params.customerCodes,
+    );
+
+    // Giới hạn tổng số định danh tìm kiếm
+    if (
+      userIds.length + customerCodes.length >
+      MAX_SEARCH_VALUES
+    ) {
       throw new BadRequestException(
-        'Cần cung cấp userId hoặc customerCode',
+        'Tối đa 100 giá trị tìm kiếm mỗi lần',
       );
     }
 
-    return {
-      userId: userId || undefined,
-      customerCode: customerCode || undefined,
-    };
-  }
+    if (
+      customerCodes.some(
+        (code) => code.length > 256,
+      )
+    ) {
+      throw new BadRequestException(
+        'Mã khách hàng quá dài',
+      );
+    }
 
-  // Chuyển dữ liệu customer về response JSON an toàn với BigInt.
-  private formatCustomerResponse(customer: any) {
-    return {
-      customer_id: customer.customer_id.toString(),
-      customer_user_id: customer.customer_user_id.toString(),
-      customer_code: customer.customer_code,
-      customer_full_name: customer.customer_full_name,
-      customer_date_of_birth: customer.customer_date_of_birth,
-      customer_gender: customer.customer_gender,
-      customer_status: customer.customer_status,
-      customer_created_at: customer.customer_created_at,
-      customer_updated_at: customer.customer_updated_at,
-      addresses: [],
-    };
-  }
+    // ADMIN, MANAGER, EMPLOYEE phải cung cấp định danh.
+    // Không cho phép truy xuất toàn bộ bảng khi bỏ trống.
+    if (
+      !isSelfOnly &&
+      userIds.length === 0 &&
+      customerCodes.length === 0
+    ) {
+      throw new BadRequestException(
+        'Vui lòng cung cấp userIds hoặc customerCodes',
+      );
+    }
 
-  // Tìm customer theo userId, customerCode hoặc cả hai định danh.
-  private async findCustomer(params: SearchCustomerParams) {
-    const normalized = this.normalizeParams(params);
+    // ========================================================
+    // 5. BUILD SEARCH CONDITIONS
+    // ========================================================
 
-    if (normalized.userId && normalized.customerCode) {
-      return this.prisma.customer.findFirst({
-        where: {
-          customer_user_id: this.parseUserId(normalized.userId),
-          customer_code: normalized.customerCode,
+    const conditions: NonNullable<
+      CustomerSearchWhere['OR']
+    > = [];
+
+    if (userIds.length > 0) {
+      conditions.push({
+        customer_user_id: {
+          in: userIds.map(
+            (id) => this.parseUserId(id),
+          ),
         },
       });
     }
 
-    if (normalized.userId) {
-      return this.prisma.customer.findUnique({
-        where: {
-          customer_user_id: this.parseUserId(normalized.userId),
+    if (customerCodes.length > 0) {
+      conditions.push({
+        customer_code: {
+          in: customerCodes,
         },
       });
     }
 
-    return this.prisma.customer.findUnique({
-      where: {
-        customer_code: normalized.customerCode!,
-      },
-    });
-  }
+    // ========================================================
+    // 6. APPLY AUTHORIZATION
+    // ========================================================
 
-  // Trả thông tin hồ sơ customer cho tool search_customer.
-  async searchCustomer(params: SearchCustomerParams) {
-    const customer = await this.findCustomer(params);
+    const where: CustomerSearchWhere = {
+      // CUSTOMER chỉ truy vấn dữ liệu của chính mình
+      ...(isSelfOnly
+        ? {
+            customer_user_id: authenticatedUserId,
+          }
+        : {}),
 
-    if (!customer) {
-      throw new NotFoundException(
-        'Không tìm thấy thông tin khách hàng',
+      // Batch Search theo User ID hoặc mã khách hàng
+      ...(conditions.length > 0
+        ? {
+            OR: conditions,
+          }
+        : {}),
+    };
+
+    // ========================================================
+    // 7. QUERY CUSTOMERS
+    // ========================================================
+
+    const customers =
+      await this.prisma.customer.findMany({
+        where,
+
+        select: {
+          customer_id: true,
+          customer_user_id: true,
+          customer_code: true,
+          customer_full_name: true,
+          customer_date_of_birth: true,
+          customer_gender: true,
+          customer_status: true,
+          customer_created_at: true,
+          customer_updated_at: true,
+        },
+
+        orderBy: {
+          customer_id: 'asc',
+        },
+      });
+
+    // ========================================================
+    // 8. HANDLE EMPTY RESULT
+    // ========================================================
+
+    if (customers.length === 0) {
+      return {
+        total: 0,
+        totalAddresses: 0,
+        data: [],
+      };
+    }
+
+    // ========================================================
+    // 9. GET AUTHORIZED CUSTOMER IDS
+    // ========================================================
+
+    const customerIds = customers.map(
+      (customer) => customer.customer_id,
+    );
+
+    // ========================================================
+    // 10. QUERY ALL CUSTOMER ADDRESSES
+    // ========================================================
+
+    const addresses =
+      await this.prisma.customer_Address.findMany({
+        where: {
+          customer_address_customer_id: {
+            in: customerIds,
+          },
+        },
+
+        select: {
+          customer_address_id: true,
+          customer_address_customer_id: true,
+          customer_address_line: true,
+          customer_address_ward: true,
+          customer_address_province: true,
+          customer_address_default: true,
+          customer_address_created_at: true,
+          customer_address_updated_at: true,
+        },
+
+        orderBy: [
+          {
+            customer_address_default: 'desc',
+          },
+          {
+            customer_address_id: 'asc',
+          },
+        ],
+      });
+
+    // ========================================================
+    // 11. FORMAT CUSTOMER ADDRESSES
+    // ========================================================
+
+    const formattedAddresses = addresses.map(
+      (address) => ({
+        ...address,
+
+        customer_address_id:
+          address.customer_address_id.toString(),
+
+        customer_address_customer_id:
+          address.customer_address_customer_id.toString(),
+      }),
+    );
+
+    // ========================================================
+    // 12. GROUP ADDRESSES BY CUSTOMER ID
+    // ========================================================
+
+    const addressGroups = new Map<
+      string,
+      typeof formattedAddresses
+    >();
+
+    for (const address of formattedAddresses) {
+      const customerId =
+        address.customer_address_customer_id;
+
+      const customerAddresses =
+        addressGroups.get(customerId) ?? [];
+
+      customerAddresses.push(address);
+
+      addressGroups.set(
+        customerId,
+        customerAddresses,
       );
     }
 
-    return this.formatCustomerResponse(customer);
+    // ========================================================
+    // 13. MERGE CUSTOMERS AND ADDRESSES
+    // ========================================================
+
+    const data = customers.map((customer) => ({
+      ...customer,
+
+      customer_id:
+        customer.customer_id.toString(),
+
+      customer_user_id:
+        customer.customer_user_id.toString(),
+
+      addresses:
+        addressGroups.get(
+          customer.customer_id.toString(),
+        ) ?? [],
+    }));
+
+    // ========================================================
+    // 14. RETURN RESULT
+    // ========================================================
+
+    return {
+      total: customers.length,
+      totalAddresses: addresses.length,
+      data,
+    };
   }
 }
