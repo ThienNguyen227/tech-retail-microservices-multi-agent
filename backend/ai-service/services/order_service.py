@@ -398,3 +398,158 @@ async def calculate_final_price(
             "data": None,
             "message": "Không thể kết nối đến Order Service.",
         }
+
+# ============================================================
+# CANCEL ORDER
+# ============================================================
+
+async def cancel_order(
+    order_id: int,
+    access_token: str | None = None,
+):
+    """
+    Gọi Order Service để hủy đơn hàng của khách hàng.
+    """
+
+    # ========================================================
+    # 1. VALIDATE SERVICE CONFIGURATION
+    # ========================================================
+
+    if not ORDER_SERVICE_URL:
+        return _error_response(
+            "Order Service chưa được cấu hình địa chỉ kết nối."
+        )
+
+    # ========================================================
+    # 2. VALIDATE ORDER ID
+    # ========================================================
+
+    if (
+        isinstance(order_id, bool)
+        or not isinstance(order_id, int)
+        or order_id < 1
+    ):
+        return _error_response(
+            "Order ID phải là số nguyên dương."
+        )
+
+    # ========================================================
+    # 3. VALIDATE ACCESS TOKEN
+    # ========================================================
+
+    if (
+        not isinstance(access_token, str)
+        or not access_token.strip()
+    ):
+        return _error_response(
+            "Không tìm thấy Access Token. Vui lòng đăng nhập."
+        )
+
+    token = access_token.strip()
+
+    if token.lower().startswith("bearer "):
+        token = token[7:].strip()
+
+    if not token:
+        return _error_response(
+            "Access Token không hợp lệ."
+        )
+
+    # ========================================================
+    # 4. BUILD REQUEST
+    # ========================================================
+
+    url = (
+        f"{ORDER_SERVICE_URL.rstrip('/')}"
+        f"/api/v1/customer-session/order-service/{order_id}/cancel"
+    )
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
+
+    # ========================================================
+    # 5. CALL ORDER SERVICE
+    # ========================================================
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+
+            response = await client.patch(
+                url,
+                headers=headers,
+            )
+
+        # ====================================================
+        # 6. PARSE RESPONSE
+        # ====================================================
+
+        try:
+            data = response.json()
+
+        except ValueError:
+            return _error_response(
+                "Order Service trả về dữ liệu không hợp lệ.",
+                response.status_code,
+                response.text,
+            )
+
+        # ====================================================
+        # 7. HANDLE HTTP ERROR
+        # ====================================================
+
+        if response.is_error:
+
+            message = "Không thể hủy đơn hàng."
+
+            if isinstance(data, dict):
+                message = data.get("message") or message
+
+            return _error_response(
+                message,
+                response.status_code,
+                data,
+            )
+
+        # ====================================================
+        # 8. VALIDATE RESPONSE
+        # ====================================================
+
+        if not isinstance(data, dict):
+            return _error_response(
+                "Dữ liệu phản hồi từ Order Service không hợp lệ."
+            )
+
+        if data.get("success") is not True:
+            return _error_response(
+                data.get("message") or "Chưa xác nhận hủy đơn hàng thành công.",
+                response.status_code,
+                data,
+            )
+
+        # ====================================================
+        # 9. RETURN RESULT
+        # ====================================================
+
+        return {
+            "success": True,
+            "found": True,
+            "data": data.get("data"),
+            "message": data.get(
+                "message",
+                "Hủy đơn hàng thành công.",
+            ),
+        }
+
+    except httpx.TimeoutException:
+        return _error_response(
+            "Order Service phản hồi quá thời gian. "
+            "Cần kiểm tra trạng thái đơn hàng trước khi thử lại."
+        )
+
+    except httpx.RequestError:
+        return _error_response(
+            "Không thể kết nối đến Order Service. "
+            "Chưa xác định được kết quả hủy đơn hàng."
+        )
