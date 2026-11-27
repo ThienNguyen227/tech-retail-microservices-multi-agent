@@ -9,7 +9,6 @@ import { CreateCustomerModule } from './customer-session/create_customer/create_
 
 // AI SESSION
 import { SearchCustomerModule } from './ai_session/search_customer/search_customer.module';
-import { GetCustomerAddressesModule } from './ai_session/get_customer_addresses/get_customer_addresses.module';
 
 // ADMIN SESSION
 import { CustomerListModule } from './admin_session/customer_list/customer_list.module';
@@ -25,7 +24,6 @@ import { CustomerListModule } from './admin_session/customer_list/customer_list.
 
     // AI SESSION
     SearchCustomerModule,
-    GetCustomerAddressesModule,
 
     // CUSTOMER - SESSION
     CustomerInformationModule,
