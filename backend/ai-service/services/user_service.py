@@ -7,6 +7,12 @@ load_dotenv()
 
 USER_SERVICE_URL = os.getenv("USER_SERVICE_URL")
 
+MAX_SEARCH_VALUES = 100
+
+
+# ============================================================
+# ERROR RESPONSE
+# ============================================================
 
 def _error_response(
     message: str,
@@ -31,16 +37,54 @@ def _error_response(
 
 
 # ============================================================
+# NORMALIZE SEARCH VALUES
+# ============================================================
+
+def _normalize_values(
+    values: list[str] | None,
+    lowercase: bool = False,
+) -> list[str]:
+
+    if values is None:
+        return []
+
+    if not isinstance(values, list):
+        raise ValueError(
+            "Tham số tìm kiếm phải là danh sách."
+        )
+
+    normalized = []
+
+    for value in values:
+
+        if not isinstance(value, str):
+            raise ValueError(
+                "Giá trị tìm kiếm phải là chuỗi."
+            )
+
+        value = value.strip()
+
+        if lowercase:
+            value = value.lower()
+
+        if value:
+            normalized.append(value)
+
+    # Loại bỏ giá trị trùng lặp
+    return list(dict.fromkeys(normalized))
+
+
+# ============================================================
 # SEARCH USER
 # ============================================================
 
 async def search_user(
-    phone: str | None = None,
-    email: str | None = None,
+    phones: list[str] | None = None,
+    emails: list[str] | None = None,
     access_token: str | None = None,
 ):
     """
-    Gọi User Service để tra cứu tài khoản người dùng.
+    Gọi User Service để tra cứu một hoặc nhiều tài khoản.
     """
 
     # ========================================================
@@ -61,7 +105,8 @@ async def search_user(
         or not access_token.strip()
     ):
         return _error_response(
-            "Không tìm thấy Access Token hợp lệ."
+            "Không tìm thấy Access Token hợp lệ.",
+            401,
         )
 
     token = access_token.strip()
@@ -71,21 +116,57 @@ async def search_user(
 
     if not token:
         return _error_response(
-            "Access Token không hợp lệ."
+            "Access Token không hợp lệ.",
+            401,
         )
 
     # ========================================================
-    # 3. BUILD REQUEST PARAMETERS
+    # 3. NORMALIZE SEARCH PARAMETERS
     # ========================================================
 
-    params = {
-        key: value
-        for key, value in {
-            "phone": phone,
-            "email": email,
-        }.items()
-        if value is not None and value != ""
-    }
+    try:
+        normalized_phones = _normalize_values(
+            phones
+        )
+
+        normalized_emails = _normalize_values(
+            emails,
+            lowercase=True,
+        )
+
+    except ValueError as error:
+        return _error_response(
+            str(error),
+            400,
+        )
+
+    # ========================================================
+    # 4. VALIDATE SEARCH LIMIT
+    # ========================================================
+
+    if (
+        len(normalized_phones) +
+        len(normalized_emails) > MAX_SEARCH_VALUES
+    ):
+        return _error_response(
+            "Danh sách tìm kiếm không được vượt quá 100 phần tử.",
+            400,
+        )
+
+    # Không bắt buộc phones hoặc emails vì CUSTOMER
+    # có thể tra cứu chính mình thông qua JWT.
+
+    # ========================================================
+    # 5. BUILD REQUEST PARAMETERS
+    # ========================================================
+
+    params: list[tuple[str, str]] = []
+
+    for phone in normalized_phones:
+        params.append(("phones", phone))
+
+    for email in normalized_emails:
+        params.append(("emails", email))
 
     url = (
         f"{USER_SERVICE_URL.rstrip('/')}"
@@ -97,7 +178,7 @@ async def search_user(
     }
 
     # ========================================================
-    # 4. CALL USER SERVICE
+    # 6. CALL USER SERVICE
     # ========================================================
 
     try:
@@ -112,20 +193,17 @@ async def search_user(
             )
 
         # ====================================================
-        # 5. PARSE RESPONSE
+        # 7. PARSE RESPONSE
         # ====================================================
 
         try:
             data = response.json()
 
         except ValueError:
-            return _error_response(
-                "User Service trả về dữ liệu không hợp lệ.",
-                response.status_code,
-            )
+            data = None
 
         # ====================================================
-        # 6. HANDLE AUTHENTICATION ERRORS
+        # 8. HANDLE AUTHENTICATION AND AUTHORIZATION
         # ====================================================
 
         if response.status_code == 401:
@@ -143,14 +221,17 @@ async def search_user(
             )
 
         # ====================================================
-        # 7. HANDLE HTTP ERRORS
+        # 9. HANDLE HTTP ERRORS
         # ====================================================
 
         if response.is_error:
 
-            message = "Đã xảy ra lỗi khi tìm kiếm tài khoản."
+            message = (
+                "Đã xảy ra lỗi khi tìm kiếm tài khoản."
+            )
 
             if isinstance(data, dict):
+
                 api_message = data.get("message")
 
                 if isinstance(api_message, str):
@@ -163,7 +244,7 @@ async def search_user(
             )
 
         # ====================================================
-        # 8. VALIDATE RESPONSE
+        # 10. VALIDATE RESPONSE
         # ====================================================
 
         if not isinstance(data, dict):
@@ -171,7 +252,7 @@ async def search_user(
                 "Dữ liệu trả về từ User Service không hợp lệ."
             )
 
-        users = data.get("users", [])
+        users = data.get("users")
 
         if not isinstance(users, list):
             return _error_response(
@@ -180,13 +261,17 @@ async def search_user(
 
         total = data.get("total", len(users))
 
-        if not isinstance(total, int):
+        if (
+            isinstance(total, bool)
+            or not isinstance(total, int)
+            or total != len(users)
+        ):
             return _error_response(
                 "Tổng số tài khoản trả về không hợp lệ."
             )
 
         # ====================================================
-        # 9. RETURN RESULT
+        # 11. RETURN RESULT
         # ====================================================
 
         return {

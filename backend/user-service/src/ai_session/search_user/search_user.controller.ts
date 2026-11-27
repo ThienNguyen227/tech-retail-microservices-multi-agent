@@ -22,16 +22,16 @@ export class SearchUserController {
   @Get('search')
   searchUser(
     @Req() req: { user: JwtPayload },
-    @Query('phone') phone?: string,
-    @Query('email') email?: string,
+    @Query('phones') phones?: string | string[],
+    @Query('emails') emails?: string | string[],
   ) {
     const userId = req.user.sub as string;
 
     return this.searchUserService.searchUser(
       userId,
       {
-        phone,
-        email,
+        phones,
+        emails,
       },
     );
   }

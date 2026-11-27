@@ -8,8 +8,8 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 
 interface SearchUserParams {
-  phone?: string;
-  email?: string;
+  phones?: string | string[];
+  emails?: string | string[];
 }
 
 @Injectable()
@@ -18,13 +18,48 @@ export class SearchUserService {
     private readonly prisma: PrismaService,
   ) {}
 
+  // ========================================================
+  // NORMALIZE SEARCH VALUES
+  // ========================================================
+
+  private normalizeValues(
+    values: unknown,
+    lowercase = false,
+  ): string[] {
+    if (values === undefined) {
+      return [];
+    }
+
+    const list = Array.isArray(values)
+      ? values
+      : [values];
+
+    if (list.some((value) => typeof value !== 'string')) {
+      throw new BadRequestException(
+        'Tham số tìm kiếm không hợp lệ',
+      );
+    }
+
+    const normalized = (list as string[])
+      .map((value) =>
+        lowercase
+          ? value.trim().toLowerCase()
+          : value.trim(),
+      )
+      .filter(Boolean);
+
+    // Loại bỏ giá trị trùng lặp
+    return [...new Set(normalized)];
+  }
+
+  // ========================================================
   // 1. (GET) SEARCH USER
+  // ========================================================
+
   async searchUser(
     userId: string,
     params: SearchUserParams,
   ) {
-    const { phone, email } = params;
-
     // ========================================================
     // 1. VALIDATE AUTHENTICATED USER ID
     // ========================================================
@@ -80,31 +115,47 @@ export class SearchUserService {
       (userRole) => userRole.role_id,
     );
 
+    const hasRole1 = roleIds.includes(BigInt(1));
     const hasRole2 = roleIds.includes(BigInt(2));
-    const hasRole4 = roleIds.includes(BigInt(1));
 
-    // Chỉ Role 2 và Role 4 được sử dụng API
-    if (!hasRole2 && !hasRole4) {
+    // Chỉ CUSTOMER và ADMIN được sử dụng API
+    if (!hasRole1 && !hasRole2) {
       throw new ForbiddenException(
         'Tài khoản không có quyền truy vấn thông tin người dùng',
       );
     }
 
-    // Role 4: Chỉ được truy vấn chính mình
-    const isSelfOnly = hasRole4;
+    // CUSTOMER chỉ được truy vấn chính mình
+    const isSelfOnly = hasRole1;
 
     // ========================================================
     // 4. NORMALIZE SEARCH PARAMETERS
     // ========================================================
 
-    const normalizedPhone = phone?.trim();
-    const normalizedEmail = email?.trim().toLowerCase();
+    const normalizedPhones = this.normalizeValues(
+      params.phones,
+    );
 
-    // Role 2 phải cung cấp phone hoặc email
+    const normalizedEmails = this.normalizeValues(
+      params.emails,
+      true,
+    );
+
+    // Giới hạn tổng số giá trị tìm kiếm
+    if (
+      normalizedPhones.length +
+      normalizedEmails.length > 100
+    ) {
+      throw new BadRequestException(
+        'Danh sách tìm kiếm không được vượt quá 100 phần tử',
+      );
+    }
+
+    // ADMIN phải cung cấp ít nhất một phone hoặc email
     if (
       !isSelfOnly &&
-      !normalizedPhone &&
-      !normalizedEmail
+      normalizedPhones.length === 0 &&
+      normalizedEmails.length === 0
     ) {
       throw new BadRequestException(
         'Vui lòng cung cấp số điện thoại hoặc email để tìm kiếm',
@@ -115,28 +166,50 @@ export class SearchUserService {
     // 5. BUILD SEARCH CONDITIONS
     // ========================================================
 
-    const where: {
-      user_id?: bigint;
-      user_phone?: string;
-      user_email?: string;
-    } = {};
+    const searchConditions: {
+      user_phone?: {
+        in: string[];
+      };
+      user_email?: {
+        in: string[];
+      };
+    }[] = [];
 
-    if (normalizedPhone) {
-      where.user_phone = normalizedPhone;
+    if (normalizedPhones.length > 0) {
+      searchConditions.push({
+        user_phone: {
+          in: normalizedPhones,
+        },
+      });
     }
 
-    if (normalizedEmail) {
-      where.user_email = normalizedEmail;
+    if (normalizedEmails.length > 0) {
+      searchConditions.push({
+        user_email: {
+          in: normalizedEmails,
+        },
+      });
     }
 
     // ========================================================
     // 6. APPLY AUTHORIZATION
     // ========================================================
 
-    // Role 4 chỉ được truy vấn tài khoản đang đăng nhập
-    if (isSelfOnly) {
-      where.user_id = currentUserId;
-    }
+    const where = {
+      // CUSTOMER chỉ được truy vấn tài khoản đang đăng nhập
+      ...(isSelfOnly
+        ? {
+            user_id: currentUserId,
+          }
+        : {}),
+
+      // Tìm kiếm theo phone hoặc email
+      ...(searchConditions.length > 0
+        ? {
+            OR: searchConditions,
+          }
+        : {}),
+    };
 
     // ========================================================
     // 7. QUERY USERS

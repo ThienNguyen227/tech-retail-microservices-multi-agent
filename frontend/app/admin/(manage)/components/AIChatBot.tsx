@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import axios from "axios";
+import { adminAxios } from "@/lib/axios/admin-axios";
 import type {
   FormEvent,
   KeyboardEvent,
@@ -8,10 +10,8 @@ import type {
 } from "react";
 
 import {
-  Bot,
   X,
   Send,
-  MessageCircle,
   Minus,
   Menu,
   Plus,
@@ -32,11 +32,25 @@ import remarkGfm from "remark-gfm";
 
 const API_ROOT_URL = "http://127.0.0.1:8000/api/v1/ai-service";
 
-// API dành riêng cho Multi-Agent
-const MULTI_AGENT_API_URL = `${API_ROOT_URL}/multi-agent`;
+// Single Agent: cùng endpoint với component Customer.
+const PRODUCT_API_URL = `${API_ROOT_URL}/product`;
+const CONVERSATION_LIST_API_URL = `${PRODUCT_API_URL}/conversations`;
+const CONVERSATION_API_URL = `${API_ROOT_URL}/conversations`;
+const CHAT_TIMEOUT_MS = 180_000;
 
-// API quản lý hội thoại dùng chung
-const CONVERSATION_API_URL = `${MULTI_AGENT_API_URL}/conversations`;
+function getApiErrorMessage(error: unknown, fallback: string): string {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data;
+    if (typeof data?.detail === "string") return data.detail;
+    if (typeof data?.message === "string") return data.message;
+    if (error.response?.status === 401) return "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.";
+    if (error.response?.status === 403) return "Bạn không có quyền thực hiện yêu cầu này.";
+    if (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT") {
+      return "AI phản hồi quá thời gian. Vui lòng kiểm tra lịch sử trước khi gửi lại.";
+    }
+  }
+  return error instanceof Error ? error.message : fallback;
+}
 
 // ==================== TYPES ====================
 
@@ -117,7 +131,7 @@ const INITIAL_MESSAGE: Message = {
   id: "welcome",
   role: "assistant",
   content:
-    "Xin chào! 👋 Tôi là trợ lý AI đa tác tử. Tôi có thể phối hợp các Agent chuyên biệt để hỗ trợ bạn tra cứu thông tin, tìm kiếm sản phẩm, so sánh sản phẩm và giải đáp các câu hỏi. Bạn cần hỗ trợ gì?",
+    "Xin chào! 👋 Tôi là trợ lý AI của hệ thống quản trị. Tôi có thể hỗ trợ tra cứu tài khoản, tìm kiếm sản phẩm và các nghiệp vụ được cấp quyền. Bạn cần hỗ trợ gì?",
 };
 
 // ==================== COMPONENT ====================
@@ -185,26 +199,14 @@ export default function AIChatBot() {
       userId: string,
       signal?: AbortSignal
     ): Promise<Conversation[]> => {
-      const response = await fetch(
-        `${MULTI_AGENT_API_URL}/conversations?user_id=${encodeURIComponent(
-          userId
-        )}`,
-        { signal }
+      const { data } = await adminAxios.get<ConversationListResponse>(
+        CONVERSATION_LIST_API_URL,
+        { params: { user_id: userId }, signal }
       );
-
-      const data: ConversationListResponse = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.detail ||
-            data.message ||
-            `Không thể tải danh sách hội thoại (HTTP ${response.status}).`
-        );
-      }
 
       if (!Array.isArray(data.conversations)) {
         throw new Error(
-          "API Multi-Agent không trả về mảng conversations."
+          "API AI không trả về mảng conversations."
         );
       }
 
@@ -260,19 +262,14 @@ export default function AIChatBot() {
           return loaded[0]?.id ?? null;
         });
       } catch (error) {
-        if (
-          error instanceof Error &&
-          error.name === "AbortError"
-        ) {
+        if (controller.signal.aborted || axios.isCancel(error)) {
           return;
         }
 
-        console.error("Load Multi-Agent conversations error:", error);
+        console.error("Load AI conversations error:", error);
 
         setConversationError(
-          error instanceof Error
-            ? error.message
-            : "Không thể tải danh sách hội thoại."
+          getApiErrorMessage(error, "Không thể tải danh sách hội thoại.")
         );
       } finally {
         if (!controller.signal.aborted) {
@@ -303,30 +300,14 @@ export default function AIChatBot() {
       setMessageError("");
 
       try {
-        const userId = sessionStorage.getItem("userId");
-
-        if (!userId) {
-          throw new Error(
-            "Không tìm thấy user_id. Vui lòng đăng nhập lại."
-          );
+        if (!sessionStorage.getItem("userId")) {
+          throw new Error("Không tìm thấy user_id. Vui lòng đăng nhập lại.");
         }
 
-        const response = await fetch(
-          `${MULTI_AGENT_API_URL}/conversations/${encodeURIComponent(
-            conversationId
-          )}/messages?user_id=${encodeURIComponent(userId)}`,
+        const { data } = await adminAxios.get<MessageListResponse>(
+          `${CONVERSATION_LIST_API_URL}/${encodeURIComponent(conversationId)}/messages`,
           { signal: controller.signal }
         );
-
-        const data: MessageListResponse = await response.json();
-
-        if (!response.ok) {
-          throw new Error(
-            data.detail ||
-              data.message ||
-              `Không thể tải tin nhắn (HTTP ${response.status}).`
-          );
-        }
 
         if (!Array.isArray(data.messages)) {
           throw new Error(
@@ -347,19 +328,14 @@ export default function AIChatBot() {
           )
         );
       } catch (error) {
-        if (
-          error instanceof Error &&
-          error.name === "AbortError"
-        ) {
+        if (controller.signal.aborted || axios.isCancel(error)) {
           return;
         }
 
-        console.error("Load Multi-Agent messages error:", error);
+        console.error("Load AI messages error:", error);
 
         setMessageError(
-          error instanceof Error
-            ? error.message
-            : "Không thể tải tin nhắn của hội thoại này."
+          getApiErrorMessage(error, "Không thể tải tin nhắn của hội thoại này.")
         );
       } finally {
         if (!controller.signal.aborted) {
@@ -381,13 +357,15 @@ export default function AIChatBot() {
     if (!userId) {
       setIsLoggedIn(false);
       setMessageError(
-        "Vui lòng đăng nhập để trò chuyện với Multi-Agent."
+        "Vui lòng đăng nhập để trò chuyện với AI."
       );
       return;
     }
 
     if (
       isCreatingConversation ||
+      isLoadingConversations ||
+      isLoadingMessages ||
       isSending ||
       deletingConversationId ||
       renamingConversationId
@@ -424,21 +402,9 @@ export default function AIChatBot() {
         params.set("conversation_id", activeConversationId);
       }
 
-      const response = await fetch(
-        `${CONVERSATION_API_URL}?${params.toString()}`,
-        { method: "POST" }
+      const { data } = await adminAxios.post<CreateConversationResponse>(
+        `${CONVERSATION_API_URL}?${params.toString()}`
       );
-
-      const data: CreateConversationResponse =
-        await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.detail ||
-            data.message ||
-            `Không thể tạo hội thoại (HTTP ${response.status}).`
-        );
-      }
 
       if (!data.conversation_id) {
         throw new Error(
@@ -468,12 +434,10 @@ export default function AIChatBot() {
       setMessageError("");
       setConversationError("");
     } catch (error) {
-      console.error("Create Multi-Agent conversation error:", error);
+      console.error("Create AI conversation error:", error);
 
       const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Không thể tạo cuộc trò chuyện mới.";
+        getApiErrorMessage(error, "Không thể tạo cuộc trò chuyện mới.");
 
       setConversationError(errorMessage);
       setMessageError(errorMessage);
@@ -616,23 +580,9 @@ export default function AIChatBot() {
         title,
       });
 
-      const response = await fetch(
-        `${CONVERSATION_API_URL}/${encodeURIComponent(
-          id
-        )}/rename?${params.toString()}`,
-        { method: "PATCH" }
+      const { data } = await adminAxios.patch<RenameConversationResponse>(
+        `${CONVERSATION_API_URL}/${encodeURIComponent(id)}/rename?${params.toString()}`
       );
-
-      const data: RenameConversationResponse =
-        await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.detail ||
-            data.message ||
-            `Không thể đổi tên hội thoại (HTTP ${response.status}).`
-        );
-      }
 
       if (!data.title) {
         throw new Error(
@@ -662,9 +612,7 @@ export default function AIChatBot() {
       console.error("Rename conversation error:", error);
 
       setDialogError(
-        error instanceof Error
-          ? error.message
-          : "Không thể đổi tên cuộc trò chuyện."
+        getApiErrorMessage(error, "Không thể đổi tên cuộc trò chuyện.")
       );
     } finally {
       setRenamingConversationId(null);
@@ -742,23 +690,10 @@ export default function AIChatBot() {
     setDialogError("");
 
     try {
-      const response = await fetch(
-        `${CONVERSATION_API_URL}/${encodeURIComponent(
-          id
-        )}?user_id=${encodeURIComponent(userId)}`,
-        { method: "DELETE" }
+      await adminAxios.delete<DeleteConversationResponse>(
+        `${CONVERSATION_API_URL}/${encodeURIComponent(id)}`,
+        { params: { user_id: userId } }
       );
-
-      const data: DeleteConversationResponse =
-        await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.detail ||
-            data.message ||
-            `Không thể xóa hội thoại (HTTP ${response.status}).`
-        );
-      }
 
       setConversations((previous) =>
         previous.filter((item) => item.id !== id)
@@ -781,16 +716,14 @@ export default function AIChatBot() {
       console.error("Delete conversation error:", error);
 
       setDialogError(
-        error instanceof Error
-          ? error.message
-          : "Không thể xóa cuộc trò chuyện."
+        getApiErrorMessage(error, "Không thể xóa cuộc trò chuyện.")
       );
     } finally {
       setDeletingConversationId(null);
     }
   };
 
-  // ==================== SEND MESSAGE TO MULTI-AGENT ====================
+  // ==================== SEND MESSAGE TO SINGLE AGENT ====================
 
   const handleSend = async () => {
     const content = input.trim();
@@ -798,6 +731,7 @@ export default function AIChatBot() {
     if (
       !content ||
       !activeConversationId ||
+      isLoadingMessages ||
       isSending ||
       isCreatingConversation ||
       deletingConversationId ||
@@ -812,7 +746,7 @@ export default function AIChatBot() {
     if (!userId) {
       setIsLoggedIn(false);
       setMessageError(
-        "Vui lòng đăng nhập để trò chuyện với Multi-Agent."
+        "Vui lòng đăng nhập để trò chuyện với AI."
       );
       return;
     }
@@ -865,25 +799,21 @@ export default function AIChatBot() {
         conversation_id: currentId,
       });
 
-      // Gọi Multi-Agent thay vì Product-Agent
-      const response = await fetch(
-        `${MULTI_AGENT_API_URL}?${params.toString()}`,
-        { method: "POST" }
+      // Sử dụng phiên Admin: interceptor của adminAxios gắn JWT
+      // và xử lý refresh token (nếu đã cấu hình trong dự án).
+      const { data } = await adminAxios.post<ChatResponse>(
+        PRODUCT_API_URL,
+        undefined,
+        { params, timeout: CHAT_TIMEOUT_MS }
       );
 
-      const data: ChatResponse = await response.json();
-
-      if (!response.ok) {
-        throw new Error(
-          data.detail ||
-            data.message ||
-            `Không thể gửi tin nhắn (HTTP ${response.status}).`
-        );
+      if (typeof data.message !== "string") {
+        throw new Error("API AI không trả về nội dung tin nhắn hợp lệ.");
       }
 
       if (!data.conversation_id) {
         throw new Error(
-          "API Multi-Agent không trả về conversation_id."
+          "API AI không trả về conversation_id."
         );
       }
 
@@ -947,17 +877,15 @@ export default function AIChatBot() {
         });
       } catch (refreshError) {
         console.error(
-          "Refresh Multi-Agent conversations error:",
+          "Refresh AI conversations error:",
           refreshError
         );
       }
     } catch (error) {
-      console.error("Send Multi-Agent message error:", error);
+      console.error("Send AI message error:", error);
 
       const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Multi-Agent đang gặp sự cố. Bạn vui lòng thử lại sau nhé.";
+        getApiErrorMessage(error, "AI đang gặp sự cố. Bạn vui lòng thử lại sau nhé.");
 
       setConversations((previous) =>
         previous.map((conversation) =>
@@ -1036,6 +964,8 @@ export default function AIChatBot() {
                     onClick={() => void handleNewConversation()}
                     disabled={
                       !isLoggedIn ||
+                      isLoadingConversations ||
+                      isLoadingMessages ||
                       isSending ||
                       isCreatingConversation ||
                       Boolean(deletingConversationId) ||
@@ -1188,7 +1118,7 @@ export default function AIChatBot() {
                 <div className="border-t border-blue-100 p-3">
                   <div className="flex items-center gap-2 text-xs text-blue-700">
                     <Network size={17} />
-                    <span>AI Multi-Agent Assistant</span>
+                    <span>AI Admin Assistant</span>
                   </div>
                 </div>
               </aside>
@@ -1216,7 +1146,7 @@ export default function AIChatBot() {
 
                   <div className="min-w-0">
                     <h3 className="text-sm font-semibold">
-                      AI Multi-Agent
+                      AI Quản trị
                     </h3>
 
                     <p className="flex items-center gap-1.5 truncate text-xs text-blue-100">
@@ -1250,11 +1180,11 @@ export default function AIChatBot() {
                             size={12}
                             className="animate-spin"
                           />
-                          Các Agent đang xử lý...
+                          AI đang xử lý...
                         </>
                       ) : (
                         activeConversation?.title ??
-                        "Trợ lý AI đa tác tử"
+                        "Trợ lý AI quản trị"
                       )}
                     </p>
                   </div>
@@ -1491,7 +1421,7 @@ export default function AIChatBot() {
                         size={16}
                         className="animate-spin text-blue-600"
                       />
-                      <span>Các Agent đang phối hợp xử lý...</span>
+                      <span>AI đang xử lý...</span>
                     </div>
                   </div>
                 )}
@@ -1505,7 +1435,7 @@ export default function AIChatBot() {
               >
                 {!isLoggedIn && (
                   <p className="mb-2 rounded-lg bg-amber-50 p-2.5 text-xs text-amber-800">
-                    Vui lòng đăng nhập để trò chuyện với Multi-Agent.
+                    Vui lòng đăng nhập để trò chuyện với AI.
                   </p>
                 )}
 
@@ -1520,13 +1450,14 @@ export default function AIChatBot() {
                       !isLoggedIn
                         ? "Đăng nhập để trò chuyện với AI..."
                         : activeConversation
-                          ? "Nhập câu hỏi cho AI Multi-Agent..."
+                          ? "Nhập câu hỏi cho AI Quản trị..."
                           : "Tạo cuộc trò chuyện mới trước..."
                     }
                     rows={1}
                     disabled={
                       !isLoggedIn ||
                       !activeConversation ||
+                      isLoadingMessages ||
                       isSending ||
                       isCreatingConversation ||
                       Boolean(deletingConversationId) ||
@@ -1542,6 +1473,7 @@ export default function AIChatBot() {
                       !isLoggedIn ||
                       !input.trim() ||
                       !activeConversation ||
+                      isLoadingMessages ||
                       isSending ||
                       isCreatingConversation ||
                       Boolean(deletingConversationId) ||
@@ -1563,7 +1495,7 @@ export default function AIChatBot() {
                 </div>
 
                 <p className="mt-2 text-center text-[10px] text-slate-400">
-                  Multi-Agent có thể đưa ra thông tin chưa chính xác.
+                  AI có thể đưa ra thông tin chưa chính xác.
                 </p>
               </form>
             </section>
